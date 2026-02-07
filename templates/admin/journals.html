@@ -761,15 +761,17 @@ function addJournal() {
     .then(data => {
         if (data.success) {
             showMsg(msg, 'Журнал добавлен!', true);
+            showToast('Журнал «' + data.name + '» создан', 'success');
             document.getElementById('addName').value = '';
             document.getElementById('addIssn').value = '';
             // Reload page to show new journal with correct stats
             setTimeout(() => location.reload(), 500);
         } else {
             showMsg(msg, data.message || 'Ошибка', false);
+            showToast(data.message || 'Ошибка при создании', 'error');
         }
     })
-    .catch(() => showMsg(msg, 'Ошибка сети', false));
+    .catch(() => { showMsg(msg, 'Ошибка сети', false); showToast('Ошибка сети', 'error'); });
 }
 
 function startEdit(id) {
@@ -823,11 +825,12 @@ function saveEdit(id) {
                 issnEl.remove();
             }
             cancelEdit(id);
+            showToast('Журнал обновлён', 'success');
         } else {
             showMsg(msg, data.message || 'Ошибка', false);
         }
     })
-    .catch(() => showMsg(msg, 'Ошибка сети', false));
+    .catch(() => { showMsg(msg, 'Ошибка сети', false); showToast('Ошибка сети', 'error'); });
 }
 
 function deleteJournal(id, name) {
@@ -867,18 +870,19 @@ function confirmDelete() {
             }, 50);
             setTimeout(() => item.remove(), 350);
             closeConfirm();
+            showToast('Журнал удалён', 'success');
             // Update count
             const countEl = document.querySelector('.jrn-count');
             if (countEl) countEl.textContent = parseInt(countEl.textContent) - 1;
         } else {
-            alert(data.message || 'Ошибка при удалении');
+            showToast(data.message || 'Ошибка при удалении', 'error');
             closeConfirm();
         }
         btn.disabled = false;
         btn.textContent = 'Удалить';
     })
     .catch(() => {
-        alert('Ошибка сети');
+        showToast('Ошибка сети', 'error');
         closeConfirm();
         btn.disabled = false;
         btn.textContent = 'Удалить';

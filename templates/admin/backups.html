@@ -162,7 +162,7 @@
         </div>
 
         <!-- Toast -->
-        <div class="bkp-toast" id="bkpToast"></div>
+        <!-- Toast notifications handled globally by base.html -->
     </div>
 </div>
 
@@ -238,8 +238,7 @@
 
 .bkp-empty { text-align: center; padding: 60px 20px; color: var(--color-fg-muted); font-size: 15px; }
 
-.bkp-toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; background: var(--color-fg-default); color: var(--color-canvas-default); font-size: 14px; font-weight: 500; opacity: 0; transform: translateY(10px); transition: all 0.25s; pointer-events: none; z-index: 100; }
-.bkp-toast.show { opacity: 1; transform: translateY(0); }
+/* Toast styles are now in base.html */
 
 @media (max-width: 768px) {
     .adm-sidebar { position: fixed; left: -280px; top: 0; height: 100vh; width: 270px; transition: left 0.25s ease; box-shadow: none; }
@@ -261,21 +260,16 @@ function toggleSidebar() {
     document.getElementById('sidebarOverlay').classList.toggle('active');
 }
 
-function showToast(msg) {
-    var t = document.getElementById('bkpToast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(function() { t.classList.remove('show'); }, 3000);
-}
+// showToast is now global (defined in base.html)
 
 function createBackup() {
     fetch('/admin/backups/create', { method: 'POST', credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.success) { showToast('Бэкап создан!'); setTimeout(function() { location.reload(); }, 800); }
-            else showToast('Ошибка: ' + (d.error || ''));
+            if (d.success) { showToast('Бэкап создан!', 'success'); setTimeout(function() { location.reload(); }, 800); }
+            else showToast('Ошибка: ' + (d.error || ''), 'error');
         })
-        .catch(function() { showToast('Ошибка сети'); });
+        .catch(function() { showToast('Ошибка сети', 'error'); });
 }
 
 function deleteBackup(name) {
@@ -286,10 +280,10 @@ function deleteBackup(name) {
             if (d.success) {
                 var el = document.getElementById('bkp-' + name);
                 if (el) el.remove();
-                showToast('Бэкап удалён');
-            } else showToast('Ошибка: ' + (d.error || ''));
+                showToast('Бэкап удалён', 'success');
+            } else showToast('Ошибка: ' + (d.error || ''), 'error');
         })
-        .catch(function() { showToast('Ошибка сети'); });
+        .catch(function() { showToast('Ошибка сети', 'error'); });
 }
 
 function restoreBackup(name) {
@@ -299,10 +293,10 @@ function restoreBackup(name) {
     fetch('/admin/backups/restore', { method: 'POST', body: form, credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.success) { showToast(d.message); setTimeout(function() { location.reload(); }, 1500); }
-            else showToast('Ошибка: ' + (d.error || ''));
+            if (d.success) { showToast(d.message, 'success'); setTimeout(function() { location.reload(); }, 1500); }
+            else showToast('Ошибка: ' + (d.error || ''), 'error');
         })
-        .catch(function() { showToast('Ошибка сети'); });
+        .catch(function() { showToast('Ошибка сети', 'error'); });
 }
 
 function restoreFromFile(input) {
@@ -313,10 +307,10 @@ function restoreFromFile(input) {
     fetch('/admin/backups/restore', { method: 'POST', body: form, credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(d) {
-            if (d.success) { showToast(d.message); setTimeout(function() { location.reload(); }, 1500); }
-            else showToast('Ошибка: ' + (d.error || ''));
+            if (d.success) { showToast(d.message, 'success'); setTimeout(function() { location.reload(); }, 1500); }
+            else showToast('Ошибка: ' + (d.error || ''), 'error');
         })
-        .catch(function() { showToast('Ошибка сети'); });
+        .catch(function() { showToast('Ошибка сети', 'error'); });
     input.value = '';
 }
 
@@ -333,5 +327,6 @@ function toggleAdmTheme() {
     var t = localStorage.getItem('theme') || 'light';
     document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
 })();
+
 </script>
 {% endblock %}

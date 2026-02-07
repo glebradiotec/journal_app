@@ -4,15 +4,23 @@
 
 {% block content %}
 <div class="dashboard">
+    <!-- Breadcrumbs -->
+    <ul class="breadcrumbs">
+        <li><a href="/">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            Главная
+        </a></li>
+        {% if journal %}
+        <li><a href="/journals">Журналы</a></li>
+        <li><a href="/journal/{{ journal.id }}">{{ journal.name }}</a></li>
+        <li><a href="/issue/{{ issue.id }}">№{{ issue.number }}/{{ issue.year }}</a></li>
+        {% endif %}
+        <li><span class="breadcrumb-current">{{ article.title[:40] }}{% if article.title|length > 40 %}...{% endif %}</span></li>
+    </ul>
+
     <!-- Header -->
     <div class="dashboard-header">
         <div class="dashboard-header-left">
-            <a href="/issue/{{ article.issue_id }}" class="back-link">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path fill-rule="evenodd" d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"/>
-                </svg>
-                К выпуску
-            </a>
             <h1 class="dashboard-title">Редактирование статьи</h1>
             {% if journal %}
             <span class="dashboard-subtitle">{{ journal.name }} — №{{ issue.number }}/{{ issue.year }}</span>

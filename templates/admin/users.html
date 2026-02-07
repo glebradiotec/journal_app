@@ -375,7 +375,7 @@ async function addUser() {
     const role = document.getElementById('newRole').value;
 
     if (!username || !displayName || !password) {
-        alert('Заполните все поля');
+        showToast('Заполните все поля', 'warning');
         return;
     }
 
@@ -392,12 +392,13 @@ async function addUser() {
         const data = await resp.json();
 
         if (data.success) {
-            window.location.reload();
+            showToast('Пользователь создан', 'success');
+            setTimeout(function() { window.location.reload(); }, 500);
         } else {
-            alert(data.error || 'Ошибка');
+            showToast(data.error || 'Ошибка', 'error');
         }
     } catch (e) {
-        alert('Ошибка сети');
+        showToast('Ошибка сети', 'error');
     }
 }
 
@@ -416,7 +417,7 @@ async function saveEdit(id) {
     const isActive = document.getElementById('editActive_' + id).value;
 
     if (!displayName) {
-        alert('Имя не может быть пустым');
+        showToast('Имя не может быть пустым', 'warning');
         return;
     }
 
@@ -433,12 +434,13 @@ async function saveEdit(id) {
         const data = await resp.json();
 
         if (data.success) {
-            window.location.reload();
+            showToast('Пользователь обновлён', 'success');
+            setTimeout(function() { window.location.reload(); }, 500);
         } else {
-            alert(data.error || 'Ошибка');
+            showToast(data.error || 'Ошибка', 'error');
         }
     } catch (e) {
-        alert('Ошибка сети');
+        showToast('Ошибка сети', 'error');
     }
 }
 
@@ -467,13 +469,14 @@ async function confirmDelete() {
 
         if (data.success) {
             closeConfirm();
+            showToast('Пользователь удалён', 'success');
             const card = document.querySelector('.usr-card[data-id="' + pendingDeleteId + '"]');
             if (card) card.remove();
         } else {
-            alert(data.error || 'Ошибка');
+            showToast(data.error || 'Ошибка', 'error');
         }
     } catch (e) {
-        alert('Ошибка сети');
+        showToast('Ошибка сети', 'error');
     }
 }
 
@@ -490,5 +493,6 @@ function toggleAdmTheme() {
     var t = localStorage.getItem('theme') || 'light';
     document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
 })();
+
 </script>
 {% endblock %}

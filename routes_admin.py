@@ -159,6 +159,7 @@ def register_admin_routes(app):
         journal = Journal.query.get(journal_id)
         log_activity('created', 'issue', issue.id, f'№{number}/{year}', f'Журнал: {journal.name}' if journal else None)
         db.session.commit()
+        flash(f'Выпуск №{number}/{year} создан', 'success')
         return redirect(f'/journal/{journal_id}')
 
     @app.route("/issue/<int:issue_id>/add-article", methods=['POST'])
@@ -192,6 +193,7 @@ def register_admin_routes(app):
         log_activity('created', 'article', article.id, article.title)
         log_article_history(article.id, 'created', [{'field': 'Статья создана', 'old': '', 'new': article.title}])
         db.session.commit()
+        flash('Статья добавлена', 'success')
         return redirect(f'/issue/{issue_id}')
 
     @app.route("/article/<int:article_id>/toggle/<field>", methods=['POST'])
@@ -242,6 +244,7 @@ def register_admin_routes(app):
         log_activity('deleted', 'article', article.id, article.title)
         db.session.delete(article)
         db.session.commit()
+        flash('Статья удалена', 'success')
         return redirect(f'/issue/{issue_id}')
 
     @app.route("/issue/<int:issue_id>/delete", methods=['POST'])
@@ -254,6 +257,7 @@ def register_admin_routes(app):
             db.session.delete(article)
         db.session.delete(issue)
         db.session.commit()
+        flash(f'Выпуск №{issue.number}/{issue.year} удалён', 'success')
         return redirect(f'/journal/{journal_id}')
 
     @app.route("/article/<int:article_id>/edit", methods=['GET', 'POST'])
@@ -335,6 +339,7 @@ def register_admin_routes(app):
             if changes:
                 log_article_history(article.id, 'updated', changes)
             db.session.commit()
+            flash('Статья обновлена', 'success')
             return redirect(f'/issue/{article.issue_id}')
         
         return render_template('edit_article.html', article=article, issue=issue, journal=journal)
@@ -481,13 +486,18 @@ def register_admin_routes(app):
     @admin_required
     def admin_dashboard():
         try:
+            total_articles = Article.query.count()
+            unpaid = Article.query.filter_by(payment_received=False).count()
+            no_review = Article.query.filter_by(has_review=False).count()
+            not_edited = Article.query.filter_by(edited=False).count()
+            
             stats = {
                 'journals': Journal.query.count(),
                 'issues': Issue.query.count(),
-                'articles': Article.query.count(),
-                'unpaid': Article.query.filter_by(payment_received=False).count(),
-                'no_review': Article.query.filter_by(has_review=False).count(),
-                'not_edited': Article.query.filter_by(edited=False).count(),
+                'articles': total_articles,
+                'unpaid': unpaid,
+                'no_review': no_review,
+                'not_edited': not_edited,
             }
             recent_articles = (
                 Article.query
@@ -511,19 +521,43 @@ def register_admin_routes(app):
             chart_data = [{'name': name, 'count': count} for name, count in chart_query]
             max_articles = chart_data[0]['count'] if chart_data else 0
             
+            # Данные для doughnut-графика: статусы статей
+            status_data = {
+                'paid': total_articles - unpaid,
+                'unpaid': unpaid,
+                'reviewed': total_articles - no_review,
+                'no_review': no_review,
+                'edited': total_articles - not_edited,
+                'not_edited': not_edited,
+            }
+            
+            # Данные для графика: статьи по годам
+            yearly_query = (
+                db.session.query(Issue.year, func.count(Article.id))
+                .join(Article, Article.issue_id == Issue.id)
+                .group_by(Issue.year)
+                .order_by(Issue.year.asc())
+                .all()
+            )
+            yearly_data = [{'year': year, 'count': count} for year, count in yearly_query]
+            
         except Exception:
             stats = {'journals': 0, 'issues': 0, 'articles': 0, 'unpaid': 0, 'no_review': 0, 'not_edited': 0}
             recent_articles = []
             recent_activity = []
             chart_data = []
             max_articles = 0
+            status_data = {'paid': 0, 'unpaid': 0, 'reviewed': 0, 'no_review': 0, 'edited': 0, 'not_edited': 0}
+            yearly_data = []
 
         return render_template('admin/dashboard.html', 
                                stats=stats, 
                                recent_articles=recent_articles,
                                recent_activity=recent_activity,
                                chart_data=chart_data,
-                               max_articles=max_articles)
+                               max_articles=max_articles,
+                               status_data=status_data,
+                               yearly_data=yearly_data)
 
     @app.route('/admin/journals')
     @admin_required

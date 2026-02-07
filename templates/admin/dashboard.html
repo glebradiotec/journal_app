@@ -155,9 +155,9 @@
             </div>
         </div>
 
-        <!-- Chart + Activity Row -->
+        <!-- Charts Row: Bar + Doughnut -->
         <div class="adm-duo-row">
-            <!-- Bar Chart -->
+            <!-- Bar Chart: Articles by Journal -->
             <div class="adm-card adm-chart-card">
                 <div class="adm-card-header">
                     <h2 class="adm-card-title">
@@ -167,25 +167,69 @@
                         Статьи по журналам
                     </h2>
                 </div>
-                <div class="adm-card-body">
+                <div class="adm-card-body" style="padding: 16px 20px;">
                     {% if chart_data %}
-                    <div class="adm-chart">
-                        {% for item in chart_data %}
-                        <div class="adm-chart-row">
-                            <span class="adm-chart-label" title="{{ item.name }}">{{ item.name[:20] }}{% if item.name|length > 20 %}...{% endif %}</span>
-                            <div class="adm-chart-bar-wrap">
-                                <div class="adm-chart-bar" style="width: {{ (item.count / max_articles * 100)|round }}%"></div>
-                            </div>
-                            <span class="adm-chart-value">{{ item.count }}</span>
-                        </div>
-                        {% endfor %}
-                    </div>
+                    <canvas id="journalBarChart" height="260"></canvas>
                     {% else %}
                     <div class="adm-empty-small">
                         <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.3">
                             <path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Z"/>
                         </svg>
                         <p>Нет данных для отображения</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Doughnut Chart: Status Breakdown -->
+            <div class="adm-card adm-chart-card">
+                <div class="adm-card-header">
+                    <h2 class="adm-card-title">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16ZM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z"/>
+                        </svg>
+                        Статусы статей
+                    </h2>
+                </div>
+                <div class="adm-card-body" style="padding: 16px 20px;">
+                    {% if stats.articles > 0 %}
+                    <div class="adm-doughnut-row">
+                        <canvas id="statusDoughnutChart" width="200" height="200"></canvas>
+                        <div class="adm-doughnut-legend" id="doughnutLegend"></div>
+                    </div>
+                    {% else %}
+                    <div class="adm-empty-small">
+                        <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.3">
+                            <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16ZM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z"/>
+                        </svg>
+                        <p>Нет статей</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Yearly Chart + Activity Row -->
+        <div class="adm-duo-row">
+            <!-- Line Chart: Articles by Year -->
+            <div class="adm-card adm-chart-card">
+                <div class="adm-card-header">
+                    <h2 class="adm-card-title">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0Z"/>
+                        </svg>
+                        Статьи по годам
+                    </h2>
+                </div>
+                <div class="adm-card-body" style="padding: 16px 20px;">
+                    {% if yearly_data %}
+                    <canvas id="yearlyLineChart" height="200"></canvas>
+                    {% else %}
+                    <div class="adm-empty-small">
+                        <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.3">
+                            <path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25Z"/>
+                        </svg>
+                        <p>Нет данных</p>
                     </div>
                     {% endif %}
                 </div>
@@ -694,58 +738,54 @@
 }
 
 /* =============================================
-   BAR CHART (pure CSS)
+   CHARTS (Chart.js)
    ============================================= */
-.adm-chart {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.adm-chart-row {
+.adm-doughnut-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 24px;
 }
 
-.adm-chart-label {
-    width: 130px;
+.adm-doughnut-row canvas {
     flex-shrink: 0;
+}
+
+.adm-doughnut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.adm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-size: 13px;
+    color: var(--color-fg-default);
+}
+
+.adm-legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.adm-legend-label {
+    flex: 1;
     font-weight: 500;
-    color: var(--color-fg-muted);
-    text-align: right;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.adm-chart-bar-wrap {
-    flex: 1;
-    height: 24px;
-    background: var(--color-canvas-subtle);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.adm-chart-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #5BA4B0, #4A8E99);
-    border-radius: 6px;
-    min-width: 4px;
-    transition: width 0.6s ease;
-}
-
-[data-theme="dark"] .adm-chart-bar {
-    background: linear-gradient(90deg, #5BA4B0, #7CC5D0);
-}
-
-.adm-chart-value {
-    width: 36px;
-    font-size: 14px;
+.adm-legend-value {
     font-weight: 700;
+    font-size: 14px;
     color: var(--color-fg-default);
-    text-align: right;
 }
 
 /* =============================================
@@ -954,6 +994,19 @@
     }
 }
 
+@media (max-width: 900px) {
+    .adm-doughnut-row {
+        flex-direction: column;
+        align-items: center;
+    }
+    .adm-doughnut-legend {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+    }
+}
+
 @media (max-width: 768px) {
     .adm-sidebar {
         position: fixed;
@@ -1014,11 +1067,6 @@
         font-size: 20px;
     }
 
-    .adm-chart-label {
-        width: 80px;
-        font-size: 12px;
-    }
-
     .adm-table-wrap {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -1051,5 +1099,192 @@ function toggleAdmTheme() {
     var t = localStorage.getItem('theme') || 'light';
     document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
 })();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var textColor = isDark ? '#adbac7' : '#57606a';
+    var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+
+    // ---- 1. Bar Chart: Articles by Journal ----
+    var barCanvas = document.getElementById('journalBarChart');
+    if (barCanvas && typeof Chart !== 'undefined') {
+        var chartData = {{ chart_data | tojson }};
+        var barLabels = chartData.map(function(d) {
+            var name = d.name;
+            return name.length > 18 ? name.substring(0, 18) + '...' : name;
+        });
+        var barValues = chartData.map(function(d) { return d.count; });
+
+        new Chart(barCanvas, {
+            type: 'bar',
+            data: {
+                labels: barLabels,
+                datasets: [{
+                    label: 'Статьи',
+                    data: barValues,
+                    backgroundColor: isDark
+                        ? 'rgba(124, 197, 208, 0.7)'
+                        : 'rgba(91, 164, 176, 0.7)',
+                    borderColor: isDark ? '#7CC5D0' : '#5BA4B0',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: isDark ? '#2d333b' : '#fff',
+                        titleColor: isDark ? '#adbac7' : '#24292f',
+                        bodyColor: isDark ? '#adbac7' : '#57606a',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 12,
+                        callbacks: {
+                            title: function(items) {
+                                return chartData[items[0].dataIndex].name;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, font: { size: 12 } }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: textColor, font: { size: 12, weight: 500 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // ---- 2. Doughnut Chart: Status Breakdown ----
+    var doughnutCanvas = document.getElementById('statusDoughnutChart');
+    if (doughnutCanvas && typeof Chart !== 'undefined') {
+        var statusData = {{ status_data | tojson }};
+        var labels = ['Оплачено', 'Без оплаты', 'С рецензией', 'Без рецензии', 'Отредактировано', 'Не отредактировано'];
+        var values = [statusData.paid, statusData.unpaid, statusData.reviewed, statusData.no_review, statusData.edited, statusData.not_edited];
+        var colors = [
+            '#1a7f37', '#cf222e',
+            '#5BA4B0', '#9a6700',
+            '#8250df', '#656d76'
+        ];
+        if (isDark) {
+            colors = [
+                '#3fb950', '#f85149',
+                '#7CC5D0', '#d29922',
+                '#a371f7', '#768390'
+            ];
+        }
+
+        var doughnutChart = new Chart(doughnutCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: false,
+                cutout: '65%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: isDark ? '#2d333b' : '#fff',
+                        titleColor: isDark ? '#adbac7' : '#24292f',
+                        bodyColor: isDark ? '#adbac7' : '#57606a',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 12
+                    }
+                }
+            }
+        });
+
+        // Custom legend
+        var legendEl = document.getElementById('doughnutLegend');
+        if (legendEl) {
+            var legendHtml = '';
+            for (var i = 0; i < labels.length; i++) {
+                legendHtml += '<div class="adm-legend-item">' +
+                    '<div class="adm-legend-dot" style="background:' + colors[i] + '"></div>' +
+                    '<span class="adm-legend-label">' + labels[i] + '</span>' +
+                    '<span class="adm-legend-value">' + values[i] + '</span>' +
+                    '</div>';
+            }
+            legendEl.innerHTML = legendHtml;
+        }
+    }
+
+    // ---- 3. Line/Bar Chart: Articles by Year ----
+    var yearlyCanvas = document.getElementById('yearlyLineChart');
+    if (yearlyCanvas && typeof Chart !== 'undefined') {
+        var yearlyData = {{ yearly_data | tojson }};
+        var yearLabels = yearlyData.map(function(d) { return d.year; });
+        var yearValues = yearlyData.map(function(d) { return d.count; });
+
+        new Chart(yearlyCanvas, {
+            type: 'bar',
+            data: {
+                labels: yearLabels,
+                datasets: [{
+                    label: 'Статьи',
+                    data: yearValues,
+                    backgroundColor: isDark
+                        ? 'rgba(163, 113, 247, 0.5)'
+                        : 'rgba(130, 80, 223, 0.5)',
+                    borderColor: isDark ? '#a371f7' : '#8250df',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: isDark ? '#2d333b' : '#fff',
+                        titleColor: isDark ? '#adbac7' : '#24292f',
+                        bodyColor: isDark ? '#adbac7' : '#57606a',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 12
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor, font: { size: 12, weight: 600 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor, font: { size: 12 }, stepSize: 1 }
+                    }
+                }
+            }
+        });
+    }
+});
 </script>
 {% endblock %}

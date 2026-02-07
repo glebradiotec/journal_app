@@ -4,15 +4,19 @@
 
 {% block content %}
 <div class="dashboard">
+    <!-- Breadcrumbs -->
+    <ul class="breadcrumbs">
+        <li><a href="/">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            Главная
+        </a></li>
+        <li><a href="/journals">Журналы</a></li>
+        <li><span class="breadcrumb-current">{{ journal.name }}</span></li>
+    </ul>
+
     <!-- Header -->
     <div class="dashboard-header">
         <div class="dashboard-header-left">
-            <a href="/journals" class="back-link">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path fill-rule="evenodd" d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"/>
-                </svg>
-                Все журналы
-            </a>
             <h1 class="dashboard-title">{{ journal.name }}</h1>
             <span class="dashboard-subtitle">ISSN: {{ journal.issn }}</span>
         </div>
@@ -215,13 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function showToast(message) {
-    const toast = document.createElement('div');
-    toast.className = 'toast-notification';
-    toast.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg> ${message}`;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2500);
-}
+// showToast is now global (defined in base.html)
 </script>
 
 <style>
@@ -733,30 +731,6 @@ function showToast(message) {
 .sortable-drag {
     background-color: var(--color-canvas-default) !important;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2) !important;
-}
-
-/* Toast */
-.toast-notification {
-    position: fixed;
-    top: 24px;
-    right: 24px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 22px;
-    background: linear-gradient(135deg, #1a7f37 0%, #166b2d 100%);
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 500;
-    border-radius: 10px;
-    box-shadow: 0 6px 20px rgba(26, 127, 55, 0.35);
-    z-index: 9999;
-    animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
 }
 
 /* Responsive */
