@@ -1,0 +1,966 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование статьи{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="dashboard-header-left">
+            <a href="/issue/{{ article.issue_id }}" class="back-link">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.78 12.53a.75.75 0 0 1-1.06 0L2.47 8.28a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L4.81 7h7.44a.75.75 0 0 1 0 1.5H4.81l2.97 2.97a.75.75 0 0 1 0 1.06Z"/>
+                </svg>
+                К выпуску
+            </a>
+            <h1 class="dashboard-title">Редактирование статьи</h1>
+            {% if journal %}
+            <span class="dashboard-subtitle">{{ journal.name }} — №{{ issue.number }}/{{ issue.year }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Edit Form -->
+    <div class="edit-form-container">
+        <form method="POST" enctype="multipart/form-data" class="edit-form">
+            <!-- Title -->
+            <div class="form-section">
+                <label class="form-label">Название статьи *</label>
+                <input type="text" name="title" class="form-input form-input-lg" 
+                       value="{{ article.title }}" required>
+            </div>
+
+            <!-- Date & Status Row -->
+            <div class="form-row">
+                <div class="form-section">
+                    <label class="form-label">Дата поступления</label>
+                    {% set date_parts = article.submission_date.split('.') if article.submission_date else ['', '', ''] %}
+                    <div class="date-inputs">
+                        <select name="submission_day" class="form-select">
+                            <option value="">День</option>
+                            {% for d in range(1, 32) %}
+                            <option value="{{ '%02d'|format(d) }}" {% if date_parts[0] == '%02d'|format(d) %}selected{% endif %}>{{ d }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="submission_month" class="form-select">
+                            <option value="">Месяц</option>
+                            {% for m in range(1, 13) %}
+                            <option value="{{ '%02d'|format(m) }}" {% if date_parts[1] == '%02d'|format(m) %}selected{% endif %}>{{ '%02d'|format(m) }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="submission_year" class="form-select">
+                            <option value="">Год</option>
+                            {% for y in range(2020, 2031) %}
+                            <option value="{{ y }}" {% if date_parts[2]|string == y|string %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <label class="form-label">Статусы</label>
+                    <div class="status-checkboxes">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="payment_received" {% if article.payment_received %}checked{% endif %}>
+                            <span class="checkbox-text checkbox-green">Оплачено</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="has_review" {% if article.has_review %}checked{% endif %}>
+                            <span class="checkbox-text checkbox-blue">Рецензия</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="edited" {% if article.edited %}checked{% endif %}>
+                            <span class="checkbox-text checkbox-orange">Редактировано</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Authors Section -->
+            <div class="form-section">
+                <div class="section-header">
+                    <label class="form-label">Авторы</label>
+                    <button type="button" class="btn-add" onclick="addAuthorField()">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+                        </svg>
+                        Добавить автора
+                    </button>
+                </div>
+                <div id="authorsContainer" class="authors-container">
+                    {% for author in article.article_authors|sort(attribute='order') %}
+                    <div class="author-card">
+                        <div class="author-main-row">
+                            <input type="text" name="author_name[]" class="form-input" 
+                                   placeholder="ФИО *" value="{{ author.full_name }}" required>
+                            <input type="email" name="author_email[]" class="form-input" 
+                                   placeholder="Email" value="{{ author.email or '' }}">
+                            <input type="text" name="author_organization[]" class="form-input" 
+                                   placeholder="Организация" value="{{ author.organization or '' }}">
+                            <button type="button" class="btn-toggle-details" onclick="toggleAuthorDetails(this)">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/>
+                                </svg>
+                            </button>
+                            <button type="button" class="btn-remove-author" onclick="removeAuthorField(this)">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="author-details" style="display: none;">
+                            <input type="text" name="author_degree[]" class="form-input" 
+                                   placeholder="Учёная степень" value="{{ author.degree or '' }}">
+                            <input type="text" name="author_position[]" class="form-input" 
+                                   placeholder="Должность" value="{{ author.position or '' }}">
+                            <input type="text" name="author_phone[]" class="form-input" 
+                                   placeholder="Телефон" value="{{ author.phone or '' }}">
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Files Section -->
+            <div class="form-section">
+                <label class="form-label">Файлы</label>
+                <div class="files-grid">
+                    <div class="file-item">
+                        <div class="file-item-header">
+                            <span class="file-icon">📄</span>
+                            <span>Текст статьи</span>
+                        </div>
+                        {% if article.manuscript_file %}
+                        <div class="file-current">
+                            <a href="/uploads/{{ article.manuscript_file }}" target="_blank">{{ article.manuscript_file }}</a>
+                            <label class="delete-file-label">
+                                <input type="checkbox" name="delete_manuscript"> Удалить
+                            </label>
+                        </div>
+                        {% endif %}
+                        <input type="file" name="manuscript_file" class="form-file" accept=".doc,.docx,.pdf">
+                    </div>
+                    
+                    <div class="file-item">
+                        <div class="file-item-header">
+                            <span class="file-icon">📋</span>
+                            <span>Рецензия</span>
+                        </div>
+                        {% if article.review_file %}
+                        <div class="file-current">
+                            <a href="/uploads/{{ article.review_file }}" target="_blank">{{ article.review_file }}</a>
+                            <label class="delete-file-label">
+                                <input type="checkbox" name="delete_review"> Удалить
+                            </label>
+                        </div>
+                        {% endif %}
+                        <input type="file" name="review_file" class="form-file" accept=".doc,.docx,.pdf,.txt,.jpg,.png">
+                    </div>
+                    
+                    <div class="file-item file-item-images">
+                        <div class="file-item-header">
+                            <span class="file-icon">🖼️</span>
+                            <span>Изображения</span>
+                        </div>
+                        
+                        <!-- Существующие изображения -->
+                        {% if article.images %}
+                        <div class="images-list" id="existingImages">
+                            {% for img in article.images %}
+                            <div class="image-item">
+                                <div class="image-preview-wrap">
+                                    <img src="/uploads/{{ img.filename }}" class="image-thumb" alt="">
+                                    <a href="/uploads/{{ img.filename }}" target="_blank" class="image-link">{{ img.filename }}</a>
+                                </div>
+                                <label class="delete-file-label">
+                                    <input type="checkbox" name="delete_image[]" value="{{ img.id }}"> Удалить
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Новые изображения (превью) -->
+                        <div class="images-list" id="newImagesPreview"></div>
+                        
+                        <!-- Скрытый контейнер для файлов -->
+                        <div id="imageFilesContainer"></div>
+                        
+                        <!-- Зона для drag & drop -->
+                        <div class="drop-zone" id="imageDropZone" onclick="triggerImageSelect()">
+                            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Z"/>
+                            </svg>
+                            <span>Перетащите изображения сюда или нажмите для выбора</span>
+                        </div>
+                        <input type="file" id="imageSelectInput" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp" style="display:none" onchange="handleImageSelect(this)">
+                    </div>
+                    
+                    <div class="file-item">
+                        <div class="file-item-header">
+                            <span class="file-icon">📑</span>
+                            <span>Титульная страница</span>
+                        </div>
+                        {% if article.title_pdf %}
+                        <div class="file-current">
+                            <a href="/uploads/{{ article.title_pdf }}" target="_blank">{{ article.title_pdf }}</a>
+                            <label class="delete-file-label">
+                                <input type="checkbox" name="delete_title_pdf"> Удалить
+                            </label>
+                        </div>
+                        {% endif %}
+                        <input type="file" name="title_pdf" class="form-file" accept=".pdf">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-section">
+                <label class="form-label">Примечания</label>
+                <textarea name="notes" class="form-textarea" rows="3" 
+                          placeholder="Дополнительная информация...">{{ article.notes or '' }}</textarea>
+            </div>
+
+            <!-- Actions -->
+            <div class="form-actions">
+                <a href="/issue/{{ article.issue_id }}" class="btn-cancel">Отмена</a>
+                <button type="submit" class="btn-save">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>
+                    </svg>
+                    Сохранить изменения
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Page Layout */
+.dashboard {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 32px;
+}
+
+.dashboard-header {
+    margin-bottom: 0;
+}
+
+.dashboard-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dashboard-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
+.dashboard-subtitle {
+    font-size: 14px;
+    color: var(--color-fg-muted);
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-accent-fg);
+    text-decoration: none;
+    margin-bottom: 4px;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.edit-form-container {
+    background-color: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    padding: 32px;
+    margin-top: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.form-input, .form-select, .form-textarea {
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--color-fg-default);
+    background-color: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 0 0 3px rgba(91, 164, 176, 0.1);
+}
+
+.form-input-lg {
+    font-size: 16px;
+    padding: 12px 16px;
+}
+
+.date-inputs {
+    display: flex;
+    gap: 8px;
+}
+
+.date-inputs .form-select {
+    flex: 1;
+}
+
+.status-checkboxes {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.checkbox-text {
+    font-size: 14px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.checkbox-green {
+    background-color: rgba(31, 136, 61, 0.1);
+    color: #1a7f37;
+}
+
+.checkbox-blue {
+    background-color: rgba(91, 164, 176, 0.1);
+    color: #5BA4B0;
+}
+
+.checkbox-orange {
+    background-color: rgba(154, 103, 0, 0.1);
+    color: #9a6700;
+}
+
+[data-theme="dark"] .checkbox-green {
+    background-color: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+}
+
+[data-theme="dark"] .checkbox-blue {
+    background-color: rgba(124, 197, 208, 0.15);
+    color: #7CC5D0;
+}
+
+[data-theme="dark"] .checkbox-orange {
+    background-color: rgba(210, 153, 34, 0.15);
+    color: #d29922;
+}
+
+/* Authors */
+.authors-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.author-card {
+    background-color: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.author-main-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.author-main-row .form-input {
+    flex: 1;
+}
+
+.author-main-row .form-input:first-child {
+    flex: 1.5;
+}
+
+.author-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border-muted);
+}
+
+.btn-toggle-details, .btn-remove-author {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--color-fg-muted);
+    transition: all 0.15s;
+}
+
+.btn-toggle-details:hover {
+    background-color: var(--color-canvas-inset);
+    color: var(--color-fg-default);
+}
+
+.btn-remove-author:hover {
+    background-color: rgba(207, 34, 46, 0.1);
+    border-color: #cf222e;
+    color: #cf222e;
+}
+
+.btn-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-accent-fg);
+    background: transparent;
+    border: 1px solid var(--color-accent-emphasis);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.btn-add:hover {
+    background-color: rgba(91, 164, 176, 0.1);
+}
+
+/* Files */
+.files-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.file-item {
+    background-color: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.file-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.file-icon {
+    font-size: 18px;
+}
+
+.file-current {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background-color: var(--color-canvas-default);
+    border: 1px solid var(--color-border-muted);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.file-current a {
+    color: var(--color-accent-fg);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+}
+
+.file-current a:hover {
+    text-decoration: underline;
+}
+
+.delete-file-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-danger-fg);
+    cursor: pointer;
+}
+
+.delete-file-label input {
+    cursor: pointer;
+}
+
+.form-file {
+    width: 100%;
+    font-size: 13px;
+    color: var(--color-fg-muted);
+}
+
+.file-hint {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    margin-top: 4px;
+}
+
+.images-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.image-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background-color: var(--color-canvas-subtle);
+    border-radius: 6px;
+    border: 1px solid var(--color-border-default);
+}
+
+.image-link {
+    font-size: 13px;
+    color: var(--color-accent-fg);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.image-link:hover {
+    text-decoration: underline;
+}
+
+.file-item-images {
+    grid-column: span 2;
+}
+
+.image-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-default);
+}
+
+.image-preview-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.image-new-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #1a7f37;
+    background-color: rgba(31, 136, 61, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+[data-theme="dark"] .image-new-badge {
+    color: #3fb950;
+    background-color: rgba(63, 185, 80, 0.15);
+}
+
+.drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px 16px;
+    border: 2px dashed var(--color-border-default);
+    border-radius: 10px;
+    background-color: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+}
+
+.drop-zone:hover {
+    border-color: var(--color-accent-fg);
+    background-color: rgba(91, 164, 176, 0.05);
+    color: var(--color-accent-fg);
+}
+
+.drop-zone-active {
+    border-color: var(--color-accent-fg);
+    background-color: rgba(91, 164, 176, 0.1);
+    color: var(--color-accent-fg);
+}
+
+.drop-zone svg {
+    opacity: 0.6;
+}
+
+.drop-zone span {
+    font-size: 13px;
+    text-align: center;
+}
+
+.btn-remove-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background-color: transparent;
+    border: 1px solid var(--color-danger-fg);
+    border-radius: 6px;
+    color: var(--color-danger-fg);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-remove-image:hover {
+    background-color: var(--color-danger-fg);
+    color: #fff;
+}
+
+.image-item-new {
+    background-color: rgba(31, 136, 61, 0.05);
+    border-color: rgba(31, 136, 61, 0.3);
+}
+
+[data-theme="dark"] .image-item-new {
+    background-color: rgba(63, 185, 80, 0.08);
+    border-color: rgba(63, 185, 80, 0.3);
+}
+
+.form-file::file-selector-button {
+    padding: 6px 12px;
+    margin-right: 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-default);
+    background-color: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.form-file::file-selector-button:hover {
+    background-color: var(--color-canvas-inset);
+}
+
+/* Actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-default);
+}
+
+.btn-cancel {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-fg-default);
+    background-color: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.btn-cancel:hover {
+    background-color: var(--color-canvas-subtle);
+}
+
+.btn-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(91, 164, 176, 0.3);
+}
+
+.btn-save:hover {
+    box-shadow: 0 4px 12px rgba(91, 164, 176, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .dashboard {
+        padding: 20px 16px;
+    }
+    
+    .dashboard-title {
+        font-size: 20px;
+    }
+    
+    .edit-form-container {
+        padding: 16px;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .author-main-row {
+        flex-wrap: wrap;
+    }
+    
+    .author-main-row .form-input {
+        flex: 1 1 100%;
+    }
+    
+    .author-main-row .form-input:first-child {
+        flex: 1 1 100%;
+    }
+    
+    .author-details {
+        grid-template-columns: 1fr;
+    }
+    
+    .files-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .file-item-images {
+        grid-column: span 1;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn-cancel, .btn-save {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+function addAuthorField() {
+    const container = document.getElementById('authorsContainer');
+    const authorCard = document.createElement('div');
+    authorCard.className = 'author-card';
+    authorCard.innerHTML = `
+        <div class="author-main-row">
+            <input type="text" name="author_name[]" class="form-input" placeholder="ФИО *" required>
+            <input type="email" name="author_email[]" class="form-input" placeholder="Email">
+            <input type="text" name="author_organization[]" class="form-input" placeholder="Организация">
+            <button type="button" class="btn-toggle-details" onclick="toggleAuthorDetails(this)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/>
+                </svg>
+            </button>
+            <button type="button" class="btn-remove-author" onclick="removeAuthorField(this)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="author-details" style="display: none;">
+            <input type="text" name="author_degree[]" class="form-input" placeholder="Учёная степень">
+            <input type="text" name="author_position[]" class="form-input" placeholder="Должность">
+            <input type="text" name="author_phone[]" class="form-input" placeholder="Телефон">
+        </div>
+    `;
+    container.appendChild(authorCard);
+}
+
+function removeAuthorField(btn) {
+    const card = btn.closest('.author-card');
+    if (card) {
+        card.remove();
+    }
+}
+
+function toggleAuthorDetails(btn) {
+    const card = btn.closest('.author-card');
+    const details = card.querySelector('.author-details');
+    if (details) {
+        const isHidden = details.style.display === 'none';
+        details.style.display = isHidden ? 'grid' : 'none';
+        btn.textContent = isHidden ? '▲' : '▼';
+    }
+}
+
+// === Работа с изображениями ===
+let imageCounter = 0;
+
+function triggerImageSelect() {
+    document.getElementById('imageSelectInput').click();
+}
+
+function handleImageSelect(input) {
+    if (!input.files || input.files.length === 0) return;
+    
+    // Обрабатываем все выбранные файлы
+    for (const file of input.files) {
+        addImageFile(file);
+    }
+    
+    // Сбрасываем input для следующего выбора
+    input.value = '';
+}
+
+function addImageFile(file) {
+    // Проверяем, что это изображение
+    if (!file.type.startsWith('image/')) return;
+    
+    const preview = document.getElementById('newImagesPreview');
+    const container = document.getElementById('imageFilesContainer');
+    
+    // Создаём скрытый input для этого файла
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = 'article_images';
+    fileInput.style.display = 'none';
+    fileInput.id = 'imageFile_' + imageCounter;
+    
+    // Копируем файл в новый input
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    container.appendChild(fileInput);
+    
+    // Создаём превью
+    const previewItem = document.createElement('div');
+    previewItem.className = 'image-item image-item-new';
+    previewItem.id = 'imagePreview_' + imageCounter;
+    
+    const currentInputId = fileInput.id;
+    const currentPreviewId = previewItem.id;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        previewItem.innerHTML = `
+            <div class="image-preview-wrap">
+                <img src="${e.target.result}" class="image-thumb" alt="">
+                <span class="image-link">${file.name}</span>
+                <span class="image-new-badge">новое</span>
+            </div>
+            <button type="button" class="btn-remove-image" onclick="removeNewImage('${currentPreviewId}', '${currentInputId}')">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+            </button>
+        `;
+    };
+    reader.readAsDataURL(file);
+    
+    preview.appendChild(previewItem);
+    imageCounter++;
+}
+
+function removeNewImage(previewId, inputId) {
+    const preview = document.getElementById(previewId);
+    const input = document.getElementById(inputId);
+    if (preview) preview.remove();
+    if (input) input.remove();
+}
+
+// Drag & Drop
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('imageDropZone');
+    if (!dropZone) return;
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-zone-active'), false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('drop-zone-active'), false);
+    });
+    
+    dropZone.addEventListener('drop', function(e) {
+        const files = e.dataTransfer.files;
+        for (const file of files) {
+            addImageFile(file);
+        }
+    }, false);
+});
+</script>
+{% endblock %}

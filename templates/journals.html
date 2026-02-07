@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Все журналы{% endblock %}
+
+{% block content %}
+<div class="journals-page">
+    <!-- Page Header -->
+    <div class="journals-header">
+        <h1 class="journals-title">
+            <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/>
+            </svg>
+            Журналы
+        </h1>
+        <span class="journals-count" data-no-slot>{{ journals|length }}</span>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="journals-stats-bar">
+        <div class="journals-stat-item">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+            </svg>
+            <span class="journals-stat-value" data-no-slot>{{ journals|length }}</span>
+            <span class="journals-stat-label">{{ journals|length|pluralize_ru('журнал', 'журнала', 'журналов') }}</span>
+        </div>
+        <div class="journals-stat-divider"></div>
+        {% set total_issues = namespace(count=0) %}
+        {% set total_articles = namespace(count=0) %}
+        {% for journal in journals %}
+            {% set total_issues.count = total_issues.count + (journal.issues|length if journal.issues else 0) %}
+            {% for issue in journal.issues %}
+                {% set total_articles.count = total_articles.count + (issue.articles|length if issue.articles else 0) %}
+            {% endfor %}
+        {% endfor %}
+        <div class="journals-stat-item journals-stat-green">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Z"/>
+            </svg>
+            <span class="journals-stat-value">{{ total_issues.count }}</span>
+            <span class="journals-stat-label">{{ total_issues.count|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span>
+        </div>
+        <div class="journals-stat-divider"></div>
+        <div class="journals-stat-item journals-stat-blue">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
+            </svg>
+            <span class="journals-stat-value">{{ total_articles.count }}</span>
+            <span class="journals-stat-label">{{ total_articles.count|pluralize_ru('статья', 'статьи', 'статей') }}</span>
+        </div>
+    </div>
+
+    <!-- Journals Grid -->
+    {% if journals %}
+    <div class="journals-grid">
+        {% for journal in journals %}
+        {% set issues_count = journal.issues|length if journal.issues else 0 %}
+        {% set articles_count = namespace(count=0) %}
+        {% for issue in journal.issues %}
+            {% set articles_count.count = articles_count.count + (issue.articles|length if issue.articles else 0) %}
+        {% endfor %}
+        <a href="/journal/{{ journal.id }}" class="journal-card{% if 'Антенны' in journal.name %} journal-card-antennas{% endif %}{% if 'Биомедицинская' in journal.name %} journal-card-biomed{% endif %}{% if 'Динамика сложных' in journal.name %} journal-card-dynamics{% endif %}{% if journal.name == 'Радиотехника' %} journal-card-radio{% endif %}{% if 'Нанотехнологии' in journal.name %} journal-card-nano{% endif %}{% if 'Информационно-измерительные' in journal.name %} journal-card-info-sys{% endif %}{% if 'Наукоемкие' in journal.name %} journal-card-scitech{% endif %}{% if 'Нелинейный мир' in journal.name %} journal-card-nonlinear{% endif %}{% if 'Успехи' in journal.name %} journal-card-uspekhi{% endif %}{% if 'Электромагнитные' in journal.name %} journal-card-emwaves{% endif %}{% if 'Технологии живых' in journal.name %} journal-card-living{% endif %}{% if 'Системы высокой' in journal.name %} journal-card-highavail{% endif %}{% if 'Нейрокомпьютеры' in journal.name %} journal-card-neuro{% endif %}{% if 'Спутниковые' in journal.name %} journal-card-satellite{% endif %}">
+            {% if 'Антенны' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_antennas.png'); opacity: 0;"></div>
+            {% elif 'Биомедицинская' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_biomed.png'); opacity: 0;"></div>
+            {% elif 'Динамика сложных' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_dynamics.png'); opacity: 0;"></div>
+            {% elif journal.name == 'Радиотехника' %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_radio.png'); opacity: 0;"></div>
+            {% elif 'Нанотехнологии' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_nano.png'); opacity: 0;"></div>
+            {% elif 'Информационно-измерительные' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_info.png'); opacity: 0;"></div>
+            {% elif 'Наукоемкие' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_scitech.png'); opacity: 0;"></div>
+            {% elif 'Нелинейный мир' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_nonlinear.png'); opacity: 0;"></div>
+            {% elif 'Успехи' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_uspekhi.png'); opacity: 0;"></div>
+            {% elif 'Электромагнитные' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_emwaves.png'); opacity: 0;"></div>
+            {% elif 'Технологии живых' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_living.png'); opacity: 0;"></div>
+            {% elif 'Системы высокой' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_highavail.png'); opacity: 0;"></div>
+            {% elif 'Нейрокомпьютеры' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_neuro.png'); opacity: 0;"></div>
+            {% elif 'Спутниковые' in journal.name %}
+            <div class="journal-card-bg" style="background-image: url('/static/journal_satellite.png'); opacity: 0;"></div>
+            {% endif %}
+            <div class="journal-card-info">
+            <h3 class="journal-card-title">{{ journal.name }}</h3>
+            <span class="journal-card-issn">{{ journal.issn }}</span>
+            {% if issues_count > 0 or articles_count.count > 0 %}
+            <div class="journal-card-badges">
+                {% if issues_count > 0 %}
+                <span class="journal-card-badge">{{ issues_count }} {{ issues_count|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span>
+                {% endif %}
+                {% if articles_count.count > 0 %}
+                <span class="journal-card-badge badge-muted">{{ articles_count.count }} {{ articles_count.count|pluralize_ru('статья', 'статьи', 'статей') }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="journals-empty">
+        <svg width="56" height="56" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+        </svg>
+        <h3>Журналы не найдены</h3>
+        <p>Начните с создания нового журнала в админ-панели</p>
+        <a href="/admin" class="journals-empty-btn">Перейти в админку</a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.journals-page {
+    max-width: 1264px;
+    margin: 0 auto;
+    padding: 40px 32px;
+    box-sizing: border-box;
+}
+
+/* Header */
+.journals-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.journals-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
+.journals-title svg {
+    color: var(--color-accent-fg);
+}
+
+.journals-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    padding: 4px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    background: linear-gradient(135deg, var(--color-canvas-subtle) 0%, var(--color-canvas-default) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 20px;
+}
+
+/* Stats Bar */
+.journals-stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 24px;
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    margin-bottom: 28px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.journals-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-fg-muted);
+}
+
+.journals-stat-green { color: #1a7f37; }
+.journals-stat-blue { color: #5BA4B0; }
+
+[data-theme="dark"] .journals-stat-green { color: #3fb950; }
+[data-theme="dark"] .journals-stat-blue { color: #7CC5D0; }
+
+.journals-stat-value {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.journals-stat-label {
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.journals-stat-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--color-border-default);
+}
+
+/* Journals Grid */
+.journals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.journal-card {
+    display: flex;
+    flex-direction: column;
+    padding: 18px 20px;
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-muted);
+    border-radius: 12px;
+    text-decoration: none;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s ease, background 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.journal-card:hover {
+    border-color: var(--color-accent-emphasis);
+    background: var(--color-canvas-subtle);
+}
+
+.journal-card-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+/* Фоновое изображение - появляется при hover */
+.journal-card-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    filter: blur(1px);
+    z-index: 0;
+    transition: opacity 0.3s ease;
+}
+
+.journal-card:hover .journal-card-bg {
+    opacity: 0.15 !important;
+}
+
+.journal-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0 0 4px 0;
+    line-height: 1.4;
+}
+
+.journal-card:hover .journal-card-title {
+    color: var(--color-accent-fg);
+}
+
+
+.journal-card-issn {
+    font-size: 13px;
+    color: var(--color-fg-muted);
+    margin-bottom: 12px;
+}
+
+.journal-card-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: auto;
+}
+
+.journal-card-badge {
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #5BA4B0;
+    background-color: rgba(91, 164, 176, 0.08);
+    border-radius: 10px;
+}
+
+.journal-card-badge.badge-muted {
+    color: var(--color-fg-muted);
+    background-color: var(--color-canvas-subtle);
+}
+
+[data-theme="dark"] .journal-card-badge {
+    color: #7CC5D0;
+    background-color: rgba(124, 197, 208, 0.12);
+}
+
+/* Empty State */
+.journals-empty {
+    text-align: center;
+    padding: 80px 40px;
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.journals-empty svg {
+    color: var(--color-fg-muted);
+    opacity: 0.3;
+    margin-bottom: 20px;
+}
+
+.journals-empty h3 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0 0 8px 0;
+}
+
+.journals-empty p {
+    font-size: 15px;
+    color: var(--color-fg-muted);
+    margin: 0 0 24px 0;
+}
+
+.journals-empty-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
+    border-radius: 10px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(91, 164, 176, 0.35);
+    transition: all 0.2s;
+}
+
+.journals-empty-btn:hover {
+    box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .journals-page { padding: 20px 16px; }
+    .journals-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .journals-stats-bar { flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+    .journals-stat-divider { display: none; }
+    .journals-grid { grid-template-columns: 1fr; }
+    .journal-card { padding: 14px 16px; }
+}
+</style>
+{% endblock %}

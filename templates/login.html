@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — Научные журналы</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--color-canvas-default);
+            color: var(--color-fg-default);
+            padding: 20px;
+        }
+
+        .login-wrapper {
+            width: 100%;
+            max-width: 400px;
+            opacity: 0;
+            transform: translateY(16px);
+            animation: loginFadeIn 0.5s ease-out 0.1s forwards;
+        }
+
+        @keyframes loginFadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Logo / Header */
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(91, 164, 176, 0.3);
+        }
+
+        .login-logo svg {
+            color: #fff;
+        }
+
+        .login-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-fg-default);
+            margin-bottom: 6px;
+        }
+
+        .login-header p {
+            font-size: 14px;
+            color: var(--color-fg-muted);
+        }
+
+        /* Card */
+        .login-card {
+            background: var(--color-canvas-default);
+            border: 1px solid var(--color-border-default);
+            border-radius: 14px;
+            padding: 28px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Flash messages */
+        .login-flash {
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .login-flash-error {
+            background: rgba(207, 34, 46, 0.08);
+            color: #cf222e;
+            border: 1px solid rgba(207, 34, 46, 0.2);
+        }
+
+        .login-flash-info {
+            background: rgba(91, 164, 176, 0.08);
+            color: #5BA4B0;
+            border: 1px solid rgba(91, 164, 176, 0.2);
+        }
+
+        .login-flash-success {
+            background: rgba(31, 136, 61, 0.08);
+            color: #1a7f37;
+            border: 1px solid rgba(31, 136, 61, 0.2);
+        }
+
+        [data-theme="dark"] .login-flash-error {
+            background: rgba(248, 81, 73, 0.1);
+            color: #f85149;
+            border-color: rgba(248, 81, 73, 0.2);
+        }
+
+        [data-theme="dark"] .login-flash-info {
+            background: rgba(124, 197, 208, 0.1);
+            color: #7CC5D0;
+            border-color: rgba(124, 197, 208, 0.2);
+        }
+
+        [data-theme="dark"] .login-flash-success {
+            background: rgba(63, 185, 80, 0.1);
+            color: #3fb950;
+            border-color: rgba(63, 185, 80, 0.2);
+        }
+
+        /* Form */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .login-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .login-field label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-fg-default);
+        }
+
+        .login-input {
+            padding: 11px 14px;
+            font-size: 15px;
+            color: var(--color-fg-default);
+            background: var(--color-canvas-subtle);
+            border: 1px solid var(--color-border-default);
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        .login-input:focus {
+            border-color: #5BA4B0;
+            box-shadow: 0 0 0 3px rgba(91, 164, 176, 0.15);
+            background: var(--color-canvas-default);
+        }
+
+        .login-input::placeholder {
+            color: var(--color-fg-muted);
+            opacity: 0.6;
+        }
+
+        .login-btn {
+            padding: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.15s;
+            font-family: inherit;
+            margin-top: 4px;
+        }
+
+        .login-btn:hover {
+            box-shadow: 0 4px 16px rgba(91, 164, 176, 0.4);
+            transform: translateY(-1px);
+        }
+
+        .login-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(91, 164, 176, 0.3);
+        }
+
+        /* Theme toggle */
+        .login-footer {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .login-theme-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--color-fg-muted);
+            background: transparent;
+            border: 1px solid var(--color-border-default);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .login-theme-btn:hover {
+            background: var(--color-canvas-subtle);
+            color: var(--color-fg-default);
+        }
+
+        /* Password visibility */
+        .login-password-wrap {
+            position: relative;
+        }
+
+        .login-password-wrap .login-input {
+            padding-right: 44px;
+            width: 100%;
+        }
+
+        .login-eye-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--color-fg-muted);
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            transition: color 0.15s;
+        }
+
+        .login-eye-btn:hover {
+            color: var(--color-fg-default);
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 22px 20px;
+            }
+            .login-logo {
+                width: 54px;
+                height: 54px;
+                border-radius: 14px;
+            }
+            .login-header h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-header">
+            <div class="login-logo">
+                <svg width="30" height="30" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/>
+                </svg>
+            </div>
+            <h1>Научные журналы</h1>
+            <p>Войдите, чтобы продолжить работу</p>
+        </div>
+
+        <div class="login-card">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="login-flash login-flash-{{ category }}">
+                        {% if category == 'danger' or category == 'error' %}
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg>
+                        {% else %}
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>
+                        {% endif %}
+                        {{ message }}
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST" class="login-form">
+                <div class="login-field">
+                    <label for="username">Логин</label>
+                    <input type="text" id="username" name="username" class="login-input" 
+                           placeholder="Введите логин" autocomplete="username" autofocus required>
+                </div>
+                <div class="login-field">
+                    <label for="password">Пароль</label>
+                    <div class="login-password-wrap">
+                        <input type="password" id="password" name="password" class="login-input" 
+                               placeholder="Введите пароль" autocomplete="current-password" required>
+                        <button type="button" class="login-eye-btn" onclick="togglePassword()" title="Показать пароль">
+                            <svg id="eye-icon" width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.473 0 2.825-.742 3.955-1.715 1.124-.967 1.954-2.096 2.366-2.717a.12.12 0 0 0 0-.136c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5c-1.473 0-2.824.742-3.955 1.715-1.124.967-1.954 2.096-2.366 2.717ZM8 10a2 2 0 1 1-.001-3.999A2 2 0 0 1 8 10Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <button type="submit" class="login-btn">Войти</button>
+            </form>
+        </div>
+
+        <div class="login-footer">
+            <button class="login-theme-btn" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span>
+                <span id="theme-label">Тёмная тема</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Theme
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateTheme(savedTheme);
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateTheme(next);
+        }
+
+        function updateTheme(theme) {
+            document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+            document.getElementById('theme-label').textContent = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+        }
+
+        // Password visibility
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const icon = document.getElementById('eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.innerHTML = '<path d="M.143 2.31a.75.75 0 0 1 1.047-.167l14.5 10.5a.75.75 0 1 1-.88 1.214l-2.248-1.628C11.346 13.19 9.792 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.349-.527 1.04-1.46 1.97-2.39L.31 3.357A.75.75 0 0 1 .143 2.31Zm3.386 3.378a14.21 14.21 0 0 0-1.85 2.244.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.195 0 2.31-.488 3.29-1.191L9.063 9.695A2 2 0 0 1 6.058 7.52L3.529 5.688ZM8 3.5c-.516 0-1.017.09-1.499.251a.75.75 0 1 1-.473-1.423A6.23 6.23 0 0 1 8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.11.166-.248.365-.41.587a.75.75 0 1 1-1.21-.887c.148-.203.272-.382.371-.53a.12.12 0 0 0 0-.137c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5Z"/>';
+            } else {
+                input.type = 'password';
+                icon.innerHTML = '<path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.473 0 2.825-.742 3.955-1.715 1.124-.967 1.954-2.096 2.366-2.717a.12.12 0 0 0 0-.136c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5c-1.473 0-2.824.742-3.955 1.715-1.124.967-1.954 2.096-2.366 2.717ZM8 10a2 2 0 1 1-.001-3.999A2 2 0 0 1 8 10Z"/>';
+            }
+        }
+    </script>
+</body>
+</html>

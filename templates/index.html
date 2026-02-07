@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+
+{% block title %}Научные журналы{% endblock %}
+
+{% block content %}
+<!-- Анимация перехода: заглушка для непрерывности + FLIP на настоящем #batLogo -->
+<script>
+(function() {
+    if (!sessionStorage.getItem('fromLoading')) return;
+    sessionStorage.removeItem('fromLoading');
+    window.__fromLoading = true;
+    window.__skipPageAnimation = true;
+
+    // Оверлей с логотипом-заглушкой (визуальная копия экрана загрузки)
+    var overlay = document.createElement('div');
+    overlay.id = 'loadingOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:var(--color-canvas-default);';
+
+    var placeholder = document.createElement('img');
+    placeholder.src = '{{ url_for("static", filename="logo.png") }}';
+    placeholder.style.cssText = 'width:340px;max-width:80vw;height:auto;';
+    placeholder.id = 'overlayPlaceholder';
+    overlay.appendChild(placeholder);
+
+    document.body.appendChild(overlay);
+    document.body.style.opacity = '1';
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var overlayEl = document.getElementById('loadingOverlay');
+        var ph = document.getElementById('overlayPlaceholder');
+        var batLogo = document.getElementById('batLogo');
+
+        if (!overlayEl || !batLogo) {
+            if (overlayEl) overlayEl.remove();
+            return;
+        }
+
+        batLogo.loading = 'eager';
+
+        function startFlyAnimation() {
+            // FLIP: замеряем натуральную позицию #batLogo и реальную позицию заглушки
+            var rect = batLogo.getBoundingClientRect();
+            var phRect = ph.getBoundingClientRect();
+
+            // Берём позицию и размер прямо из заглушки — пиксель-в-пиксель
+            var scaleUp = phRect.width / rect.width;
+            var dx = (phRect.left + phRect.width / 2) - (rect.left + rect.width / 2);
+            var dy = (phRect.top + phRect.height / 2) - (rect.top + rect.height / 2);
+
+            // Ставим batLogo в FLIP-позицию (визуально = центр экрана, тот же размер что заглушка)
+            batLogo.style.position = 'relative';
+            batLogo.style.zIndex = '10001';
+            batLogo.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(' + scaleUp + ')';
+            batLogo.getBoundingClientRect(); // force reflow — transform применён
+
+            // Теперь batLogo визуально совпадает с заглушкой — убираем заглушку
+            if (ph) ph.style.display = 'none';
+
+            // FLIP-анимация: из центра → натуральная позиция
+            batLogo.animate([
+                { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + scaleUp + ')' },
+                { transform: 'translate(0, 0) scale(1)' }
+            ], {
+                duration: 900,
+                easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                fill: 'forwards'
+            }).onfinish = function() {
+                batLogo.style.position = '';
+                batLogo.style.zIndex = '';
+                batLogo.style.transform = '';
+            };
+
+            // Фон оверлея растворяется
+            overlayEl.style.background = 'var(--color-canvas-default)';
+            overlayEl.animate([
+                { opacity: 1 },
+                { opacity: 0 }
+            ], {
+                duration: 600,
+                delay: 250,
+                easing: 'ease-out',
+                fill: 'forwards'
+            }).onfinish = function() {
+                overlayEl.remove();
+            };
+        }
+
+        function onReady() {
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    setTimeout(startFlyAnimation, 30);
+                });
+            });
+        }
+
+        if (batLogo.complete && batLogo.naturalWidth > 0) {
+            onReady();
+        } else {
+            batLogo.onload = onReady;
+            setTimeout(onReady, 2000);
+        }
+    });
+})();
+</script>
+
+<div class="home-page">
+    <!-- Hero Section -->
+    <div class="home-hero">
+        <div class="home-hero-content">
+            <h1 class="home-hero-title">Научные журналы</h1>
+            <p class="home-hero-subtitle">Управление выпусками, статьями и статусами публикаций</p>
+            <div class="home-hero-actions">
+                <a href="/journals" class="home-btn home-btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/>
+                    </svg>
+                    Все журналы
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Section -->
+    <div class="home-search-section">
+        <div class="home-search-wrapper">
+            <svg class="home-search-icon" width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
+            </svg>
+            <input type="text" id="searchInput" class="home-search-input" 
+                   placeholder="Поиск по статьям, авторам, журналам..." 
+                   autocomplete="off">
+            <button type="button" id="clearSearch" class="home-clear-btn" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div id="searchInfo" class="home-search-info" style="display: none;">
+            <span id="resultsCount" class="home-results-count">0</span> 
+            <span id="resultsLabel">результатов</span> по запросу 
+            «<strong id="searchQuery"></strong>»
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="home-results" id="searchResults">
+        {% for article in articles %}
+        <div class="home-article-card" 
+             data-title="{{ article.title|lower }}"
+             data-authors="{% if article.article_authors %}{% for a in article.article_authors %}{{ a.full_name|lower }} {% endfor %}{% else %}{{ (article.authors or '')|lower }}{% endif %}"
+             data-journal="{{ article.issue.journal.name|lower if article.issue and article.issue.journal else '' }}">
+            <div class="home-article-header">
+                <h3 class="home-article-title">
+                    <a href="/issue/{{ article.issue.id if article.issue else '#' }}">{{ article.title }}</a>
+                </h3>
+                <div class="home-article-meta">
+                    {% if article.issue and article.issue.journal %}
+                    <span class="home-label home-label-blue">{{ article.issue.journal.name }}</span>
+                    {% endif %}
+                    {% if article.issue %}
+                    <span class="home-label">№{{ article.issue.number }} / {{ article.issue.year }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="home-article-authors">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.432-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/>
+                </svg>
+                <span>
+                    {% if article.article_authors %}
+                        {% for author in article.article_authors|sort(attribute='order') %}
+                            {{ author.full_name }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {{ article.authors or 'Автор не указан' }}
+                    {% endif %}
+                </span>
+            </div>
+            
+            <div class="home-article-footer">
+                <div class="home-article-status">
+                    {% if article.payment_received %}
+                    <span class="home-status home-status-success">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>
+                        </svg>
+                        Оплачено
+                    </span>
+                    {% endif %}
+                    {% if article.has_review %}
+                    <span class="home-status home-status-info">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z"/>
+                        </svg>
+                        Рецензия
+                    </span>
+                    {% endif %}
+                    {% if article.edited %}
+                    <span class="home-status home-status-warning">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/>
+                        </svg>
+                        Редакт.
+                    </span>
+                    {% endif %}
+                </div>
+                <a href="/issue/{{ article.issue.id if article.issue else '#' }}" class="home-link">
+                    Перейти к выпуску
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Empty State -->
+    <div id="emptyState" class="home-empty-state" style="display: none;">
+        <svg width="56" height="56" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
+        </svg>
+        <h3>Ничего не найдено</h3>
+        <p>Попробуйте изменить поисковый запрос</p>
+    </div>
+
+    <!-- Footer with Logo -->
+    <footer class="home-footer">
+        <img id="batLogo" 
+             src="{{ url_for('static', filename='logo.png') }}" 
+             alt="Логотип"
+             loading="lazy"
+             onclick="playBatAnimation()">
+    </footer>
+</div>
+
+<script>
+function playBatAnimation() {
+    const bat = document.getElementById('batLogo');
+    const originalSrc = "{{ url_for('static', filename='logo.png') }}";
+    bat.src = "{{ url_for('static', filename='bat.gif') }}";
+    bat.style.height = "100px";
+    setTimeout(() => {
+        bat.src = originalSrc;
+        bat.style.height = "56px";
+    }, 10000);
+}
+
+// Клиентский поиск
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const clearBtn = document.getElementById('clearSearch');
+    const searchInfo = document.getElementById('searchInfo');
+    const resultsCount = document.getElementById('resultsCount');
+    const resultsLabel = document.getElementById('resultsLabel');
+    const searchQuery = document.getElementById('searchQuery');
+    const emptyState = document.getElementById('emptyState');
+    const cards = document.querySelectorAll('.home-article-card');
+    
+    // Нормализация текста
+    function normalize(text) {
+        return (text || '').toLowerCase().replace(/ё/g, 'е');
+    }
+    
+    // Склонение слов
+    function pluralize(n, one, few, many) {
+        const mod10 = n % 10;
+        const mod100 = n % 100;
+        if (mod100 >= 11 && mod100 <= 19) return many;
+        if (mod10 === 1) return one;
+        if (mod10 >= 2 && mod10 <= 4) return few;
+        return many;
+    }
+    
+    // Фильтрация
+    function filterCards() {
+        const query = normalize(searchInput.value.trim());
+        let visibleCount = 0;
+        let visibleIndex = 0;
+        
+        // Если запрос пустой — скрыть все карточки
+        if (!query) {
+            cards.forEach((card) => {
+                card.classList.remove('card-visible');
+            });
+            clearBtn.style.display = 'none';
+            searchInfo.style.display = 'none';
+            emptyState.style.display = 'none';
+            return;
+        }
+        
+        cards.forEach((card) => {
+            const title = normalize(card.dataset.title);
+            const authors = normalize(card.dataset.authors);
+            const journal = normalize(card.dataset.journal);
+            
+            const matches = title.includes(query) || 
+                authors.includes(query) || 
+                journal.includes(query);
+            
+            if (matches) {
+                card.style.setProperty('--card-index', visibleIndex);
+                card.classList.add('card-visible');
+                visibleCount++;
+                visibleIndex++;
+            } else {
+                card.classList.remove('card-visible');
+            }
+        });
+        
+        // Показать информацию о поиске
+        clearBtn.style.display = 'flex';
+        searchInfo.style.display = 'block';
+        resultsCount.textContent = visibleCount;
+        resultsLabel.textContent = pluralize(visibleCount, 'результат', 'результата', 'результатов');
+        searchQuery.textContent = searchInput.value.trim();
+        
+        if (visibleCount === 0) {
+            emptyState.style.display = 'block';
+        } else {
+            emptyState.style.display = 'none';
+        }
+    }
+    
+    // Дебаунс для производительности
+    let debounceTimer;
+    searchInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(filterCards, 150);
+    });
+    
+    // Очистка поиска
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        filterCards();
+        searchInput.focus();
+    });
+    
+    // Карточки уже скрыты через CSS (max-height: 0)
+});
+</script>
+
+<style>
+.home-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 32px;
+}
+
+/* Hero — анимированный градиент */
+.home-hero {
+    text-align: center;
+    padding: 48px 24px;
+    margin-bottom: 40px;
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(224, 247, 250, 0.6) 35%,
+        rgba(178, 235, 242, 0.4) 65%,
+        rgba(0, 188, 212, 0.10) 100%);
+    background-size: 300% 300%;
+    animation: heroGradientShift 10s ease infinite;
+    border: 1px solid var(--color-border-default);
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] .home-hero {
+    background: linear-gradient(135deg,
+        var(--color-canvas-default) 0%,
+        rgba(0, 188, 212, 0.06) 35%,
+        rgba(0, 188, 212, 0.12) 65%,
+        rgba(0, 188, 212, 0.08) 100%);
+    background-size: 300% 300%;
+    animation: heroGradientShift 10s ease infinite;
+}
+
+.home-hero-title {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--color-fg-default);
+    margin: 0 0 12px 0;
+    letter-spacing: -0.5px;
+}
+
+.home-hero-subtitle {
+    font-size: 18px;
+    color: var(--color-fg-muted);
+    margin: 0 0 28px 0;
+}
+
+.home-hero-actions {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.home-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.home-btn-primary {
+    color: #fff;
+    background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
+    box-shadow: 0 4px 14px rgba(91, 164, 176, 0.35);
+}
+
+.home-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45);
+}
+
+/* Search */
+.home-search-section {
+    margin-bottom: 32px;
+}
+
+.home-search-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px 8px 20px;
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 2px solid var(--color-border-default);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: all 0.2s;
+    margin-bottom: 16px;
+}
+
+.home-search-wrapper:focus-within {
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 4px 16px rgba(91, 164, 176, 0.15);
+}
+
+.home-search-icon {
+    color: var(--color-fg-muted);
+    flex-shrink: 0;
+}
+
+.home-search-input {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 16px;
+    color: var(--color-fg-default);
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+.home-search-input::placeholder {
+    color: var(--color-fg-muted);
+}
+
+.home-clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.home-clear-btn:hover {
+    background: var(--color-canvas-inset);
+    color: var(--color-fg-default);
+}
+
+.home-search-info {
+    font-size: 14px;
+    color: var(--color-fg-muted);
+    padding: 12px 20px;
+    background-color: var(--color-canvas-subtle);
+    border-radius: 10px;
+}
+
+.home-results-count {
+    font-weight: 700;
+    color: var(--color-accent-fg);
+}
+
+/* Results */
+.home-results {
+    display: flex;
+    flex-direction: column;
+}
+
+.home-article-card {
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.02);
+    /* Плавное сворачивание */
+    overflow: hidden;
+    max-height: 0;
+    padding: 0 24px;
+    margin-bottom: 0;
+    opacity: 0;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                margin-bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease;
+    transition-delay: calc(var(--card-index, 0) * 0.05s);
+}
+
+.home-article-card.card-visible {
+    max-height: 400px;
+    padding: 24px;
+    margin-bottom: 16px;
+    opacity: 1;
+}
+
+.home-article-card.card-visible:hover {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+.home-article-header {
+    margin-bottom: 12px;
+}
+
+.home-article-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    line-height: 1.4;
+}
+
+.home-article-title a {
+    color: var(--color-fg-default);
+    text-decoration: none;
+}
+
+.home-article-title a:hover {
+    color: var(--color-accent-fg);
+}
+
+.home-article-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.home-label {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    background-color: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+    border: 1px solid var(--color-border-default);
+}
+
+.home-label-blue {
+    background: linear-gradient(135deg, rgba(91, 164, 176, 0.1) 0%, rgba(91, 164, 176, 0.05) 100%);
+    color: #5BA4B0;
+    border-color: rgba(91, 164, 176, 0.3);
+}
+
+[data-theme="dark"] .home-label-blue {
+    color: #7CC5D0;
+    border-color: rgba(124, 197, 208, 0.3);
+}
+
+.home-article-authors {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--color-fg-muted);
+    margin-bottom: 16px;
+}
+
+.home-article-authors svg {
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+.home-article-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-muted);
+}
+
+.home-article-status {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.home-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+.home-status-success {
+    color: #1a7f37;
+    background-color: rgba(31, 136, 61, 0.1);
+}
+
+.home-status-info {
+    color: #5BA4B0;
+    background-color: rgba(91, 164, 176, 0.1);
+}
+
+.home-status-warning {
+    color: #9a6700;
+    background-color: rgba(154, 103, 0, 0.1);
+}
+
+[data-theme="dark"] .home-status-success { color: #3fb950; background-color: rgba(63, 185, 80, 0.15); }
+[data-theme="dark"] .home-status-info { color: #7CC5D0; background-color: rgba(124, 197, 208, 0.15); }
+[data-theme="dark"] .home-status-warning { color: #d29922; background-color: rgba(210, 153, 34, 0.15); }
+
+.home-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-accent-fg);
+    text-decoration: none;
+    transition: gap 0.2s;
+}
+
+.home-link:hover {
+    gap: 10px;
+}
+
+/* Empty State */
+.home-empty-state {
+    text-align: center;
+    padding: 64px 32px;
+    color: var(--color-fg-muted);
+}
+
+.home-empty-state svg {
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.home-empty-state h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0 0 8px 0;
+}
+
+.home-empty-state p {
+    font-size: 15px;
+    margin: 0;
+}
+
+/* Footer */
+.home-footer {
+    display: flex;
+    justify-content: center;
+    padding: 48px 0 16px 0;
+}
+
+#batLogo {
+    height: 56px;
+    cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .home-page { padding: 20px 16px; }
+    .home-hero { padding: 32px 20px; }
+    .home-hero-title { font-size: 28px; }
+    .home-hero-actions { flex-direction: column; }
+    .home-btn { justify-content: center; }
+    .home-search-wrapper { flex-wrap: wrap; }
+    .home-search-input { min-width: 100%; }
+    .home-article-footer { flex-direction: column; gap: 12px; align-items: flex-start; }
+}
+</style>
+{% endblock %}

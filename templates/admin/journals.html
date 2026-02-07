@@ -1,0 +1,909 @@
+{% extends "base.html" %}
+{% block title %}Управление журналами{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<!-- Mobile overlay -->
+<div class="adm-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="adm-layout">
+    <!-- Sidebar -->
+    <aside class="adm-sidebar" id="sidebar">
+        <div class="adm-sidebar-header">
+            <div class="adm-logo">
+                <div class="adm-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                </div>
+                <span class="adm-logo-text">Журналы</span>
+            </div>
+            <button class="adm-sidebar-close" onclick="toggleSidebar()">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
+        </div>
+
+        <nav class="adm-nav">
+            <div class="adm-nav-label">Меню</div>
+            <a href="{{ url_for('admin_dashboard') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7h-3.5A1.75 1.75 0 0 1 0 5.25Zm9 0C9 .784 9.784 0 10.75 0h3.5C15.216 0 16 .784 16 1.75v3.5A1.75 1.75 0 0 1 14.25 7h-3.5A1.75 1.75 0 0 1 9 5.25Zm0 9C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25Zm-9 0C0 9.784.784 9 1.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 5.25 16h-3.5A1.75 1.75 0 0 1 0 14.25Z"/>
+                </svg>
+                Dashboard
+            </a>
+            <a href="{{ url_for('admin_journals') }}" class="adm-nav-item adm-nav-active">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                </svg>
+                Журналы
+            </a>
+            <a href="{{ url_for('admin_articles') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
+                </svg>
+                Все статьи
+            </a>
+            <a href="{{ url_for('bulk_export_articles') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/>
+                </svg>
+                Экспорт
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.001 4.001 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.012.749.749 0 0 1-.885.954.752.752 0 0 1-.549-.514 3.507 3.507 0 0 0-2.522-2.372.75.75 0 0 1-.574-.73v-.352a.75.75 0 0 1 .416-.672A1.5 1.5 0 0 0 11 5.5.75.75 0 0 1 11 4Zm-5.5-.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 3.5Z"/>
+                </svg>
+                Пользователи
+            </a>
+        </nav>
+
+        <div class="adm-sidebar-footer">
+            <div class="adm-user-block">
+                <div class="adm-user-avatar">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/>
+                    </svg>
+                </div>
+                <div class="adm-user-info">
+                    <span class="adm-user-name">{{ current_user.display_name }}</span>
+                    <span class="adm-user-role">{{ current_user.role }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="adm-main">
+        <!-- Top-right toolbar -->
+        <div class="adm-toolbar">
+            <a href="/" class="adm-toolbar-btn" title="На главную">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            </a>
+            <button class="adm-toolbar-btn" onclick="toggleAdmTheme()" title="Переключить тему">
+                <span class="adm-theme-icon">🌙</span>
+            </button>
+            <a href="/logout" class="adm-toolbar-btn adm-toolbar-exit" title="Выйти">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </a>
+        </div>
+
+        <!-- Mobile header -->
+        <div class="adm-mobile-header">
+            <button class="adm-hamburger" onclick="toggleSidebar()">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+            <span class="adm-mobile-title">Журналы</span>
+        </div>
+
+        <!-- Welcome -->
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Управление журналами</h1>
+            <p class="adm-welcome-sub">Добавление, удаление и редактирование названий</p>
+        </div>
+
+        <!-- Toggle Button -->
+        <button class="jrn-toggle-btn" onclick="toggleAddForm()">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+            </svg>
+            Добавить журнал
+        </button>
+
+        <!-- Add Journal (hidden by default, animated) -->
+        <div class="jrn-add-card" id="addCard">
+            <div class="jrn-add-card-header">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+                </svg>
+                <span>Новый журнал</span>
+            </div>
+            <div class="jrn-add-card-body">
+                <div class="jrn-add-row">
+                    <div class="jrn-input-group jrn-input-name">
+                        <label class="jrn-label">Название</label>
+                        <input type="text" id="addName" class="jrn-input" placeholder="Название журнала" autocomplete="off">
+                    </div>
+                    <div class="jrn-input-group jrn-input-issn">
+                        <label class="jrn-label">ISSN</label>
+                        <input type="text" id="addIssn" class="jrn-input" placeholder="0000-0000" autocomplete="off">
+                    </div>
+                    <button class="jrn-btn jrn-btn-add" onclick="addJournal()">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+                        </svg>
+                        Добавить
+                    </button>
+                </div>
+                <div class="jrn-message" id="addMessage"></div>
+            </div>
+        </div>
+
+        <!-- Journals List -->
+        <div class="adm-card">
+            <div class="adm-card-header">
+                <h2 class="adm-card-title">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                    Все журналы
+                    <span class="jrn-count">{{ journals|length }}</span>
+                </h2>
+            </div>
+            <div class="jrn-list" id="journalList">
+                {% for j in journals %}
+                <div class="jrn-item" data-id="{{ j.id }}" id="journal-{{ j.id }}">
+                    <div class="jrn-item-view">
+                        <div class="jrn-item-info">
+                            <a href="/journal/{{ j.id }}" class="jrn-item-name">{{ j.name }}</a>
+                            {% if j.issn %}<span class="jrn-item-issn">ISSN: {{ j.issn }}</span>{% endif %}
+                            <div class="jrn-item-stats">
+                                <span class="jrn-item-stat">{{ j.issues }} выпуск{{ j.issues|pluralize_ru('', 'а', 'ов') }}</span>
+                                <span class="jrn-item-dot"></span>
+                                <span class="jrn-item-stat">{{ j.articles }} стат{{ j.articles|pluralize_ru('ья', 'ьи', 'ей') }}</span>
+                            </div>
+                        </div>
+                        <div class="jrn-item-actions">
+                            <button class="jrn-action-btn jrn-action-edit" onclick="startEdit({{ j.id }})" title="Редактировать">
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>
+                            </button>
+                            <button class="jrn-action-btn jrn-action-del" onclick="deleteJournal({{ j.id }}, '{{ j.name|e }}')" title="Удалить">
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="jrn-item-edit" style="display:none">
+                        <div class="jrn-edit-row">
+                            <div class="jrn-input-group jrn-input-name">
+                                <input type="text" class="jrn-input jrn-edit-name" value="{{ j.name }}" placeholder="Название">
+                            </div>
+                            <div class="jrn-input-group jrn-input-issn">
+                                <input type="text" class="jrn-input jrn-edit-issn" value="{{ j.issn }}" placeholder="ISSN">
+                            </div>
+                            <button class="jrn-btn jrn-btn-save" onclick="saveEdit({{ j.id }})">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>
+                                Сохранить
+                            </button>
+                            <button class="jrn-btn jrn-btn-cancel" onclick="cancelEdit({{ j.id }})">
+                                Отмена
+                            </button>
+                        </div>
+                        <div class="jrn-message" id="editMessage-{{ j.id }}"></div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if not journals %}
+                <div class="jrn-empty">
+                    <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.2">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                    <p>Журналы не найдены</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="jrn-modal-overlay" id="confirmModal">
+    <div class="jrn-modal">
+        <div class="jrn-modal-header">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style="color:#cf222e">
+                <path d="M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575ZM8 5a.75.75 0 0 0-.75.75v2.5a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8 5Zm1 6a1 1 0 1 0-2 0 1 1 0 0 0 2 0Z"/>
+            </svg>
+            <h3>Удалить журнал?</h3>
+        </div>
+        <p class="jrn-modal-text" id="confirmText"></p>
+        <div class="jrn-modal-actions">
+            <button class="jrn-btn jrn-btn-cancel" onclick="closeConfirm()">Отмена</button>
+            <button class="jrn-btn jrn-btn-del" id="confirmBtn" onclick="confirmDelete()">Удалить</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* =============================================
+   ADMIN LAYOUT (shared with dashboard)
+   ============================================= */
+.adm-layout { display: flex; min-height: 100vh; }
+.adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 998; backdrop-filter: blur(2px); }
+.adm-overlay.active { display: block; }
+
+.adm-sidebar { width: 260px; min-height: 100vh; background: var(--color-canvas-subtle); border-right: 1px solid var(--color-border-default); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 999; }
+.adm-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 20px 20px; border-bottom: 1px solid var(--color-border-muted); }
+.adm-sidebar-close { display: none; background: none; border: none; color: var(--color-fg-muted); cursor: pointer; padding: 4px; border-radius: 6px; }
+.adm-sidebar-close:hover { background: var(--color-canvas-inset); }
+.adm-logo { display: flex; align-items: center; gap: 12px; }
+.adm-logo-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #5BA4B0, #4A8E99); color: #fff; display: flex; align-items: center; justify-content: center; }
+[data-theme="dark"] .adm-logo-icon { background: linear-gradient(135deg, #5BA4B0, #7CC5D0); }
+.adm-logo-text { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+
+.adm-nav { padding: 16px 12px; }
+.adm-nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-fg-muted); padding: 0 12px; margin-bottom: 8px; }
+.adm-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 14px; font-weight: 500; color: var(--color-fg-muted); text-decoration: none; border-radius: 8px; margin-bottom: 2px; transition: background 0.15s, color 0.15s; }
+.adm-nav-item:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+.adm-nav-active { background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.06)); color: #5BA4B0; font-weight: 600; }
+[data-theme="dark"] .adm-nav-active { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.06)); }
+.adm-nav-active:hover { background: linear-gradient(135deg, rgba(91,164,176,0.18), rgba(91,164,176,0.1)); }
+
+.adm-sidebar-footer { padding: 8px 12px 20px; border-top: 1px solid var(--color-border-muted); margin-top: 8px; }
+.adm-user-block { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.adm-user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--color-canvas-inset); border: 2px solid var(--color-border-default); display: flex; align-items: center; justify-content: center; color: var(--color-fg-muted); flex-shrink: 0; }
+.adm-user-info { display: flex; flex-direction: column; min-width: 0; }
+.adm-user-name { font-size: 13px; font-weight: 600; color: var(--color-fg-default); }
+.adm-user-role { font-size: 12px; color: var(--color-fg-muted); }
+
+
+.adm-main { flex: 1; min-width: 0; padding: 32px 36px 48px; background: var(--color-canvas-default); position: relative; }
+
+/* Toolbar — правый верхний угол */
+.adm-toolbar { position: absolute; top: 20px; right: 24px; display: flex; gap: 6px; z-index: 10; }
+.adm-toolbar-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.adm-toolbar-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); border-color: var(--color-border-muted); }
+.adm-toolbar-exit:hover { color: #cf222e; border-color: rgba(207,34,46,0.3); background: rgba(207,34,46,0.06); }
+[data-theme="dark"] .adm-toolbar-exit:hover { color: #f85149; border-color: rgba(248,81,73,0.3); background: rgba(248,81,73,0.08); }
+
+.adm-mobile-header { display: none; align-items: center; gap: 12px; margin-bottom: 24px; }
+.adm-hamburger { background: none; border: 1px solid var(--color-border-default); border-radius: 8px; padding: 8px; color: var(--color-fg-default); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.adm-hamburger:hover { background: var(--color-canvas-subtle); }
+.adm-mobile-title { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+
+.adm-welcome { margin-bottom: 28px; }
+.adm-welcome-title { font-size: 26px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 6px 0; }
+.adm-welcome-sub { font-size: 15px; color: var(--color-fg-muted); margin: 0; }
+
+.adm-card { background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 24px; }
+.adm-card-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--color-border-muted); }
+.adm-card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; color: var(--color-fg-default); margin: 0; }
+.adm-card-title svg { color: var(--color-fg-muted); }
+.adm-card-body { padding: 20px 22px; }
+
+/* =============================================
+   JOURNAL MANAGEMENT
+   ============================================= */
+
+/* Toggle button */
+.jrn-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #5BA4B0, #4A8E99);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 14px rgba(91,164,176,0.35);
+    transition: box-shadow 0.2s, background 0.2s;
+}
+.jrn-toggle-btn:hover {
+    box-shadow: 0 6px 20px rgba(91,164,176,0.45);
+}
+[data-theme="dark"] .jrn-toggle-btn {
+    background: linear-gradient(135deg, #5BA4B0, #7CC5D0);
+    box-shadow: 0 4px 14px rgba(91,164,176,0.25);
+}
+
+/* Collapsible add card */
+.jrn-add-card {
+    background: var(--color-canvas-default);
+    border: 1px solid transparent;
+    border-radius: 14px;
+    margin-bottom: 0;
+    overflow: hidden;
+    opacity: 0;
+    max-height: 0;
+    padding: 0;
+    transition: opacity 0.45s ease, max-height 0.45s ease, margin-bottom 0.45s ease, padding 0.45s ease, border-color 0.45s ease, box-shadow 0.45s ease;
+    box-shadow: none;
+    visibility: hidden;
+}
+
+.jrn-add-card.form-open {
+    opacity: 1;
+    max-height: 300px;
+    margin-bottom: 24px;
+    border-color: var(--color-border-default);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    visibility: visible;
+}
+
+.jrn-add-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 22px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    border-bottom: 1px solid var(--color-border-muted);
+}
+
+.jrn-add-card-header svg {
+    color: var(--color-fg-muted);
+}
+
+.jrn-add-card-body {
+    padding: 20px 22px;
+}
+
+/* Add Form */
+.jrn-add-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.jrn-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.jrn-input-name { flex: 1; }
+.jrn-input-issn { width: 160px; flex-shrink: 0; }
+
+.jrn-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.jrn-input {
+    padding: 9px 14px;
+    font-size: 14px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.jrn-input:focus {
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 0 0 3px rgba(91,164,176,0.2);
+}
+
+[data-theme="dark"] .jrn-input:focus {
+    box-shadow: 0 0 0 3px rgba(91,164,176,0.3);
+}
+
+.jrn-input::placeholder {
+    color: var(--color-fg-muted);
+}
+
+/* Buttons */
+.jrn-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.jrn-btn-add {
+    background: linear-gradient(135deg, #5BA4B0, #4A8E99);
+    color: #fff;
+    border-color: rgba(31,35,40,0.15);
+}
+.jrn-btn-add:hover {
+    background: linear-gradient(135deg, #4A8E99, #3E7A84);
+    box-shadow: 0 2px 8px rgba(91,164,176,0.3);
+}
+
+[data-theme="dark"] .jrn-btn-add {
+    background: linear-gradient(135deg, #5BA4B0, #7CC5D0);
+    border-color: rgba(240,246,252,0.1);
+}
+
+.jrn-btn-save {
+    background: #1a7f37;
+    color: #fff;
+    border-color: rgba(31,35,40,0.15);
+}
+.jrn-btn-save:hover {
+    background: #178132;
+}
+
+[data-theme="dark"] .jrn-btn-save {
+    background: #238636;
+}
+
+.jrn-btn-cancel {
+    background: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+    border-color: var(--color-border-default);
+}
+.jrn-btn-cancel:hover {
+    background: var(--color-canvas-inset);
+    color: var(--color-fg-default);
+}
+
+.jrn-btn-del {
+    background: #cf222e;
+    color: #fff;
+    border-color: rgba(31,35,40,0.15);
+}
+.jrn-btn-del:hover {
+    background: #a40e26;
+}
+
+[data-theme="dark"] .jrn-btn-del {
+    background: #da3633;
+}
+
+/* Message */
+.jrn-message {
+    margin-top: 10px;
+    font-size: 13px;
+    min-height: 0;
+    transition: all 0.2s;
+}
+
+.jrn-message.jrn-msg-ok { color: #1a7f37; }
+.jrn-message.jrn-msg-err { color: #cf222e; }
+[data-theme="dark"] .jrn-message.jrn-msg-ok { color: #3fb950; }
+[data-theme="dark"] .jrn-message.jrn-msg-err { color: #f85149; }
+
+/* Count badge */
+.jrn-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 22px;
+    padding: 0 7px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    color: var(--color-fg-muted);
+}
+
+/* Journal list */
+.jrn-list {
+    /* no extra padding — items have their own */
+}
+
+.jrn-item {
+    border-bottom: 1px solid var(--color-border-muted);
+    transition: background 0.1s;
+}
+
+.jrn-item:last-child {
+    border-bottom: none;
+}
+
+.jrn-item:hover {
+    background: var(--color-canvas-subtle);
+}
+
+.jrn-item-view {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    gap: 16px;
+}
+
+.jrn-item-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.jrn-item-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    text-decoration: none;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.jrn-item-name:hover {
+    color: var(--color-accent-fg);
+    text-decoration: underline;
+}
+
+.jrn-item-issn {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.jrn-item-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.jrn-item-stat {
+    font-size: 12px;
+    color: var(--color-fg-subtle);
+}
+
+.jrn-item-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-fg-subtle);
+}
+
+.jrn-item-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.jrn-action-btn {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    background: var(--color-canvas-default);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.jrn-action-edit {
+    color: var(--color-fg-muted);
+}
+.jrn-action-edit:hover {
+    color: var(--color-accent-fg);
+    border-color: var(--color-accent-emphasis);
+    background: rgba(91,164,176,0.08);
+}
+
+.jrn-action-del {
+    color: var(--color-fg-muted);
+}
+.jrn-action-del:hover {
+    color: #cf222e;
+    border-color: rgba(207,34,46,0.4);
+    background: rgba(207,34,46,0.08);
+}
+[data-theme="dark"] .jrn-action-del:hover {
+    color: #f85149;
+    border-color: rgba(248,81,73,0.4);
+}
+
+/* Edit row (inline) */
+.jrn-item-edit {
+    padding: 12px 22px 16px;
+    background: var(--color-canvas-subtle);
+}
+
+.jrn-edit-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+/* Empty */
+.jrn-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--color-fg-muted);
+}
+
+.jrn-empty p {
+    margin: 12px 0 0;
+    font-size: 14px;
+}
+
+/* =============================================
+   CONFIRM MODAL
+   ============================================= */
+.jrn-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
+
+.jrn-modal-overlay.active {
+    display: flex;
+}
+
+.jrn-modal {
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    padding: 28px 30px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+}
+
+.jrn-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.jrn-modal-header h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
+.jrn-modal-text {
+    font-size: 14px;
+    color: var(--color-fg-muted);
+    margin: 0 0 20px 0;
+    line-height: 1.5;
+}
+
+.jrn-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+@media (max-width: 768px) {
+    .adm-sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        height: 100vh;
+        width: 270px;
+        transition: left 0.25s ease;
+        box-shadow: none;
+    }
+    .adm-sidebar.open {
+        left: 0;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    }
+    .adm-sidebar-close { display: flex; }
+    .adm-mobile-header { display: flex; }
+    .adm-toolbar { display: none; }
+    .adm-main { padding: 20px 16px 36px; }
+    .adm-welcome-title { font-size: 22px; }
+
+    .jrn-add-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .jrn-input-issn { width: 100%; }
+    .jrn-edit-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .jrn-edit-row .jrn-input-issn { width: 100%; }
+    .jrn-edit-row .jrn-btn { align-self: flex-start; }
+    .jrn-item-view { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .jrn-item-actions { align-self: flex-end; }
+}
+</style>
+
+<script>
+let deleteId = null;
+
+function toggleAddForm() {
+    document.getElementById('addCard').classList.toggle('form-open');
+}
+
+function showMsg(el, text, ok) {
+    el.textContent = text;
+    el.className = 'jrn-message ' + (ok ? 'jrn-msg-ok' : 'jrn-msg-err');
+    if (ok) setTimeout(() => { el.textContent = ''; el.className = 'jrn-message'; }, 3000);
+}
+
+function addJournal() {
+    const name = document.getElementById('addName').value.trim();
+    const issn = document.getElementById('addIssn').value.trim();
+    const msg = document.getElementById('addMessage');
+
+    if (!name) {
+        showMsg(msg, 'Введите название журнала', false);
+        return;
+    }
+
+    fetch('/admin/journals/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ name, issn })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showMsg(msg, 'Журнал добавлен!', true);
+            document.getElementById('addName').value = '';
+            document.getElementById('addIssn').value = '';
+            // Reload page to show new journal with correct stats
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showMsg(msg, data.message || 'Ошибка', false);
+        }
+    })
+    .catch(() => showMsg(msg, 'Ошибка сети', false));
+}
+
+function startEdit(id) {
+    const item = document.getElementById('journal-' + id);
+    item.querySelector('.jrn-item-view').style.display = 'none';
+    item.querySelector('.jrn-item-edit').style.display = 'block';
+    item.querySelector('.jrn-edit-name').focus();
+}
+
+function cancelEdit(id) {
+    const item = document.getElementById('journal-' + id);
+    item.querySelector('.jrn-item-view').style.display = '';
+    item.querySelector('.jrn-item-edit').style.display = 'none';
+    // Reset message
+    const msg = document.getElementById('editMessage-' + id);
+    if (msg) { msg.textContent = ''; msg.className = 'jrn-message'; }
+}
+
+function saveEdit(id) {
+    const item = document.getElementById('journal-' + id);
+    const name = item.querySelector('.jrn-edit-name').value.trim();
+    const issn = item.querySelector('.jrn-edit-issn').value.trim();
+    const msg = document.getElementById('editMessage-' + id);
+
+    if (!name) {
+        showMsg(msg, 'Название не может быть пустым', false);
+        return;
+    }
+
+    fetch('/admin/journals/' + id + '/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ name, issn })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Update view
+            item.querySelector('.jrn-item-name').textContent = data.name;
+            const issnEl = item.querySelector('.jrn-item-issn');
+            if (data.issn) {
+                if (issnEl) {
+                    issnEl.textContent = 'ISSN: ' + data.issn;
+                } else {
+                    const span = document.createElement('span');
+                    span.className = 'jrn-item-issn';
+                    span.textContent = 'ISSN: ' + data.issn;
+                    item.querySelector('.jrn-item-name').after(span);
+                }
+            } else if (issnEl) {
+                issnEl.remove();
+            }
+            cancelEdit(id);
+        } else {
+            showMsg(msg, data.message || 'Ошибка', false);
+        }
+    })
+    .catch(() => showMsg(msg, 'Ошибка сети', false));
+}
+
+function deleteJournal(id, name) {
+    deleteId = id;
+    document.getElementById('confirmText').textContent = 'Вы уверены, что хотите удалить журнал «' + name + '»? Это действие нельзя отменить.';
+    document.getElementById('confirmModal').classList.add('active');
+}
+
+function closeConfirm() {
+    document.getElementById('confirmModal').classList.remove('active');
+    deleteId = null;
+}
+
+function confirmDelete() {
+    if (!deleteId) return;
+    const id = deleteId;
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Удаление...';
+
+    fetch('/admin/journals/' + id + '/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const item = document.getElementById('journal-' + id);
+            item.style.transition = 'opacity 0.3s, max-height 0.3s';
+            item.style.opacity = '0';
+            item.style.maxHeight = item.offsetHeight + 'px';
+            setTimeout(() => {
+                item.style.maxHeight = '0';
+                item.style.overflow = 'hidden';
+                item.style.padding = '0';
+                item.style.borderBottom = 'none';
+            }, 50);
+            setTimeout(() => item.remove(), 350);
+            closeConfirm();
+            // Update count
+            const countEl = document.querySelector('.jrn-count');
+            if (countEl) countEl.textContent = parseInt(countEl.textContent) - 1;
+        } else {
+            alert(data.message || 'Ошибка при удалении');
+            closeConfirm();
+        }
+        btn.disabled = false;
+        btn.textContent = 'Удалить';
+    })
+    .catch(() => {
+        alert('Ошибка сети');
+        closeConfirm();
+        btn.disabled = false;
+        btn.textContent = 'Удалить';
+    });
+}
+
+// Enter key support
+document.getElementById('addName').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addJournal();
+});
+document.getElementById('addIssn').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addJournal();
+});
+
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+function toggleAdmTheme() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = next === 'dark' ? '☀️' : '🌙'; });
+    var hi = document.getElementById('theme-icon');
+    if (hi) hi.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+    var t = localStorage.getItem('theme') || 'light';
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
+})();
+</script>
+{% endblock %}

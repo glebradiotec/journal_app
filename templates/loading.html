@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Загрузка...</title>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');</script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <style>
+        html { background: var(--color-canvas-default); }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--color-canvas-default);
+            overflow: hidden;
+        }
+
+        .loading-container {
+            position: relative;
+            width: 340px;
+            opacity: 0;
+            animation: fadeIn 0.4s ease-out 0.1s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Серый логотип (фон) */
+        .logo-gray {
+            display: block;
+            width: 100%;
+            height: auto;
+            filter: grayscale(1) brightness(1.8) opacity(0.5);
+        }
+
+        [data-theme="dark"] .logo-gray {
+            filter: grayscale(1) brightness(0.35) opacity(0.6);
+        }
+
+        /* Цветной логотип (заполнение) */
+        .logo-color-wrap {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            clip-path: inset(100% 0 0 0);
+            animation: fillUp 2.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.5s forwards;
+        }
+
+        .logo-color-wrap img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        [data-theme="dark"] .logo-color-wrap img {
+            filter: brightness(1.15) saturate(1.1);
+        }
+
+        @keyframes fillUp {
+            0%   { clip-path: inset(100% 0 0 0); }
+            100% { clip-path: inset(0% 0 0 0); }
+        }
+
+        /* Blur-выход страницы загрузки */
+        body.fade-out {
+            animation: pageOut 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+        }
+
+        @keyframes pageOut {
+            to {
+                opacity: 0;
+                filter: blur(6px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-container">
+        <!-- Серый (фоновый) логотип -->
+        <img class="logo-gray" src="{{ url_for('static', filename='logo.png') }}" alt="">
+
+        <!-- Цветной логотип поверх, заполняется снизу вверх -->
+        <div class="logo-color-wrap">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Радиотехника">
+        </div>
+    </div>
+
+    <script>
+        // Редирект после завершения анимации
+        const ANIMATION_DELAY = 500;   // задержка начала заполнения
+        const ANIMATION_FILL  = 2200;  // длительность заполнения
+        const PAUSE_AFTER     = 400;   // пауза после заполнения
+
+        const totalWait = ANIMATION_DELAY + ANIMATION_FILL + PAUSE_AFTER;
+
+        setTimeout(function() {
+            // Передаём флаг для анимации перелёта на целевой странице
+            sessionStorage.setItem('fromLoading', '1');
+            window.location.href = "{{ next_url }}";
+        }, totalWait);
+    </script>
+</body>
+</html>

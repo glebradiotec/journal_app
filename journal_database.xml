@@ -1,0 +1,165 @@
+<?xml version="1.0" ?>
+<database name="journal_app">
+  <table name="journal">
+    <schema>
+      <column name="id" type="INTEGER" nullable="NO"/>
+      <column name="name" type="VARCHAR(100)" nullable="NO"/>
+      <column name="issn" type="VARCHAR(20)" nullable="YES"/>
+    </schema>
+    <data count="14">
+      <row>
+        <id>1</id>
+        <name>Антенны</name>
+        <issn>0320-9601</issn>
+      </row>
+      <row>
+        <id>2</id>
+        <name>Биомедицинская радиоэлектроника</name>
+        <issn>2074-4118</issn>
+      </row>
+      <row>
+        <id>3</id>
+        <name>Динамика сложных систем - XXI век</name>
+        <issn>2220-3510</issn>
+      </row>
+      <row>
+        <id>4</id>
+        <name>Информационно-измерительные и управляющие системы</name>
+        <issn>1996-5981</issn>
+      </row>
+      <row>
+        <id>5</id>
+        <name>Нанотехнологии: разработка, применение - XXI век</name>
+        <issn>2075-1417</issn>
+      </row>
+      <row>
+        <id>6</id>
+        <name>Наукоемкие технологии</name>
+        <issn>2220-3508</issn>
+      </row>
+      <row>
+        <id>7</id>
+        <name>Нелинейный мир</name>
+        <issn>2073-4407</issn>
+      </row>
+      <row>
+        <id>8</id>
+        <name>Нейрокомпьютеры: разработка, применение</name>
+        <issn>2073-0565</issn>
+      </row>
+      <row>
+        <id>9</id>
+        <name>Радиотехника</name>
+        <issn>0033-8494</issn>
+      </row>
+      <row>
+        <id>10</id>
+        <name>Системы высокой доступности</name>
+        <issn>2072-0505</issn>
+      </row>
+      <row>
+        <id>11</id>
+        <name>Спутниковые системы связи и вещания</name>
+        <issn>2072-8735</issn>
+      </row>
+      <row>
+        <id>12</id>
+        <name>Технологии живых систем</name>
+        <issn>1998-4927</issn>
+      </row>
+      <row>
+        <id>13</id>
+        <name>Успехи современной радиоэлектроники</name>
+        <issn>2070-0784</issn>
+      </row>
+      <row>
+        <id>14</id>
+        <name>Электромагнитные волны и электронные системы</name>
+        <issn>1560-4128</issn>
+      </row>
+    </data>
+  </table>
+  <table name="issue">
+    <schema>
+      <column name="id" type="INTEGER" nullable="NO"/>
+      <column name="number" type="INTEGER" nullable="NO"/>
+      <column name="year" type="INTEGER" nullable="NO"/>
+      <column name="position" type="INTEGER" nullable="YES"/>
+      <column name="journal_id" type="INTEGER" nullable="NO"/>
+    </schema>
+    <data count="4">
+      <row>
+        <id>1</id>
+        <number>1</number>
+        <year>2026</year>
+        <position>3</position>
+        <journal_id>1</journal_id>
+      </row>
+      <row>
+        <id>2</id>
+        <number>2</number>
+        <year>2026</year>
+        <position>2</position>
+        <journal_id>1</journal_id>
+      </row>
+      <row>
+        <id>3</id>
+        <number>3</number>
+        <year>2026</year>
+        <position>1</position>
+        <journal_id>1</journal_id>
+      </row>
+      <row>
+        <id>4</id>
+        <number>6</number>
+        <year>2025</year>
+        <position>0</position>
+        <journal_id>1</journal_id>
+      </row>
+    </data>
+  </table>
+  <table name="article">
+    <schema>
+      <column name="id" type="INTEGER" nullable="NO"/>
+      <column name="title" type="VARCHAR(200)" nullable="NO"/>
+      <column name="authors" type="VARCHAR(200)" nullable="YES"/>
+      <column name="payment_received" type="BOOLEAN" nullable="YES"/>
+      <column name="edited" type="BOOLEAN" nullable="YES"/>
+      <column name="has_review" type="BOOLEAN" nullable="YES"/>
+      <column name="notes" type="TEXT" nullable="YES"/>
+      <column name="issue_id" type="INTEGER" nullable="NO"/>
+    </schema>
+    <data count="3">
+      <row>
+        <id>1</id>
+        <title>Алгоритмы углового сверхразрешения MUSIC на базе методов NIPALS и Якоби</title>
+        <authors>П. Н. Башлы, В. Г. Денисенко, С. Е. Мищенко, В. В. Шацкий</authors>
+        <payment_received>1</payment_received>
+        <edited>1</edited>
+        <has_review>1</has_review>
+        <notes>Взять 5000 за срочность! </notes>
+        <issue_id>4</issue_id>
+      </row>
+      <row>
+        <id>2</id>
+        <title>Метод синтеза антенной решетки векторных антенн по заданной амплитудной диаграмме направленности</title>
+        <authors>С. В. Землянский, С. Е. Мищенко</authors>
+        <payment_received>0</payment_received>
+        <edited>1</edited>
+        <has_review>0</has_review>
+        <notes/>
+        <issue_id>4</issue_id>
+      </row>
+      <row>
+        <id>3</id>
+        <title>Управление фазой Панчаратнама-Берри обратного рассеяния от цилиндрических метаповерхностей</title>
+        <authors>А. И. Семенихин, А. Н. Савицкий</authors>
+        <payment_received>0</payment_received>
+        <edited>0</edited>
+        <has_review>1</has_review>
+        <notes/>
+        <issue_id>4</issue_id>
+      </row>
+    </data>
+  </table>
+</database>

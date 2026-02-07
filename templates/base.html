@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');</script>
+    <title>{% block title %}Научные журналы{% endblock %}</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <style>
+        html {
+            background: var(--color-canvas-default);
+            scrollbar-gutter: stable;
+        }
+        
+        /* Скрываем основной хедер в админке */
+        body.adm-body .gh-header-wrapper {
+            display: none;
+        }
+        
+        /* Анимация входа — только первый заход на сайт */
+        .page-wrap {
+            opacity: 0;
+            transform: translateY(18px);
+            animation: pageSlideUp 0.3s ease-out 0.04s forwards;
+        }
+        
+        /* Мгновенное появление (без анимации) */
+        .page-wrap.no-anim {
+            opacity: 1;
+            transform: none;
+            animation: none;
+        }
+        
+        @keyframes pageSlideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* SPA progress bar */
+        #spa-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #5BA4B0, #7CC5D0);
+            z-index: 10001;
+            width: 0;
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 0 2px 2px 0;
+        }
+    </style>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div id="spa-progress"></div>
+    <div class="page-wrap">
+        {% include 'header.html' %}
+
+        <main id="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
+    <script>
+        (function() {
+            var pageWrap = document.querySelector('.page-wrap');
+            
+            // Проверяем флаг загрузки
+            if (sessionStorage.getItem('fromLoading') && !window.__fromLoading) {
+                sessionStorage.removeItem('fromLoading');
+                window.__skipPageAnimation = true;
+            }
+            
+            // Пришли с экрана загрузки — показываем сразу без анимации
+            if (window.__skipPageAnimation) {
+                pageWrap.classList.add('no-anim');
+            }
+        })();
+        
+        // ========== SPA Router — мгновенные переходы без перезагрузки ==========
+        (function() {
+            var mainEl = document.getElementById('main-content');
+            var bar = document.getElementById('spa-progress');
+            if (!mainEl || !bar) return;
+            
+            var prefetchCache = {};
+            var isNavigating = false;
+            var loadedScripts = {};
+            
+            // Запоминаем уже загруженные внешние скрипты
+            document.querySelectorAll('script[src]').forEach(function(s) {
+                loadedScripts[s.src] = true;
+                // Также по атрибуту (без origin)
+                var attr = s.getAttribute('src');
+                if (attr) loadedScripts[attr] = true;
+            });
+            
+            // ---- Progress bar ----
+            function showProgress() {
+                bar.style.transition = 'none';
+                bar.style.width = '0';
+                bar.style.opacity = '1';
+                void bar.offsetWidth;
+                bar.style.transition = 'width 0.6s cubic-bezier(0.4,0,0.2,1)';
+                bar.style.width = '70%';
+            }
+            
+            function finishProgress() {
+                bar.style.transition = 'width 0.15s ease';
+                bar.style.width = '100%';
+                setTimeout(function() {
+                    bar.style.transition = 'opacity 0.3s';
+                    bar.style.opacity = '0';
+                }, 150);
+            }
+            
+            // ---- Helpers ----
+            function shouldIntercept(href) {
+                if (!href) return false;
+                if (href.startsWith('#')) return false;
+                if (!href.startsWith('/') && !href.startsWith('?')) return false;
+                if (href === '/logout') return false;
+                if (href.indexOf('/download/') !== -1) return false;
+                if (href.indexOf('/uploads/') !== -1) return false;
+                if (href.indexOf('/export') !== -1) return false;
+                return true;
+            }
+            
+            function resolveHref(href) {
+                var a = document.createElement('a');
+                a.href = href;
+                return a.pathname + a.search;
+            }
+            
+            function isSamePage(href) {
+                return resolveHref(href) === (location.pathname + location.search);
+            }
+            
+            function fetchPage(url, skipRedirect) {
+                return fetch(url, { credentials: 'same-origin' }).then(function(r) {
+                    if (r.redirected && !skipRedirect) {
+                        // Если редирект (напр. на /login) — делаем полный переход
+                        window.location.href = r.url;
+                        return null;
+                    }
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.text();
+                });
+            }
+            
+            function prefetch(url) {
+                url = resolveHref(url);
+                if (prefetchCache[url]) return;
+                // skipRedirect=true — prefetch не должен вызывать навигацию
+                prefetchCache[url] = fetchPage(url, true).catch(function() {
+                    delete prefetchCache[url];
+                });
+            }
+            
+            // ---- Выполнение скриптов в новом контенте ----
+            function executeScripts(container) {
+                var scripts = Array.from(container.querySelectorAll('script'));
+                var externalQueue = [];
+                var inlineQueue = [];
+                
+                scripts.forEach(function(s) {
+                    if (s.src || s.getAttribute('src')) externalQueue.push(s);
+                    else inlineQueue.push(s);
+                });
+                
+                // Загружаем внешние скрипты (пропускаем уже загруженные)
+                var loadPromises = externalQueue.map(function(old) {
+                    var src = old.src || old.getAttribute('src');
+                    if (loadedScripts[src] || loadedScripts[old.getAttribute('src')]) {
+                        old.remove();
+                        return Promise.resolve();
+                    }
+                    return new Promise(function(resolve) {
+                        var ns = document.createElement('script');
+                        ns.src = old.getAttribute('src');
+                        ns.onload = function() {
+                            loadedScripts[ns.src] = true;
+                            loadedScripts[old.getAttribute('src')] = true;
+                            resolve();
+                        };
+                        ns.onerror = resolve;
+                        old.parentNode.replaceChild(ns, old);
+                    });
+                });
+                
+                return Promise.all(loadPromises).then(function() {
+                    // Перехватываем DOMContentLoaded-коллбеки (DOM уже загружен)
+                    var dclCallbacks = [];
+                    var origAEL = document.addEventListener;
+                    document.addEventListener = function(type, fn, opts) {
+                        if (type === 'DOMContentLoaded') {
+                            dclCallbacks.push(fn);
+                        } else {
+                            origAEL.call(document, type, fn, opts);
+                        }
+                    };
+                    
+                    // Выполняем inline-скрипты
+                    inlineQueue.forEach(function(old) {
+                        var ns = document.createElement('script');
+                        ns.textContent = old.textContent;
+                        old.parentNode.replaceChild(ns, old);
+                    });
+                    
+                    // Восстанавливаем оригинальный addEventListener
+                    document.addEventListener = origAEL;
+                    
+                    // Запускаем перехваченные DOMContentLoaded-коллбеки
+                    dclCallbacks.forEach(function(fn) {
+                        try { fn(); } catch(e) { console.error('SPA script error:', e); }
+                    });
+                });
+            }
+            
+            // ---- Навигация ----
+            function navigateTo(url, isPush) {
+                if (isNavigating) return;
+                isNavigating = true;
+                
+                var fullUrl = resolveHref(url);
+                showProgress();
+                
+                // Определяем: текущая страница — админка?
+                var curAdmMain = mainEl.querySelector('.adm-main');
+                var targetPath = fullUrl.replace(location.origin, '').split('?')[0];
+                var admToAdm = curAdmMain && targetPath.startsWith('/admin');
+                
+                // Fade-out: для admin→admin только правую часть, иначе всё
+                var fadeTarget = admToAdm ? curAdmMain : mainEl;
+                fadeTarget.style.transition = 'opacity 80ms ease-out';
+                fadeTarget.style.opacity = '0';
+                
+                var promise = prefetchCache[fullUrl] || fetchPage(fullUrl);
+                delete prefetchCache[fullUrl];
+                
+                // Ждём и fade-out, и загрузку одновременно
+                var fadeDone = new Promise(function(r) { setTimeout(r, 80); });
+                
+                Promise.all([promise, fadeDone]).then(function(results) {
+                    var html = results[0];
+                    if (!html) { isNavigating = false; return; }
+                    
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    var newMain = doc.getElementById('main-content') || doc.querySelector('main');
+                    var newTitle = doc.querySelector('title');
+                    
+                    if (!newMain) {
+                        window.location.href = fullUrl;
+                        return;
+                    }
+                    
+                    if (newTitle) document.title = newTitle.textContent;
+                    if (isPush !== false) history.pushState({ spa: true }, '', fullUrl);
+                    
+                    var newBody = doc.querySelector('body');
+                    if (newBody) document.body.className = newBody.className;
+                    
+                    var newAdmMain = newMain.querySelector('.adm-main');
+                    
+                    if (admToAdm && newAdmMain) {
+                        // ── Админ → Админ: sidebar не трогаем ──
+                        
+                        // 1. Заменяем только контент справа
+                        curAdmMain.innerHTML = newAdmMain.innerHTML;
+                        
+                        // 2. Обновляем активный пункт навигации
+                        var curNav = mainEl.querySelectorAll('.adm-nav-item');
+                        var newNav = newMain.querySelectorAll('.adm-nav-item');
+                        curNav.forEach(function(item) { item.classList.remove('adm-nav-active'); });
+                        newNav.forEach(function(ni) {
+                            if (ni.classList.contains('adm-nav-active')) {
+                                var href = ni.getAttribute('href');
+                                curNav.forEach(function(ci) {
+                                    if (ci.getAttribute('href') === href) ci.classList.add('adm-nav-active');
+                                });
+                            }
+                        });
+                        
+                        // 3. Заменяем page-specific <style> и <script>
+                        //    Сначала добавляем новые, потом удаляем старые
+                        //    (sidebar CSS одинаков — никаких прыжков)
+                        var oldTags = [];
+                        Array.from(mainEl.children).forEach(function(ch) {
+                            if (ch.tagName === 'STYLE' || ch.tagName === 'SCRIPT') oldTags.push(ch);
+                        });
+                        Array.from(newMain.children).forEach(function(ch) {
+                            if (ch.tagName === 'STYLE' || ch.tagName === 'SCRIPT') {
+                                mainEl.appendChild(ch.cloneNode(true));
+                            }
+                        });
+                        oldTags.forEach(function(ch) { ch.remove(); });
+                    } else {
+                        // ── Обычная навигация: заменяем весь контент ──
+                        mainEl.innerHTML = newMain.innerHTML;
+                    }
+                    
+                    // Обновляем кнопки в хедере
+                    var path = location.pathname;
+                    var homeBtn = document.getElementById('home-btn');
+                    var adminBtn = document.getElementById('admin-btn');
+                    if (homeBtn) homeBtn.style.display = path === '/' ? 'none' : '';
+                    if (adminBtn) adminBtn.style.display = path !== '/' ? 'none' : '';
+                    
+                    window.scrollTo(0, 0);
+                    return executeScripts(mainEl);
+                }).then(function() {
+                    if (admToAdm) {
+                        // Sidebar остаётся видимым, fade-in только .adm-main
+                        mainEl.style.opacity = '1';
+                        var am = mainEl.querySelector('.adm-main');
+                        if (am) {
+                            am.style.transition = 'none';
+                            am.style.opacity = '1';
+                        }
+                        // Анимируем только контент справа, sidebar не трогаем
+                        if (window.__runPageEntrance) window.__runPageEntrance(am);
+                    } else {
+                        mainEl.style.transition = 'none';
+                        mainEl.style.opacity = '1';
+                        if (window.__runPageEntrance) window.__runPageEntrance();
+                    }
+                    finishProgress();
+                    isNavigating = false;
+                }).catch(function(err) {
+                    console.error('SPA navigation error:', err);
+                    window.location.href = fullUrl;
+                });
+            }
+            
+            // ---- Перехват кликов по ссылкам ----
+            document.addEventListener('click', function(e) {
+                // Не перехватываем с модификаторами (Ctrl+Click = новая вкладка)
+                if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+                
+                var link = e.target.closest('a[href]');
+                if (!link) return;
+                if (link.target === '_blank') return;
+                
+                var href = link.getAttribute('href');
+                if (!shouldIntercept(href)) return;
+                if (isSamePage(href)) return;
+                
+                e.preventDefault();
+                navigateTo(href, true);
+            });
+            
+            // ---- Prefetch при наведении ----
+            var prefetchTimer = null;
+            document.addEventListener('mouseover', function(e) {
+                var link = e.target.closest('a[href]');
+                if (!link) return;
+                var href = link.getAttribute('href');
+                if (!shouldIntercept(href) || isSamePage(href)) return;
+                clearTimeout(prefetchTimer);
+                prefetchTimer = setTimeout(function() { prefetch(href); }, 65);
+            });
+            
+            // ---- Touch prefetch для мобилок ----
+            document.addEventListener('touchstart', function(e) {
+                var link = e.target.closest('a[href]');
+                if (!link) return;
+                var href = link.getAttribute('href');
+                if (!shouldIntercept(href) || isSamePage(href)) return;
+                prefetch(href);
+            }, { passive: true });
+            
+            // ---- Обработка кнопок назад/вперёд ----
+            window.addEventListener('popstate', function(e) {
+                if (e.state && e.state.spa) {
+                    navigateTo(location.href, false);
+                } else {
+                    // Не SPA-состояние — перезагружаем
+                    location.reload();
+                }
+            });
+            
+            // Помечаем текущее состояние
+            history.replaceState({ spa: true }, '', location.href);
+        })();
+        
+        // bfcache — восстановление при возврате из другого сайта
+        window.addEventListener('pageshow', function(e) {
+            if (e.persisted) {
+                var pw = document.querySelector('.page-wrap');
+                pw.getAnimations().forEach(function(a) { a.cancel(); });
+                pw.style.opacity = '1';
+                pw.style.transform = 'none';
+                document.getElementById('main-content').style.opacity = '1';
+            }
+        });
+        
+        // ========== Animation System — каскады, счётчики, ripple ==========
+        (function() {
+            var STAGGER_MS = 40;    // задержка между карточками
+            var MAX_DELAY = 400;     // макс. задержка (для длинных списков)
+            
+            // ---- Каскадная анимация секций + карточек ----
+            function animateEntrance(container) {
+                // Группа 1: заголовки страниц (появляются первыми)
+                animateGroup(container.querySelectorAll(
+                    '.dashboard-header, .journals-header, .home-hero, .adm-welcome, .adm-mobile-header'
+                ), 0, 320);
+                
+                // Группа 2: статистика
+                animateGroup(container.querySelectorAll(
+                    '.stats-bar, .journals-stats-bar, .home-search-section, .adm-stats-grid'
+                ), 70, 320);
+                
+                // Группа 3: контейнеры таблиц и поиск
+                animateGroup(container.querySelectorAll(
+                    '.table-container, .search-toggle-container'
+                ), 120, 350);
+                
+                // Группа 4: карточки — каскад с stagger
+                var cards = container.querySelectorAll(
+                    '.journal-card, .issue-card, .article-card, .adm-stat-card'
+                );
+                cards.forEach(function(el, i) {
+                    var anim = el.animate([
+                        { opacity: 0, transform: 'translateY(18px) scale(0.98)' },
+                        { opacity: 1, transform: 'translateY(0) scale(1)' }
+                    ], {
+                        duration: 420,
+                        delay: 100 + Math.min(i * STAGGER_MS, MAX_DELAY),
+                        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                        fill: 'backwards'
+                    });
+                    // Полностью удаляем анимацию после завершения,
+                    // чтобы не блокировать CSS hover transitions на transform
+                    anim.finished.then(function() { anim.cancel(); });
+                });
+                
+                // Группа 5: футер
+                animateGroup(container.querySelectorAll('.home-footer'), 300, 400);
+            }
+            
+            function animateGroup(elements, baseDelay, duration) {
+                if (!elements.length) return;
+                Array.from(elements).forEach(function(el, i) {
+                    var anim = el.animate([
+                        { opacity: 0, transform: 'translateY(14px)' },
+                        { opacity: 1, transform: 'translateY(0)' }
+                    ], {
+                        duration: duration,
+                        delay: baseDelay + i * 60,
+                        easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+                        fill: 'backwards'
+                    });
+                    anim.finished.then(function() { anim.cancel(); });
+                });
+            }
+            
+            // ---- Анимация счётчиков (слот-машина) ----
+            function animateCounters(container) {
+                var counters = container.querySelectorAll(
+                    '.stat-value, .journals-stat-value, .journals-count, .adm-stat-number'
+                );
+                counters.forEach(function(el) {
+                    var text = el.textContent.trim();
+                    var target = parseInt(text);
+                    if (isNaN(target) || target <= 0) return;
+                    if (el.dataset.slotBusy) return;
+                    if (el.hasAttribute('data-no-slot')) return;
+                    el.dataset.slotBusy = '1';
+                    
+                    var digits = String(target).split('');
+                    var fontSize = parseFloat(getComputedStyle(el).fontSize) || 16;
+                    var cellH = Math.round(fontSize * 1.35);
+                    
+                    el.textContent = '';
+                    
+                    // Обёртка-окно высотой в одну цифру
+                    var wrapper = document.createElement('span');
+                    wrapper.style.cssText =
+                        'display:inline-flex;height:' + cellH + 'px;' +
+                        'overflow:hidden;line-height:' + cellH + 'px;vertical-align:baseline;';
+                    
+                    var longestEnd = 0;
+                    
+                    digits.forEach(function(d, idx) {
+                        var digit = parseInt(d);
+                        var spins = 2; // полных оборотов 0-9 перед финалом
+                        var totalSteps = spins * 10 + digit;
+                        
+                        // Колонка-лента с цифрами
+                        var reel = document.createElement('span');
+                        reel.style.cssText =
+                            'display:flex;flex-direction:column;will-change:transform;';
+                        
+                        for (var i = 0; i <= totalSteps; i++) {
+                            var cell = document.createElement('span');
+                            cell.style.cssText =
+                                'display:flex;align-items:center;justify-content:center;' +
+                                'height:' + cellH + 'px;min-width:0.62em;';
+                            cell.textContent = String(i % 10);
+                            reel.appendChild(cell);
+                        }
+                        
+                        wrapper.appendChild(reel);
+                        
+                        // Каждая следующая цифра стартует чуть позже и крутится дольше
+                        var delay = 50 + idx * 130;
+                        var dur = 700 + idx * 200;
+                        var endTime = delay + dur;
+                        if (endTime > longestEnd) longestEnd = endTime;
+                        
+                        var targetY = -totalSteps * cellH;
+                        
+                        reel.animate([
+                            { transform: 'translateY(0)' },
+                            { transform: 'translateY(' + targetY + 'px)' }
+                        ], {
+                            duration: dur,
+                            delay: delay,
+                            easing: 'cubic-bezier(0.06, 0.75, 0.18, 1)',
+                            fill: 'forwards'
+                        });
+                    });
+                    
+                    el.appendChild(wrapper);
+                    
+                    // После остановки всех барабанов — возвращаем чистый текст
+                    setTimeout(function() {
+                        el.textContent = text;
+                        delete el.dataset.slotBusy;
+                    }, longestEnd + 120);
+                });
+            }
+            
+            // ---- Ripple-эффект на кнопках (через overlay, не ломает layout) ----
+            document.addEventListener('mousedown', function(e) {
+                var btn = e.target.closest(
+                    '.btn-create, .btn-submit, .btn-primary, .home-btn-primary, ' +
+                    '.action-btn-primary, .login-btn, .search-btn, .btn-export, ' +
+                    '.journals-empty-btn'
+                );
+                if (!btn) return;
+                
+                var rect = btn.getBoundingClientRect();
+                var br = getComputedStyle(btn).borderRadius || '0';
+                
+                // Overlay поверх кнопки — не трогает DOM кнопки
+                var overlay = document.createElement('div');
+                overlay.style.cssText =
+                    'position:fixed;pointer-events:none;overflow:hidden;z-index:9999;' +
+                    'left:' + rect.left + 'px;top:' + rect.top + 'px;' +
+                    'width:' + rect.width + 'px;height:' + rect.height + 'px;' +
+                    'border-radius:' + br + ';';
+                
+                var size = Math.max(rect.width, rect.height) * 2;
+                var x = e.clientX - rect.left - size / 2;
+                var y = e.clientY - rect.top - size / 2;
+                
+                var ripple = document.createElement('span');
+                ripple.className = 'ripple-circle';
+                ripple.style.cssText =
+                    'width:' + size + 'px;height:' + size + 'px;' +
+                    'left:' + x + 'px;top:' + y + 'px;';
+                
+                overlay.appendChild(ripple);
+                document.body.appendChild(overlay);
+                
+                setTimeout(function() { overlay.remove(); }, 600);
+            });
+            
+            // ---- Public API ----
+            window.__runPageEntrance = function(customContainer) {
+                var target = customContainer || document.getElementById('main-content');
+                if (!target) return;
+                animateEntrance(target);
+                animateCounters(target);
+            };
+            
+            // Начальная загрузка — только счётчики (page-wrap уже анимирует вход)
+            setTimeout(function() {
+                var main = document.getElementById('main-content');
+                if (main) animateCounters(main);
+            }, 380);
+        })();
+    </script>
+</body>
+</html>

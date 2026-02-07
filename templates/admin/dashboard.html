@@ -1,0 +1,1049 @@
+{% extends "base.html" %}
+{% block title %}Админ-панель{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<!-- Mobile overlay -->
+<div class="adm-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="adm-layout">
+    <!-- Sidebar -->
+    <aside class="adm-sidebar" id="sidebar">
+        <div class="adm-sidebar-header">
+            <div class="adm-logo">
+                <div class="adm-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                </div>
+                <span class="adm-logo-text">Журналы</span>
+            </div>
+            <button class="adm-sidebar-close" onclick="toggleSidebar()">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
+        </div>
+
+        <nav class="adm-nav">
+            <div class="adm-nav-label">Меню</div>
+            <a href="{{ url_for('admin_dashboard') }}" class="adm-nav-item adm-nav-active">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7h-3.5A1.75 1.75 0 0 1 0 5.25Zm9 0C9 .784 9.784 0 10.75 0h3.5C15.216 0 16 .784 16 1.75v3.5A1.75 1.75 0 0 1 14.25 7h-3.5A1.75 1.75 0 0 1 9 5.25Zm0 9C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25Zm-9 0C0 9.784.784 9 1.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 5.25 16h-3.5A1.75 1.75 0 0 1 0 14.25Z"/>
+                </svg>
+                Dashboard
+            </a>
+            <a href="{{ url_for('admin_journals') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                </svg>
+                Журналы
+            </a>
+            <a href="{{ url_for('admin_articles') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
+                </svg>
+                Все статьи
+            </a>
+            <a href="{{ url_for('bulk_export_articles') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/>
+                </svg>
+                Экспорт
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.001 4.001 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.012.749.749 0 0 1-.885.954.752.752 0 0 1-.549-.514 3.507 3.507 0 0 0-2.522-2.372.75.75 0 0 1-.574-.73v-.352a.75.75 0 0 1 .416-.672A1.5 1.5 0 0 0 11 5.5.75.75 0 0 1 11 4Zm-5.5-.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 3.5Z"/>
+                </svg>
+                Пользователи
+            </a>
+        </nav>
+
+        <div class="adm-sidebar-footer">
+            <div class="adm-user-block">
+                <div class="adm-user-avatar">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/>
+                    </svg>
+                </div>
+                <div class="adm-user-info">
+                    <span class="adm-user-name">{{ current_user.display_name }}</span>
+                    <span class="adm-user-role">{{ current_user.role }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="adm-main">
+        <!-- Top-right toolbar -->
+        <div class="adm-toolbar">
+            <a href="/" class="adm-toolbar-btn" title="На главную">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            </a>
+            <button class="adm-toolbar-btn" onclick="toggleAdmTheme()" title="Переключить тему">
+                <span class="adm-theme-icon">🌙</span>
+            </button>
+            <a href="/logout" class="adm-toolbar-btn adm-toolbar-exit" title="Выйти">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </a>
+        </div>
+
+        <!-- Mobile header -->
+        <div class="adm-mobile-header">
+            <button class="adm-hamburger" onclick="toggleSidebar()">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+            <span class="adm-mobile-title">Админ-панель</span>
+        </div>
+
+        <!-- Welcome -->
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Добро пожаловать!</h1>
+            <p class="adm-welcome-sub">Обзор системы управления журналами</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="adm-stats-grid">
+            <div class="adm-stat-card adm-stat-teal">
+                <div class="adm-stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                </div>
+                <div class="adm-stat-data">
+                    <span class="adm-stat-number">{{ stats.journals }}</span>
+                    <span class="adm-stat-label">Журналов</span>
+                </div>
+            </div>
+            <div class="adm-stat-card adm-stat-green">
+                <div class="adm-stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Z"/>
+                    </svg>
+                </div>
+                <div class="adm-stat-data">
+                    <span class="adm-stat-number">{{ stats.issues }}</span>
+                    <span class="adm-stat-label">Выпусков</span>
+                </div>
+            </div>
+            <div class="adm-stat-card adm-stat-blue">
+                <div class="adm-stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
+                    </svg>
+                </div>
+                <div class="adm-stat-data">
+                    <span class="adm-stat-number">{{ stats.articles }}</span>
+                    <span class="adm-stat-label">Статей</span>
+                </div>
+            </div>
+            <div class="adm-stat-card adm-stat-orange">
+                <div class="adm-stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16ZM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.19l-.265.148a.75.75 0 0 1-.729-1.31l.265-.148c.093-.051.183-.106.258-.153.112-.073.187-.13.232-.18a.369.369 0 0 0 .073-.133.749.749 0 0 0 .05-.225c0-.228-.127-.427-.32-.57A1.27 1.27 0 0 0 8 5.5c-.373 0-.593.097-.728.18a.972.972 0 0 0-.252.253ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/>
+                    </svg>
+                </div>
+                <div class="adm-stat-data">
+                    <span class="adm-stat-number">{{ stats.unpaid }}</span>
+                    <span class="adm-stat-label">Без оплаты</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart + Activity Row -->
+        <div class="adm-duo-row">
+            <!-- Bar Chart -->
+            <div class="adm-card adm-chart-card">
+                <div class="adm-card-header">
+                    <h2 class="adm-card-title">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Zm14.28 2.53-5.25 5.25a.75.75 0 0 1-1.06 0L7 7.06 4.28 9.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.25-3.25a.75.75 0 0 1 1.06 0L10 7.94l4.72-4.72a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z"/>
+                        </svg>
+                        Статьи по журналам
+                    </h2>
+                </div>
+                <div class="adm-card-body">
+                    {% if chart_data %}
+                    <div class="adm-chart">
+                        {% for item in chart_data %}
+                        <div class="adm-chart-row">
+                            <span class="adm-chart-label" title="{{ item.name }}">{{ item.name[:20] }}{% if item.name|length > 20 %}...{% endif %}</span>
+                            <div class="adm-chart-bar-wrap">
+                                <div class="adm-chart-bar" style="width: {{ (item.count / max_articles * 100)|round }}%"></div>
+                            </div>
+                            <span class="adm-chart-value">{{ item.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="adm-empty-small">
+                        <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.3">
+                            <path d="M1.5 1.75V13.5h13.75a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75V1.75a.75.75 0 0 1 1.5 0Z"/>
+                        </svg>
+                        <p>Нет данных для отображения</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Activity Feed -->
+            <div class="adm-card adm-activity-card">
+                <div class="adm-card-header">
+                    <h2 class="adm-card-title">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0ZM8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Zm.5 4.75a.75.75 0 0 0-1.5 0v3.5a.75.75 0 0 0 .471.696l2.5 1a.75.75 0 0 0 .557-1.392L8.5 7.742Z"/>
+                        </svg>
+                        Последние действия
+                    </h2>
+                </div>
+                <div class="adm-card-body adm-activity-body">
+                    {% if recent_activity %}
+                    <div class="adm-activity-list">
+                        {% for log in recent_activity %}
+                        <div class="adm-activity-item">
+                            <div class="adm-activity-dot
+                                {% if log.action == 'created' %} adm-dot-green
+                                {% elif log.action == 'deleted' %} adm-dot-red
+                                {% elif log.action == 'toggled' %} adm-dot-yellow
+                                {% else %} adm-dot-blue{% endif %}"></div>
+                            <div class="adm-activity-content">
+                                <p class="adm-activity-text">
+                                    {% if log.action == 'created' %}<strong>Создано</strong>
+                                    {% elif log.action == 'updated' %}<strong>Обновлено</strong>
+                                    {% elif log.action == 'deleted' %}<strong>Удалено</strong>
+                                    {% elif log.action == 'toggled' %}<strong>Статус</strong>
+                                    {% endif %}
+                                    <span class="adm-activity-entity">{{ log.entity_type }}</span>
+                                    {% if log.entity_title %}&laquo;{{ log.entity_title[:40] }}{% if log.entity_title|length > 40 %}...{% endif %}&raquo;{% endif %}
+                                </p>
+                                {% if log.details %}<p class="adm-activity-detail">{{ log.details }}</p>{% endif %}
+                                <span class="adm-activity-time">{{ log.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="adm-empty-small">
+                        <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.3">
+                            <path d="M1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0ZM8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0Z"/>
+                        </svg>
+                        <p>Пока нет действий</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Articles Table -->
+        {% if recent_articles %}
+        <div class="adm-card adm-table-card">
+            <div class="adm-card-header">
+                <h2 class="adm-card-title">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM6.5 6.5v8h7.75a.25.25 0 0 0 .25-.25V6.5Zm8-1.5V1.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25V5Zm-8 10H1.75a.25.25 0 0 1-.25-.25V6.5H6Z"/>
+                    </svg>
+                    Последние статьи
+                </h2>
+                <a href="{{ url_for('admin_articles') }}" class="adm-card-link">Все статьи &rarr;</a>
+            </div>
+            <div class="adm-table-wrap">
+                <table class="adm-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Название</th>
+                            <th>Журнал / Выпуск</th>
+                            <th>Оплата</th>
+                            <th>Рецензия</th>
+                            <th>Редакт.</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for article in recent_articles %}
+                        <tr>
+                            <td class="adm-td-id">#{{ article.id }}</td>
+                            <td class="adm-td-title">{{ article.title[:50] }}{% if article.title|length > 50 %}...{% endif %}</td>
+                            <td class="adm-td-meta">
+                                {% if article.issue %}
+                                <span class="adm-meta-journal">{{ article.issue.journal.name[:22] }}{% if article.issue.journal.name|length > 22 %}...{% endif %}</span>
+                                <span class="adm-meta-badge">№{{ article.issue.number }}/{{ article.issue.year }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if article.payment_received %}
+                                <span class="adm-check adm-check-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="adm-check adm-check-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if article.has_review %}
+                                <span class="adm-check adm-check-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="adm-check adm-check-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if article.edited %}
+                                <span class="adm-check adm-check-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="adm-check adm-check-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('edit_article', article_id=article.id) }}" class="adm-btn-open">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+/* =============================================
+   ADMIN DASHBOARD — BLOCKY LAYOUT
+   ============================================= */
+
+/* Layout */
+.adm-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Overlay for mobile sidebar */
+.adm-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 998;
+    backdrop-filter: blur(2px);
+}
+
+.adm-overlay.active {
+    display: block;
+}
+
+/* =============================================
+   SIDEBAR
+   ============================================= */
+.adm-sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background: var(--color-canvas-subtle);
+    border-right: 1px solid var(--color-border-default);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 999;
+}
+
+.adm-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--color-border-muted);
+}
+
+.adm-sidebar-close {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.adm-sidebar-close:hover {
+    background: var(--color-canvas-inset);
+}
+
+.adm-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.adm-logo-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #5BA4B0, #4A8E99);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+[data-theme="dark"] .adm-logo-icon {
+    background: linear-gradient(135deg, #5BA4B0, #7CC5D0);
+}
+
+.adm-logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+}
+
+/* Navigation */
+.adm-nav {
+    padding: 16px 12px;
+}
+
+.adm-nav-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--color-fg-muted);
+    padding: 0 12px;
+    margin-bottom: 8px;
+}
+
+.adm-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-fg-muted);
+    text-decoration: none;
+    border-radius: 8px;
+    margin-bottom: 2px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.adm-nav-item:hover {
+    background: var(--color-canvas-inset);
+    color: var(--color-fg-default);
+}
+
+.adm-nav-active {
+    background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.06));
+    color: #5BA4B0;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .adm-nav-active {
+    color: #7CC5D0;
+    background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.06));
+}
+
+.adm-nav-active:hover {
+    background: linear-gradient(135deg, rgba(91,164,176,0.18), rgba(91,164,176,0.1));
+}
+
+/* Sidebar footer */
+.adm-sidebar-footer {
+    padding: 8px 12px 20px;
+    border-top: 1px solid var(--color-border-muted);
+    margin-top: 8px;
+}
+
+.adm-user-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
+
+.adm-user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-canvas-inset);
+    border: 2px solid var(--color-border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-fg-muted);
+    flex-shrink: 0;
+}
+
+.adm-user-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.adm-user-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+}
+
+.adm-user-role {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+}
+
+/* =============================================
+   MAIN CONTENT
+   ============================================= */
+.adm-main {
+    flex: 1;
+    min-width: 0;
+    padding: 32px 36px 48px;
+    background: var(--color-canvas-default);
+    position: relative;
+}
+
+/* Toolbar — правый верхний угол */
+.adm-toolbar { position: absolute; top: 20px; right: 24px; display: flex; gap: 6px; z-index: 10; }
+.adm-toolbar-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.adm-toolbar-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); border-color: var(--color-border-muted); }
+.adm-toolbar-exit:hover { color: #cf222e; border-color: rgba(207,34,46,0.3); background: rgba(207,34,46,0.06); }
+[data-theme="dark"] .adm-toolbar-exit:hover { color: #f85149; border-color: rgba(248,81,73,0.3); background: rgba(248,81,73,0.08); }
+
+/* Mobile header (hidden on desktop) */
+.adm-mobile-header {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.adm-hamburger {
+    background: none;
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    padding: 8px;
+    color: var(--color-fg-default);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.adm-hamburger:hover {
+    background: var(--color-canvas-subtle);
+}
+
+.adm-mobile-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+}
+
+/* Welcome */
+.adm-welcome {
+    margin-bottom: 28px;
+}
+
+.adm-welcome-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0 0 6px 0;
+}
+
+.adm-welcome-sub {
+    font-size: 15px;
+    color: var(--color-fg-muted);
+    margin: 0;
+}
+
+/* =============================================
+   STATS GRID
+   ============================================= */
+.adm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.adm-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.adm-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.adm-stat-data {
+    display: flex;
+    flex-direction: column;
+}
+
+.adm-stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-fg-default);
+}
+
+.adm-stat-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-muted);
+}
+
+/* Color variants */
+.adm-stat-teal .adm-stat-icon {
+    background: linear-gradient(135deg, rgba(91,164,176,0.15), rgba(91,164,176,0.05));
+    color: #5BA4B0;
+}
+.adm-stat-green .adm-stat-icon {
+    background: linear-gradient(135deg, rgba(31,136,61,0.15), rgba(31,136,61,0.05));
+    color: #1a7f37;
+}
+.adm-stat-blue .adm-stat-icon {
+    background: linear-gradient(135deg, rgba(130,80,223,0.15), rgba(130,80,223,0.05));
+    color: #8250df;
+}
+.adm-stat-orange .adm-stat-icon {
+    background: linear-gradient(135deg, rgba(154,103,0,0.15), rgba(154,103,0,0.05));
+    color: #9a6700;
+}
+
+[data-theme="dark"] .adm-stat-teal .adm-stat-icon { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.2), rgba(124,197,208,0.05)); }
+[data-theme="dark"] .adm-stat-green .adm-stat-icon { color: #3fb950; background: linear-gradient(135deg, rgba(63,185,80,0.2), rgba(63,185,80,0.05)); }
+[data-theme="dark"] .adm-stat-blue .adm-stat-icon { color: #a371f7; background: linear-gradient(135deg, rgba(163,113,247,0.2), rgba(163,113,247,0.05)); }
+[data-theme="dark"] .adm-stat-orange .adm-stat-icon { color: #d29922; background: linear-gradient(135deg, rgba(210,153,34,0.2), rgba(210,153,34,0.05)); }
+
+/* =============================================
+   CARDS (generic)
+   ============================================= */
+.adm-card {
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 24px;
+}
+
+.adm-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--color-border-muted);
+}
+
+.adm-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
+.adm-card-title svg {
+    color: var(--color-fg-muted);
+}
+
+.adm-card-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-accent-fg);
+    text-decoration: none;
+}
+
+.adm-card-link:hover {
+    text-decoration: underline;
+}
+
+.adm-card-body {
+    padding: 20px 22px;
+}
+
+/* =============================================
+   DUO ROW (chart + activity)
+   ============================================= */
+.adm-duo-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 0;
+}
+
+/* =============================================
+   BAR CHART (pure CSS)
+   ============================================= */
+.adm-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.adm-chart-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.adm-chart-label {
+    width: 130px;
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-muted);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.adm-chart-bar-wrap {
+    flex: 1;
+    height: 24px;
+    background: var(--color-canvas-subtle);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.adm-chart-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #5BA4B0, #4A8E99);
+    border-radius: 6px;
+    min-width: 4px;
+    transition: width 0.6s ease;
+}
+
+[data-theme="dark"] .adm-chart-bar {
+    background: linear-gradient(90deg, #5BA4B0, #7CC5D0);
+}
+
+.adm-chart-value {
+    width: 36px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    text-align: right;
+}
+
+/* =============================================
+   ACTIVITY FEED
+   ============================================= */
+.adm-activity-body {
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 16px 22px;
+}
+
+.adm-activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.adm-activity-item {
+    display: flex;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border-muted);
+}
+
+.adm-activity-item:last-child {
+    border-bottom: none;
+}
+
+.adm-activity-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 5px;
+}
+
+.adm-dot-green { background: #1a7f37; }
+.adm-dot-red { background: #cf222e; }
+.adm-dot-yellow { background: #9a6700; }
+.adm-dot-blue { background: #5BA4B0; }
+
+[data-theme="dark"] .adm-dot-green { background: #3fb950; }
+[data-theme="dark"] .adm-dot-red { background: #f85149; }
+[data-theme="dark"] .adm-dot-yellow { background: #d29922; }
+[data-theme="dark"] .adm-dot-blue { background: #7CC5D0; }
+
+.adm-activity-content {
+    min-width: 0;
+}
+
+.adm-activity-text {
+    font-size: 13px;
+    color: var(--color-fg-default);
+    margin: 0 0 2px 0;
+    line-height: 1.4;
+}
+
+.adm-activity-entity {
+    color: var(--color-fg-muted);
+}
+
+.adm-activity-detail {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    margin: 0 0 2px 0;
+}
+
+.adm-activity-time {
+    font-size: 11px;
+    color: var(--color-fg-subtle);
+}
+
+/* Empty state (small) */
+.adm-empty-small {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--color-fg-muted);
+}
+
+.adm-empty-small p {
+    margin: 10px 0 0;
+    font-size: 13px;
+}
+
+/* =============================================
+   TABLE
+   ============================================= */
+.adm-table-card {
+    overflow: hidden;
+}
+
+.adm-table-wrap {
+    overflow-x: auto;
+}
+
+.adm-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.adm-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-fg-muted);
+    background: var(--color-canvas-subtle);
+    border-bottom: 1px solid var(--color-border-default);
+}
+
+.adm-table td {
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--color-fg-default);
+    border-bottom: 1px solid var(--color-border-muted);
+}
+
+.adm-table tr:last-child td {
+    border-bottom: none;
+}
+
+.adm-table tr:hover td {
+    background: var(--color-canvas-subtle);
+}
+
+.adm-td-id {
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    white-space: nowrap;
+}
+
+.adm-td-title {
+    font-weight: 500;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.adm-td-meta {
+    white-space: nowrap;
+}
+
+.adm-meta-journal {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    display: block;
+}
+
+.adm-meta-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    color: var(--color-fg-muted);
+}
+
+.adm-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.adm-check-ok { color: #1a7f37; }
+.adm-check-no { color: #cf222e; }
+
+[data-theme="dark"] .adm-check-ok { color: #3fb950; }
+[data-theme="dark"] .adm-check-no { color: #f85149; }
+
+.adm-btn-open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--color-accent-fg);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.adm-btn-open:hover {
+    background: var(--color-accent-emphasis);
+    border-color: var(--color-accent-emphasis);
+    color: #fff;
+}
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+@media (max-width: 1100px) {
+    .adm-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .adm-duo-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .adm-sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        height: 100vh;
+        width: 270px;
+        transition: left 0.25s ease;
+        box-shadow: none;
+    }
+
+    .adm-sidebar.open {
+        left: 0;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    }
+
+    .adm-sidebar-close {
+        display: flex;
+    }
+
+    .adm-mobile-header {
+        display: flex;
+    }
+
+    .adm-toolbar {
+        display: none;
+    }
+
+    .adm-main {
+        padding: 20px 16px 36px;
+    }
+
+    .adm-welcome-title {
+        font-size: 22px;
+    }
+
+    .adm-stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .adm-stat-card {
+        padding: 14px;
+        gap: 12px;
+    }
+
+    .adm-stat-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .adm-stat-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .adm-stat-number {
+        font-size: 20px;
+    }
+
+    .adm-chart-label {
+        width: 80px;
+        font-size: 12px;
+    }
+
+    .adm-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+@media (max-width: 480px) {
+    .adm-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+function toggleAdmTheme() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = next === 'dark' ? '☀️' : '🌙'; });
+    var hi = document.getElementById('theme-icon');
+    if (hi) hi.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+    var t = localStorage.getItem('theme') || 'light';
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
+})();
+</script>
+{% endblock %}

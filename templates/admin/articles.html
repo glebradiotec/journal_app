@@ -1,0 +1,735 @@
+{% extends "base.html" %}
+{% block title %}Все статьи{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<!-- Mobile overlay -->
+<div class="adm-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="adm-layout">
+    <!-- Sidebar -->
+    <aside class="adm-sidebar" id="sidebar">
+        <div class="adm-sidebar-header">
+            <div class="adm-logo">
+                <div class="adm-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                </div>
+                <span class="adm-logo-text">Журналы</span>
+            </div>
+            <button class="adm-sidebar-close" onclick="toggleSidebar()">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
+        </div>
+        <nav class="adm-nav">
+            <div class="adm-nav-label">Меню</div>
+            <a href="{{ url_for('admin_dashboard') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7h-3.5A1.75 1.75 0 0 1 0 5.25Zm9 0C9 .784 9.784 0 10.75 0h3.5C15.216 0 16 .784 16 1.75v3.5A1.75 1.75 0 0 1 14.25 7h-3.5A1.75 1.75 0 0 1 9 5.25Zm0 9C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25Zm-9 0C0 9.784.784 9 1.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 5.25 16h-3.5A1.75 1.75 0 0 1 0 14.25Z"/></svg>
+                Dashboard
+            </a>
+            <a href="{{ url_for('admin_journals') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/></svg>
+                Журналы
+            </a>
+            <a href="{{ url_for('admin_articles') }}" class="adm-nav-item adm-nav-active">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/></svg>
+                Все статьи
+            </a>
+            <a href="{{ url_for('bulk_export_articles') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                Экспорт
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.001 4.001 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.012.749.749 0 0 1-.885.954.752.752 0 0 1-.549-.514 3.507 3.507 0 0 0-2.522-2.372.75.75 0 0 1-.574-.73v-.352a.75.75 0 0 1 .416-.672A1.5 1.5 0 0 0 11 5.5.75.75 0 0 1 11 4Zm-5.5-.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 3.5Z"/></svg>
+                Пользователи
+            </a>
+        </nav>
+        <div class="adm-sidebar-footer">
+            <div class="adm-user-block">
+                <div class="adm-user-avatar">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></svg>
+                </div>
+                <div class="adm-user-info">
+                    <span class="adm-user-name">{{ current_user.display_name }}</span>
+                    <span class="adm-user-role">{{ current_user.role }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="adm-main">
+        <!-- Top-right toolbar -->
+        <div class="adm-toolbar">
+            <a href="/" class="adm-toolbar-btn" title="На главную">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            </a>
+            <button class="adm-toolbar-btn" onclick="toggleAdmTheme()" title="Переключить тему">
+                <span class="adm-theme-icon">🌙</span>
+            </button>
+            <a href="/logout" class="adm-toolbar-btn adm-toolbar-exit" title="Выйти">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </a>
+        </div>
+
+        <!-- Mobile header -->
+        <div class="adm-mobile-header">
+            <button class="adm-hamburger" onclick="toggleSidebar()">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+            <span class="adm-mobile-title">Все статьи</span>
+        </div>
+
+        <!-- Welcome -->
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Все статьи</h1>
+            <p class="adm-welcome-sub">Найдено: {{ articles|length }}</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="art-card art-filters-card">
+            <form method="GET" class="art-filters">
+                <div class="art-filter-group">
+                    <label class="art-filter-label">Журнал</label>
+                    <select name="journal_id" class="art-select" onchange="this.form.submit()">
+                        <option value="">Все журналы</option>
+                        {% for journal in journals %}
+                        <option value="{{ journal.id }}" {% if current_journal == journal.id %}selected{% endif %}>{{ journal.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="art-filter-group">
+                    <label class="art-filter-label">Статус</label>
+                    <select name="status" class="art-select" onchange="this.form.submit()">
+                        <option value="">Все статусы</option>
+                        <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Без оплаты</option>
+                        <option value="no_review" {% if current_status == 'no_review' %}selected{% endif %}>Без рецензии</option>
+                        <option value="not_edited" {% if current_status == 'not_edited' %}selected{% endif %}>Не отредактировано</option>
+                    </select>
+                </div>
+                <div class="art-filter-group art-filter-search">
+                    <label class="art-filter-label">Поиск</label>
+                    <div class="art-search-wrap">
+                        <svg class="art-search-icon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
+                        <input type="text" name="search" class="art-search-input" placeholder="Название или автор..." value="{{ search }}">
+                    </div>
+                </div>
+                <div class="art-filter-actions">
+                    <button type="submit" class="art-btn art-btn-search">Найти</button>
+                    {% if current_journal or current_status or search %}
+                    <a href="{{ url_for('admin_articles') }}" class="art-btn art-btn-reset">Сбросить</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- Bulk Actions (hidden) -->
+        <div class="art-bulk-bar" id="bulkBar" style="display:none">
+            <div class="art-bulk-left">
+                <span class="art-bulk-count">Выбрано: <strong id="selectedCount">0</strong></span>
+            </div>
+            <div class="art-bulk-actions">
+                <button class="art-bulk-btn art-bulk-ok" onclick="bulkToggle('payment', true)" title="Оплата: вкл">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>
+                    Оплата
+                </button>
+                <button class="art-bulk-btn art-bulk-ok" onclick="bulkToggle('review', true)" title="Рецензия: вкл">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>
+                    Рецензия
+                </button>
+                <button class="art-bulk-btn art-bulk-ok" onclick="bulkToggle('edited', true)" title="Редакт.: вкл">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>
+                    Редакт.
+                </button>
+                <span class="art-bulk-sep"></span>
+                <button class="art-bulk-btn art-bulk-off" onclick="bulkToggle('payment', false)">Снять оплату</button>
+                <button class="art-bulk-btn art-bulk-off" onclick="bulkToggle('review', false)">Снять рецензию</button>
+                <button class="art-bulk-btn art-bulk-off" onclick="bulkToggle('edited', false)">Снять редакт.</button>
+                <span class="art-bulk-sep"></span>
+                <button class="art-bulk-btn art-bulk-export" onclick="bulkExport()">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                    Экспорт
+                </button>
+                <button class="art-bulk-btn art-bulk-del" onclick="bulkDelete()">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z"/></svg>
+                    Удалить
+                </button>
+            </div>
+        </div>
+
+        <!-- Articles Table -->
+        <div class="art-card art-table-card">
+            <div class="art-table-wrap">
+                <table class="art-table">
+                    <thead>
+                        <tr>
+                            <th class="art-th-check"><input type="checkbox" class="art-checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                            <th>ID</th>
+                            <th>Название</th>
+                            <th>Авторы</th>
+                            <th>Журнал / Выпуск</th>
+                            <th class="art-th-center">Оплата</th>
+                            <th class="art-th-center">Рецензия</th>
+                            <th class="art-th-center">Редакт.</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for article in articles %}
+                        <tr>
+                            <td><input type="checkbox" class="art-checkbox article-cb" value="{{ article.id }}" onchange="updateBulk()"></td>
+                            <td class="art-td-id">#{{ article.id }}</td>
+                            <td class="art-td-title">
+                                <a href="{{ url_for('edit_article', article_id=article.id) }}">{{ article.title[:55] }}{% if article.title|length > 55 %}...{% endif %}</a>
+                            </td>
+                            <td class="art-td-authors">
+                                {% if article.article_authors %}
+                                    {{ article.article_authors|map(attribute='full_name')|join(', ')|truncate(35, True, '...') }}
+                                {% else %}
+                                    {{ (article.authors or '-')|truncate(35, True, '...') }}
+                                {% endif %}
+                            </td>
+                            <td class="art-td-meta">
+                                {% if article.issue %}
+                                <span class="art-meta-journal">{{ article.issue.journal.name[:22] }}{% if article.issue.journal.name|length > 22 %}...{% endif %}</span>
+                                <span class="art-meta-badge">№{{ article.issue.number }}/{{ article.issue.year }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="art-th-center">
+                                {% if article.payment_received %}
+                                <span class="art-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="art-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td class="art-th-center">
+                                {% if article.has_review %}
+                                <span class="art-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="art-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td class="art-th-center">
+                                {% if article.edited %}
+                                <span class="art-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="art-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="art-row-actions">
+                                    <a href="{{ url_for('edit_article', article_id=article.id) }}" class="art-action-btn" title="Редактировать">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>
+                                    </a>
+                                    <a href="/issue/{{ article.issue_id }}" class="art-action-btn" title="К выпуску">
+                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/></svg>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if not articles %}
+                <div class="art-empty">
+                    <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.2">
+                        <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Z"/>
+                    </svg>
+                    <p>Статьи не найдены</p>
+                    {% if current_journal or current_status or search %}
+                    <a href="{{ url_for('admin_articles') }}" class="art-btn art-btn-reset" style="margin-top:8px">Сбросить фильтры</a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Export all -->
+        {% if articles %}
+        <div class="art-export-row">
+            <a href="{{ url_for('bulk_export_articles') }}" class="art-btn art-btn-export-all">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                Экспортировать все в Excel
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+/* =============================================
+   ADMIN LAYOUT (shared)
+   ============================================= */
+.adm-layout { display: flex; min-height: 100vh; }
+.adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 998; backdrop-filter: blur(2px); }
+.adm-overlay.active { display: block; }
+
+.adm-sidebar { width: 260px; min-height: 100vh; background: var(--color-canvas-subtle); border-right: 1px solid var(--color-border-default); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 999; }
+.adm-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 20px 20px; border-bottom: 1px solid var(--color-border-muted); }
+.adm-sidebar-close { display: none; background: none; border: none; color: var(--color-fg-muted); cursor: pointer; padding: 4px; border-radius: 6px; }
+.adm-sidebar-close:hover { background: var(--color-canvas-inset); }
+.adm-logo { display: flex; align-items: center; gap: 12px; }
+.adm-logo-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #5BA4B0, #4A8E99); color: #fff; display: flex; align-items: center; justify-content: center; }
+[data-theme="dark"] .adm-logo-icon { background: linear-gradient(135deg, #5BA4B0, #7CC5D0); }
+.adm-logo-text { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+
+.adm-nav { padding: 16px 12px; }
+.adm-nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-fg-muted); padding: 0 12px; margin-bottom: 8px; }
+.adm-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 14px; font-weight: 500; color: var(--color-fg-muted); text-decoration: none; border-radius: 8px; margin-bottom: 2px; transition: background 0.15s, color 0.15s; }
+.adm-nav-item:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+.adm-nav-active { background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.06)); color: #5BA4B0; font-weight: 600; }
+[data-theme="dark"] .adm-nav-active { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.06)); }
+.adm-nav-active:hover { background: linear-gradient(135deg, rgba(91,164,176,0.18), rgba(91,164,176,0.1)); }
+
+.adm-sidebar-footer { padding: 8px 12px 20px; border-top: 1px solid var(--color-border-muted); margin-top: 8px; }
+.adm-user-block { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.adm-user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--color-canvas-inset); border: 2px solid var(--color-border-default); display: flex; align-items: center; justify-content: center; color: var(--color-fg-muted); flex-shrink: 0; }
+.adm-user-info { display: flex; flex-direction: column; min-width: 0; }
+.adm-user-name { font-size: 13px; font-weight: 600; color: var(--color-fg-default); }
+.adm-user-role { font-size: 12px; color: var(--color-fg-muted); }
+
+
+.adm-main { flex: 1; min-width: 0; padding: 32px 36px 48px; background: var(--color-canvas-default); position: relative; }
+
+/* Toolbar — правый верхний угол */
+.adm-toolbar { position: absolute; top: 20px; right: 24px; display: flex; gap: 6px; z-index: 10; }
+.adm-toolbar-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.adm-toolbar-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); border-color: var(--color-border-muted); }
+.adm-toolbar-exit:hover { color: #cf222e; border-color: rgba(207,34,46,0.3); background: rgba(207,34,46,0.06); }
+[data-theme="dark"] .adm-toolbar-exit:hover { color: #f85149; border-color: rgba(248,81,73,0.3); background: rgba(248,81,73,0.08); }
+
+.adm-mobile-header { display: none; align-items: center; gap: 12px; margin-bottom: 24px; }
+.adm-hamburger { background: none; border: 1px solid var(--color-border-default); border-radius: 8px; padding: 8px; color: var(--color-fg-default); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.adm-hamburger:hover { background: var(--color-canvas-subtle); }
+.adm-mobile-title { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+.adm-welcome { margin-bottom: 24px; }
+.adm-welcome-title { font-size: 26px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 4px 0; }
+.adm-welcome-sub { font-size: 15px; color: var(--color-fg-muted); margin: 0; }
+
+/* =============================================
+   ARTICLES PAGE
+   ============================================= */
+.art-card {
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+}
+
+/* Filters */
+.art-filters-card {
+    padding: 18px 22px;
+}
+
+.art-filters {
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.art-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.art-filter-search { flex: 1; min-width: 180px; }
+
+.art-filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--color-fg-muted);
+}
+
+.art-select {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    min-width: 150px;
+    transition: border-color 0.15s;
+}
+
+.art-select:focus {
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 0 0 3px rgba(91,164,176,0.2);
+}
+
+.art-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.art-search-wrap:focus-within {
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 0 0 3px rgba(91,164,176,0.2);
+}
+
+.art-search-icon { color: var(--color-fg-muted); flex-shrink: 0; }
+
+.art-search-input {
+    border: none;
+    background: transparent;
+    color: var(--color-fg-default);
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+}
+
+.art-search-input::placeholder { color: var(--color-fg-muted); }
+
+.art-filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.art-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+
+.art-btn-search {
+    background: #5BA4B0;
+    color: #fff;
+    border-color: rgba(31,35,40,0.15);
+}
+.art-btn-search:hover { background: #4A8E99; }
+[data-theme="dark"] .art-btn-search { background: #5BA4B0; }
+
+.art-btn-reset {
+    background: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+    border-color: var(--color-border-default);
+}
+.art-btn-reset:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+
+/* Bulk bar */
+.art-bulk-bar {
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    padding: 12px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.art-bulk-left { font-size: 13px; color: var(--color-fg-default); white-space: nowrap; }
+.art-bulk-count strong { color: var(--color-accent-fg); }
+
+.art-bulk-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.art-bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    background: var(--color-canvas-default);
+    color: var(--color-fg-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.art-bulk-btn:hover { color: var(--color-fg-default); background: var(--color-canvas-inset); }
+
+.art-bulk-ok { color: #1a7f37; border-color: rgba(31,136,61,0.3); }
+.art-bulk-ok:hover { background: rgba(31,136,61,0.08); }
+[data-theme="dark"] .art-bulk-ok { color: #3fb950; border-color: rgba(63,185,80,0.3); }
+
+.art-bulk-off { color: var(--color-fg-muted); }
+
+.art-bulk-export { color: #5BA4B0; border-color: rgba(91,164,176,0.3); }
+.art-bulk-export:hover { background: rgba(91,164,176,0.08); }
+[data-theme="dark"] .art-bulk-export { color: #7CC5D0; }
+
+.art-bulk-del { color: #cf222e; border-color: rgba(207,34,46,0.3); }
+.art-bulk-del:hover { background: rgba(207,34,46,0.08); }
+[data-theme="dark"] .art-bulk-del { color: #f85149; }
+
+.art-bulk-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--color-border-default);
+    margin: 0 2px;
+}
+
+/* Table */
+.art-table-card { overflow: hidden; }
+.art-table-wrap { overflow-x: auto; }
+
+.art-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.art-table thead th {
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-fg-muted);
+    background: var(--color-canvas-subtle);
+    border-bottom: 1px solid var(--color-border-default);
+    white-space: nowrap;
+}
+
+.art-th-check { width: 36px; }
+.art-th-center { text-align: center !important; }
+
+.art-table td {
+    padding: 11px 14px;
+    font-size: 13px;
+    color: var(--color-fg-default);
+    border-bottom: 1px solid var(--color-border-muted);
+    vertical-align: middle;
+}
+
+.art-table tr:last-child td { border-bottom: none; }
+.art-table tbody tr:hover td { background: var(--color-canvas-subtle); }
+
+.art-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #5BA4B0;
+}
+
+.art-td-id { font-weight: 600; color: var(--color-fg-muted); white-space: nowrap; }
+
+.art-td-title {
+    max-width: 260px;
+    font-weight: 500;
+}
+
+.art-td-title a {
+    color: var(--color-fg-default);
+    text-decoration: none;
+}
+.art-td-title a:hover {
+    color: var(--color-accent-fg);
+    text-decoration: underline;
+}
+
+.art-td-authors {
+    color: var(--color-fg-muted);
+    font-size: 12px;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.art-td-meta { white-space: nowrap; }
+
+.art-meta-journal {
+    font-size: 11px;
+    color: var(--color-fg-muted);
+    display: block;
+}
+
+.art-meta-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    color: var(--color-fg-muted);
+}
+
+.art-ok { color: #1a7f37; display: inline-flex; }
+.art-no { color: #cf222e; display: inline-flex; }
+[data-theme="dark"] .art-ok { color: #3fb950; }
+[data-theme="dark"] .art-no { color: #f85149; }
+
+.art-row-actions { display: flex; gap: 5px; }
+
+.art-action-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-fg-muted);
+    border: 1px solid var(--color-border-default);
+    border-radius: 7px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.art-action-btn:hover {
+    color: var(--color-accent-fg);
+    border-color: var(--color-accent-emphasis);
+    background: rgba(91,164,176,0.08);
+}
+
+/* Empty */
+.art-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--color-fg-muted);
+}
+.art-empty p { margin: 12px 0 0; font-size: 14px; }
+
+/* Export row */
+.art-export-row { text-align: right; }
+
+.art-btn-export-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: #1a7f37;
+    border: none;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+.art-btn-export-all:hover { background: #178132; color: #fff; }
+[data-theme="dark"] .art-btn-export-all { background: #238636; }
+
+/* =============================================
+   RESPONSIVE
+   ============================================= */
+@media (max-width: 768px) {
+    .adm-sidebar { position: fixed; left: -280px; top: 0; height: 100vh; width: 270px; transition: left 0.25s ease; box-shadow: none; }
+    .adm-sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.15); }
+    .adm-sidebar-close { display: flex; }
+    .adm-mobile-header { display: flex; }
+    .adm-toolbar { display: none; }
+    .adm-main { padding: 20px 16px 36px; }
+    .adm-welcome-title { font-size: 22px; }
+
+    .art-filters { flex-direction: column; }
+    .art-select { min-width: 100%; }
+    .art-filter-actions { width: 100%; }
+    .art-filter-actions .art-btn { flex: 1; justify-content: center; }
+
+    .art-bulk-bar { flex-direction: column; align-items: flex-start; }
+    .art-bulk-actions { width: 100%; }
+}
+</style>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.article-cb:checked')).map(cb => parseInt(cb.value));
+}
+
+function updateBulk() {
+    const ids = getSelectedIds();
+    const bar = document.getElementById('bulkBar');
+    document.getElementById('selectedCount').textContent = ids.length;
+    bar.style.display = ids.length > 0 ? 'flex' : 'none';
+
+    const all = document.querySelectorAll('.article-cb');
+    const sa = document.getElementById('selectAll');
+    sa.checked = all.length > 0 && ids.length === all.length;
+    sa.indeterminate = ids.length > 0 && ids.length < all.length;
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.article-cb').forEach(cb => cb.checked = checked);
+    updateBulk();
+}
+
+async function bulkDelete() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    if (!confirm('Удалить ' + ids.length + ' статей? Это действие необратимо!')) return;
+    try {
+        const r = await fetch('/admin/articles/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids })
+        });
+        const data = await r.json();
+        if (data.success) location.reload();
+        else alert(data.message || 'Ошибка');
+    } catch (e) { alert('Ошибка сети'); }
+}
+
+async function bulkToggle(field, value) {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    try {
+        const r = await fetch('/admin/articles/bulk-toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, field, value })
+        });
+        const data = await r.json();
+        if (data.success) location.reload();
+        else alert(data.message || 'Ошибка');
+    } catch (e) { alert('Ошибка сети'); }
+}
+
+function bulkExport() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    window.location.href = '/admin/articles/bulk-export?ids=' + ids.join(',');
+}
+
+function toggleAdmTheme() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = next === 'dark' ? '☀️' : '🌙'; });
+    var hi = document.getElementById('theme-icon');
+    if (hi) hi.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+    var t = localStorage.getItem('theme') || 'light';
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
+})();
+</script>
+{% endblock %}
