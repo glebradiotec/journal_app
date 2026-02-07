@@ -850,4 +850,5 @@ def register_admin_routes(app):
         db.session.commit()
 
         log_activity('deleted', 'user', user_id, name)
-        db.session.commit()        return jsonify({'success': True})
+        db.session.commit()
+        return jsonify({'success': True})
