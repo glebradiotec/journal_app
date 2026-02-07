@@ -102,3 +102,15 @@ class ActivityLog(db.Model):
     entity_title = db.Column(db.String(300))
     details = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+class ArticleHistory(db.Model):
+    """Детальная история изменений статьи."""
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id'), nullable=False, index=True)
+    user_name = db.Column(db.String(150))
+    action = db.Column(db.String(50), nullable=False)  # created, updated, status, deleted, moved
+    changes = db.Column(db.Text)  # JSON: [{"field": "...", "old": "...", "new": "..."}]
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    article = db.relationship('Article', backref=db.backref('history', cascade='all, delete-orphan', lazy='dynamic'))

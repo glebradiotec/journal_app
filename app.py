@@ -6,7 +6,7 @@ from flask_compress import Compress
 from flask_login import LoginManager
 
 from backup import create_backup
-from models import db, User, Journal, Article, ArticleImage
+from models import db, User, Journal, Article, ArticleImage, ArticleHistory
 from routes_public import register_public_routes
 from routes_admin import register_admin_routes
 

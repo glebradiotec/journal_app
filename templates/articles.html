@@ -287,6 +287,12 @@
                         </svg>
                         Редактировать
                     </a>
+                    <button class="action-btn" onclick="showHistory({{ article.id }}, '{{ article.title|e }}')">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1.643 3.143.427 1.927A.25.25 0 0 1 .604 1.5H3.75a.25.25 0 0 1 .25.25v3.146a.25.25 0 0 1-.427.177L2.322 3.822A6.002 6.002 0 0 0 6 13.5c3.311 0 6-2.689 6-6a.75.75 0 0 1 1.5 0A7.5 7.5 0 1 1 1.643 3.143ZM6.5 5a.75.75 0 0 1 .75.75v3.378l2.652.8a.75.75 0 0 1-.456 1.429l-3.174-.96A.751.751 0 0 1 5.75 9.7V5.75A.75.75 0 0 1 6.5 5Z"/>
+                        </svg>
+                        История
+                    </button>
                     <button class="action-btn" onclick="openMoveModal('{{ article.id }}')">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                             <path d="m12.836.855 2.309 2.31a.75.75 0 0 1 0 1.06l-2.309 2.31a.75.75 0 1 1-1.06-1.061l1.028-1.029H6.652a.75.75 0 0 1 0-1.5h6.152L11.776 1.916a.75.75 0 0 1 1.06-1.061Zm-1.672 7.619 2.309 2.31a.75.75 0 0 1 0 1.06l-2.309 2.31a.75.75 0 0 1-1.06-1.06l1.028-1.03H3.152a.75.75 0 0 1 0-1.5h6.152l-1.028-1.029a.75.75 0 0 1 1.06-1.061Z"/>
@@ -346,6 +352,23 @@
         <div class="modal-footer">
             <button class="btn-secondary" onclick="closeModal()">Отмена</button>
             <button class="btn-primary" onclick="confirmMove()">Переместить</button>
+        </div>
+    </div>
+</div>
+
+<!-- History Modal -->
+<div id="historyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header">
+            <h3 id="historyTitle">История изменений</h3>
+            <button class="modal-close" onclick="document.getElementById('historyModal').style.display='none'">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="modal-body" id="historyBody" style="max-height: 400px; overflow-y: auto;">
+            <p style="color:var(--color-fg-muted)">Загрузка...</p>
         </div>
     </div>
 </div>
@@ -468,6 +491,51 @@ function confirmMove() {
 
 function closeModal() {
     document.getElementById('moveModal').style.display = 'none';
+}
+
+function showHistory(articleId, title) {
+    var modal = document.getElementById('historyModal');
+    var body = document.getElementById('historyBody');
+    document.getElementById('historyTitle').textContent = 'История: ' + title;
+    body.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
+    modal.style.display = 'flex';
+
+    fetch('/article/' + articleId + '/history', { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.history || !data.history.length) {
+                body.innerHTML = '<p style="color:var(--color-fg-muted);text-align:center;padding:20px 0">Нет записей в истории</p>';
+                return;
+            }
+            var html = '<div class="history-timeline">';
+            var actionLabels = { created: 'Создание', updated: 'Редактирование', status: 'Статус', moved: 'Перемещение', deleted: 'Удаление' };
+            var actionColors = { created: '#1a7f37', updated: '#0969da', status: '#bf8700', moved: '#8250df', deleted: '#cf222e' };
+            data.history.forEach(function(e) {
+                var color = actionColors[e.action] || '#656d76';
+                html += '<div class="history-item">';
+                html += '<div class="history-dot" style="background:' + color + '"></div>';
+                html += '<div class="history-content">';
+                html += '<div class="history-header"><span class="history-action" style="color:' + color + '">' + (actionLabels[e.action] || e.action) + '</span>';
+                html += '<span class="history-meta">' + e.user + ' • ' + e.date + '</span></div>';
+                if (e.changes && e.changes.length) {
+                    html += '<div class="history-changes">';
+                    e.changes.forEach(function(c) {
+                        html += '<div class="history-change">';
+                        html += '<span class="history-field">' + c.field + ':</span> ';
+                        if (c.old) html += '<span class="history-old">' + c.old + '</span> → ';
+                        html += '<span class="history-new">' + c.new + '</span>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                }
+                html += '</div></div>';
+            });
+            html += '</div>';
+            body.innerHTML = html;
+        })
+        .catch(function() {
+            body.innerHTML = '<p style="color:var(--color-fg-muted)">Ошибка загрузки</p>';
+        });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1775,5 +1843,22 @@ function updateStatCounter(field, delta) {
     .form-compact-actions { width: 100%; justify-content: flex-end; }
     .form-files-grid { grid-template-columns: 1fr; }
 }
+
+/* History timeline */
+.history-timeline { display: flex; flex-direction: column; gap: 0; }
+.history-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border-default); position: relative; }
+.history-item:last-child { border-bottom: none; }
+.history-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.history-content { flex: 1; min-width: 0; }
+.history-header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.history-action { font-size: 13px; font-weight: 600; }
+.history-meta { font-size: 12px; color: var(--color-fg-muted); }
+.history-changes { margin-top: 4px; }
+.history-change { font-size: 13px; color: var(--color-fg-default); line-height: 1.5; }
+.history-field { font-weight: 600; color: var(--color-fg-muted); }
+.history-old { color: #cf222e; text-decoration: line-through; }
+.history-new { color: #1a7f37; }
+[data-theme="dark"] .history-old { color: #f85149; }
+[data-theme="dark"] .history-new { color: #3fb950; }
 </style>
 {% endblock %}

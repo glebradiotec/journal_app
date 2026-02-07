@@ -23,7 +23,8 @@ from sqlalchemy import or_, func
 from flask import send_file
 
 from sqlalchemy.orm import joinedload
-from models import db, User, Journal, Issue, Article, ArticleAuthor, ArticleImage, ActivityLog
+import json
+from models import db, User, Journal, Issue, Article, ArticleAuthor, ArticleImage, ActivityLog, ArticleHistory
 
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif', 'bmp'}
@@ -54,6 +55,20 @@ def log_activity(action, entity_type, entity_id=None, entity_title=None, details
         entity_id=entity_id,
         entity_title=entity_title,
         details=details,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(entry)
+
+
+def log_article_history(article_id, action, changes=None, user_name=None):
+    """Записывает изменение статьи в историю."""
+    if user_name is None:
+        user_name = current_user.display_name if current_user and current_user.is_authenticated else 'Система'
+    entry = ArticleHistory(
+        article_id=article_id,
+        user_name=user_name,
+        action=action,
+        changes=json.dumps(changes, ensure_ascii=False) if changes else None,
         created_at=datetime.utcnow()
     )
     db.session.add(entry)
@@ -167,6 +182,7 @@ def register_admin_routes(app):
             article.authors = ", ".join(author_names_list)
 
         log_activity('created', 'article', article.id, article.title)
+        log_article_history(article.id, 'created', [{'field': 'Статья создана', 'old': '', 'new': article.title}])
         db.session.commit()
         return redirect(f'/issue/{issue_id}')
 
@@ -190,6 +206,7 @@ def register_admin_routes(app):
         field_labels = {'payment': 'Оплата', 'edited': 'Редакт.', 'review': 'Рецензия'}
         status_text = 'вкл' if new_value else 'выкл'
         log_activity('toggled', 'article', article.id, article.title, f'{field_labels.get(field, field)}: {status_text}')
+        log_article_history(article.id, 'status', [{'field': field_labels.get(field, field), 'old': 'выкл' if new_value else 'вкл', 'new': status_text}])
         db.session.commit()
         
         # Если AJAX-запрос, возвращаем JSON
@@ -242,21 +259,42 @@ def register_admin_routes(app):
         journal = issue.journal if issue else None
         
         if request.method == 'POST':
+            # Отслеживаем изменения
+            changes = []
+            new_title = request.form.get('title', article.title)
+            new_notes = request.form.get('notes', '')
+            if new_title != article.title:
+                changes.append({'field': 'Название', 'old': article.title or '', 'new': new_title})
+            if new_notes != (article.notes or ''):
+                changes.append({'field': 'Заметки', 'old': (article.notes or '')[:100], 'new': new_notes[:100]})
+
             # Основные поля
-            article.title = request.form.get('title', article.title)
-            article.notes = request.form.get('notes', '')
+            article.title = new_title
+            article.notes = new_notes
             
             # Дата поступления
             day = request.form.get('submission_day', '')
             month = request.form.get('submission_month', '')
             year = request.form.get('submission_year', '')
             if day and month and year:
-                article.submission_date = f"{day}.{month}.{year}"
+                new_date = f"{day}.{month}.{year}"
+                if new_date != (article.submission_date or ''):
+                    changes.append({'field': 'Дата поступления', 'old': article.submission_date or '', 'new': new_date})
+                article.submission_date = new_date
             
             # Статусы
-            article.payment_received = 'payment_received' in request.form
-            article.has_review = 'has_review' in request.form
-            article.edited = 'edited' in request.form
+            new_payment = 'payment_received' in request.form
+            new_review = 'has_review' in request.form
+            new_edited = 'edited' in request.form
+            status_labels = {'payment_received': 'Оплата', 'has_review': 'Рецензия', 'edited': 'Редактирование'}
+            for field, label in status_labels.items():
+                old_val = getattr(article, field)
+                new_val = {'payment_received': new_payment, 'has_review': new_review, 'edited': new_edited}[field]
+                if old_val != new_val:
+                    changes.append({'field': label, 'old': 'вкл' if old_val else 'выкл', 'new': 'вкл' if new_val else 'выкл'})
+            article.payment_received = new_payment
+            article.has_review = new_review
+            article.edited = new_edited
             
             # Загрузка файлов
             files_to_process = {
@@ -331,12 +369,20 @@ def register_admin_routes(app):
                     )
                     db.session.add(author)
             
+            # Отслеживаем изменение авторов
+            old_authors = article.authors or ''
+            new_authors_str = ", ".join(author_names_list) if author_names_list else ''
+            if old_authors != new_authors_str:
+                changes.append({'field': 'Авторы', 'old': old_authors[:100], 'new': new_authors_str[:100]})
+
             if author_names_list:
                 article.authors = ", ".join(author_names_list)
             else:
                 article.authors = None
-            
+
             log_activity('updated', 'article', article.id, article.title)
+            if changes:
+                log_article_history(article.id, 'updated', changes)
             db.session.commit()
             return redirect(f'/issue/{article.issue_id}')
         
@@ -357,12 +403,15 @@ def register_admin_routes(app):
             return jsonify({'error': 'Выпуск не найден'}), 400
 
         old_issue = article.issue
+        old_label = f'{old_issue.journal.name} №{old_issue.number}/{old_issue.year}'
+        new_label = f'{issue.journal.name} №{issue.number}/{issue.year}'
         article.issue_id = new_issue_id
+        log_article_history(article.id, 'moved', [{'field': 'Выпуск', 'old': old_label, 'new': new_label}])
         db.session.commit()
 
         return jsonify({
             'success': True,
-            'message': f'Статья перемещена из "{old_issue.journal.name} №{old_issue.number}/{old_issue.year}" в "{issue.journal.name} №{issue.number}/{issue.year}"'
+            'message': f'Статья перемещена из "{old_label}" в "{new_label}"'
         })
 
     @app.route('/issue/<int:issue_id>/export-excel')
@@ -852,3 +901,118 @@ def register_admin_routes(app):
         log_activity('deleted', 'user', user_id, name)
         db.session.commit()
         return jsonify({'success': True})
+
+    # =============================================
+    #   БЭКАПЫ
+    # =============================================
+    @app.route('/admin/backups')
+    @admin_required
+    def admin_backups():
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        backups_dir = os.path.join(base_dir, 'backups')
+        os.makedirs(backups_dir, exist_ok=True)
+
+        backups = []
+        for f in sorted(os.listdir(backups_dir), reverse=True):
+            if f.endswith('.db'):
+                path = os.path.join(backups_dir, f)
+                size = os.path.getsize(path)
+                mtime = datetime.fromtimestamp(os.path.getmtime(path))
+                backups.append({'name': f, 'size': size, 'date': mtime})
+
+        db_path = os.path.join(base_dir, 'instance', 'journal.db')
+        db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+
+        return render_template('admin/backups.html', backups=backups, db_size=db_size)
+
+    @app.route('/admin/backups/create', methods=['POST'])
+    @admin_required
+    def admin_backup_create():
+        from backup import create_backup
+        create_backup()
+        return jsonify({'success': True, 'message': 'Бэкап создан'})
+
+    @app.route('/admin/backups/download/<filename>')
+    @admin_required
+    def admin_backup_download(filename):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        backups_dir = os.path.join(base_dir, 'backups')
+        safe = secure_filename(filename)
+        path = os.path.join(backups_dir, safe)
+        if not os.path.exists(path):
+            return 'Файл не найден', 404
+        return send_file(path, as_attachment=True, download_name=safe)
+
+    @app.route('/admin/backups/download-current')
+    @admin_required
+    def admin_backup_download_current():
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(base_dir, 'instance', 'journal.db')
+        if not os.path.exists(db_path):
+            return 'БД не найдена', 404
+        name = f'journal_current_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.db'
+        return send_file(db_path, as_attachment=True, download_name=name)
+
+    @app.route('/admin/backups/restore', methods=['POST'])
+    @admin_required
+    def admin_backup_restore():
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(base_dir, 'instance', 'journal.db')
+        backups_dir = os.path.join(base_dir, 'backups')
+
+        # Сначала создаём бэкап текущей БД
+        from backup import create_backup
+        create_backup()
+
+        source = request.form.get('backup_name')
+        uploaded = request.files.get('backup_file')
+
+        if uploaded and uploaded.filename:
+            # Восстановление из загруженного файла
+            db.session.remove()
+            db.engine.dispose()
+            uploaded.save(db_path)
+            return jsonify({'success': True, 'message': 'БД восстановлена из загруженного файла. Перезагрузите приложение.'})
+        elif source:
+            # Восстановление из существующего бэкапа
+            safe = secure_filename(source)
+            src_path = os.path.join(backups_dir, safe)
+            if not os.path.exists(src_path):
+                return jsonify({'success': False, 'error': 'Бэкап не найден'}), 404
+            db.session.remove()
+            db.engine.dispose()
+            import shutil
+            shutil.copy(src_path, db_path)
+            return jsonify({'success': True, 'message': f'БД восстановлена из {safe}. Перезагрузите приложение.'})
+        else:
+            return jsonify({'success': False, 'error': 'Не указан источник'}), 400
+
+    @app.route('/admin/backups/delete/<filename>', methods=['POST'])
+    @admin_required
+    def admin_backup_delete(filename):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        backups_dir = os.path.join(base_dir, 'backups')
+        safe = secure_filename(filename)
+        path = os.path.join(backups_dir, safe)
+        if os.path.exists(path):
+            os.remove(path)
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Файл не найден'}), 404
+
+    # =============================================
+    #   ИСТОРИЯ ИЗМЕНЕНИЙ СТАТЬИ
+    # =============================================
+    @app.route('/article/<int:article_id>/history')
+    @login_required
+    def article_history(article_id):
+        article = Article.query.get_or_404(article_id)
+        entries = ArticleHistory.query.filter_by(article_id=article_id).order_by(ArticleHistory.created_at.desc()).limit(50).all()
+        result = []
+        for e in entries:
+            result.append({
+                'user': e.user_name,
+                'action': e.action,
+                'changes': json.loads(e.changes) if e.changes else [],
+                'date': e.created_at.strftime('%d.%m.%Y %H:%M')
+            })
+        return jsonify({'article': article.title, 'history': result})
