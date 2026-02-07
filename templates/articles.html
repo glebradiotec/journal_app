@@ -585,7 +585,7 @@ let journalsData = [];
 
 function openMoveModal(articleId, e) {
     currentArticleId = articleId;
-    openModalFrom(document.getElementById('moveModal'), e);
+    openModalFrom(document.getElementById('moveModal'), captureOrigin(e));
     
     fetch('/api/journals-and-issues')
         .then(r => r.json())
@@ -637,45 +637,47 @@ function closeMoveModal() {
 function showHistory(articleId, title, e) {
     var modal = document.getElementById('historyModal');
     var body = document.getElementById('historyBody');
+    var origin = captureOrigin(e);
     document.getElementById('historyTitle').textContent = 'История: ' + title;
-    body.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
-    openModalFrom(modal, e);
 
     fetch('/article/' + articleId + '/history', { credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.history || !data.history.length) {
                 body.innerHTML = '<p style="color:var(--color-fg-muted);text-align:center;padding:20px 0">Нет записей в истории</p>';
-                return;
-            }
-            var html = '<div class="history-timeline">';
-            var actionLabels = { created: 'Создание', updated: 'Редактирование', status: 'Статус', moved: 'Перемещение', deleted: 'Удаление' };
-            var actionColors = { created: '#1a7f37', updated: '#0969da', status: '#bf8700', moved: '#8250df', deleted: '#cf222e' };
-            data.history.forEach(function(e) {
-                var color = actionColors[e.action] || '#656d76';
-                html += '<div class="history-item">';
-                html += '<div class="history-dot" style="background:' + color + '"></div>';
-                html += '<div class="history-content">';
-                html += '<div class="history-header"><span class="history-action" style="color:' + color + '">' + (actionLabels[e.action] || e.action) + '</span>';
-                html += '<span class="history-meta">' + e.user + ' • ' + e.date + '</span></div>';
-                if (e.changes && e.changes.length) {
-                    html += '<div class="history-changes">';
-                    e.changes.forEach(function(c) {
-                        html += '<div class="history-change">';
-                        html += '<span class="history-field">' + c.field + ':</span> ';
-                        if (c.old) html += '<span class="history-old">' + c.old + '</span> → ';
-                        html += '<span class="history-new">' + c.new + '</span>';
+            } else {
+                var html = '<div class="history-timeline">';
+                var actionLabels = { created: 'Создание', updated: 'Редактирование', status: 'Статус', moved: 'Перемещение', deleted: 'Удаление' };
+                var actionColors = { created: '#1a7f37', updated: '#0969da', status: '#bf8700', moved: '#8250df', deleted: '#cf222e' };
+                data.history.forEach(function(entry) {
+                    var color = actionColors[entry.action] || '#656d76';
+                    html += '<div class="history-item">';
+                    html += '<div class="history-dot" style="background:' + color + '"></div>';
+                    html += '<div class="history-content">';
+                    html += '<div class="history-header"><span class="history-action" style="color:' + color + '">' + (actionLabels[entry.action] || entry.action) + '</span>';
+                    html += '<span class="history-meta">' + entry.user + ' • ' + entry.date + '</span></div>';
+                    if (entry.changes && entry.changes.length) {
+                        html += '<div class="history-changes">';
+                        entry.changes.forEach(function(c) {
+                            html += '<div class="history-change">';
+                            html += '<span class="history-field">' + c.field + ':</span> ';
+                            if (c.old) html += '<span class="history-old">' + c.old + '</span> → ';
+                            html += '<span class="history-new">' + c.new + '</span>';
+                            html += '</div>';
+                        });
                         html += '</div>';
-                    });
-                    html += '</div>';
-                }
-                html += '</div></div>';
-            });
-            html += '</div>';
-            body.innerHTML = html;
+                    }
+                    html += '</div></div>';
+                });
+                html += '</div>';
+                body.innerHTML = html;
+            }
+            // Content ready — open with animation
+            openModalFrom(modal, origin);
         })
         .catch(function() {
             body.innerHTML = '<p style="color:var(--color-fg-muted)">Ошибка загрузки</p>';
+            openModalFrom(modal, origin);
         });
 }
 
@@ -910,7 +912,20 @@ var MODAL_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
 var MODAL_DURATION = '0.32s';
 var _activeCard = null;
 
-function openModalFrom(modalEl, originEvent) {
+// Capture click origin info immediately (before async operations)
+function captureOrigin(e) {
+    if (!e || !e.currentTarget) return null;
+    var btn = e.currentTarget;
+    var br = btn.getBoundingClientRect();
+    var card = btn.closest('.article-card');
+    return {
+        x: br.left + br.width / 2,
+        y: br.top + br.height / 2,
+        card: card
+    };
+}
+
+function openModalFrom(modalEl, origin) {
     var content = modalEl.querySelector('.modal-content');
     
     // 1. Freeze: no transitions, flatten transform for accurate measurement
@@ -923,14 +938,10 @@ function openModalFrom(modalEl, originEvent) {
     modalEl.style.display = 'flex';
     content.offsetHeight; // force layout
     
-    // 3. Calculate transform-origin from clicked element
-    if (originEvent && originEvent.currentTarget) {
-        var btn = originEvent.currentTarget;
-        var br = btn.getBoundingClientRect();
-        var cx = br.left + br.width / 2;
-        var cy = br.top + br.height / 2;
+    // 3. Calculate transform-origin from captured click position
+    if (origin) {
         var cr = content.getBoundingClientRect();
-        content.style.transformOrigin = (cx - cr.left) + 'px ' + (cy - cr.top) + 'px';
+        content.style.transformOrigin = (origin.x - cr.left) + 'px ' + (origin.y - cr.top) + 'px';
     } else {
         content.style.transformOrigin = '50% 50%';
     }
@@ -943,13 +954,10 @@ function openModalFrom(modalEl, originEvent) {
     content.style.transition = 'opacity ' + MODAL_DURATION + ' ' + MODAL_EASING + ', transform ' + MODAL_DURATION + ' ' + MODAL_EASING;
     
     // Highlight the source article card while modal is open
-    if (originEvent && originEvent.currentTarget) {
-        var card = originEvent.currentTarget.closest('.article-card');
-        if (card) {
-            if (_activeCard) _activeCard.classList.remove('article-card-active');
-            card.classList.add('article-card-active');
-            _activeCard = card;
-        }
+    if (origin && origin.card) {
+        if (_activeCard) _activeCard.classList.remove('article-card-active');
+        origin.card.classList.add('article-card-active');
+        _activeCard = origin.card;
     }
     
     requestAnimationFrame(function() {
@@ -1011,10 +1019,9 @@ function quickView(articleId, initialTab, originEvent) {
     var tab = initialTab || 'info';
     var modal = document.getElementById('quickViewModal');
     var body = document.getElementById('qvBody');
-    body.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
-    switchQvTab(tab);
-    openModalFrom(modal, originEvent);
+    var origin = captureOrigin(originEvent);
 
+    // Fetch data FIRST, then open modal with content ready
     fetch('/article/' + articleId + '/json')
         .then(r => r.json())
         .then(data => {
@@ -1103,16 +1110,22 @@ function quickView(articleId, initialTab, originEvent) {
             } else {
                 badge.style.display = 'none';
             }
+
+            // Content ready — now open modal with animation
+            switchQvTab(tab);
+            openModalFrom(modal, origin);
         })
         .catch(function() {
             body.innerHTML = '<p style="color:var(--color-danger-fg)">Ошибка загрузки</p>';
+            switchQvTab(tab);
+            openModalFrom(modal, origin);
         });
 }
 
 function openFilePreview(url, title, e) {
     document.getElementById('filePreviewTitle').textContent = title || 'Просмотр файла';
     document.getElementById('filePreviewFrame').src = url;
-    openModalFrom(document.getElementById('filePreviewModal'), e);
+    openModalFrom(document.getElementById('filePreviewModal'), captureOrigin(e));
 }
 
 // Close file dropdowns on outside click
