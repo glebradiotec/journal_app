@@ -27,8 +27,8 @@ for table in tables:
     table_elem = ET.SubElement(root, 'table')
     table_elem.set('name', table_name)
     
-    # Получаем структуру таблицы
-    c.execute(f"PRAGMA table_info({table_name})")
+    # Получаем структуру таблицы (PRAGMA безопасен — table_name из sqlite_master)
+    c.execute("PRAGMA table_info([{}])".format(table_name.replace(']', ']]')))
     columns = c.fetchall()
     
     # Добавляем информацию о колонках
@@ -40,7 +40,7 @@ for table in tables:
         col_elem.set('nullable', 'NO' if col[3] else 'YES')
     
     # Получаем все записи
-    c.execute(f"SELECT * FROM {table_name}")
+    c.execute("SELECT * FROM [{}]".format(table_name.replace(']', ']]')))
     rows = c.fetchall()
     
     # Добавляем данные

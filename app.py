@@ -1,19 +1,20 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 from flask import Flask
 from flask_compress import Compress
 from flask_login import LoginManager
 
 from backup import create_backup
-from models import db, User, Journal, Article, ArticleImage, ArticleHistory
+from models import db, User, Journal, Article, ArticleImage, ArticleHistory, ArticleComment
 from routes_public import register_public_routes
 from routes_admin import register_admin_routes
 
 
+BASE_DIR = Path(__file__).parent
+
 # Создаём папку instance если её нет
-instance_path = Path(__file__).parent / 'instance'
-instance_path.mkdir(exist_ok=True)
+(BASE_DIR / 'instance').mkdir(exist_ok=True)
 
 
 app = Flask(__name__)
@@ -30,7 +31,7 @@ app.jinja_env.auto_reload = False
 app.jinja_env.cache = {}
 
 # Конфиг для загрузки файлов статей
-UPLOAD_FOLDER = os.path.join(Path(__file__).parent, 'uploads', 'articles')
+UPLOAD_FOLDER = str(BASE_DIR / 'uploads' / 'articles')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -52,7 +53,9 @@ db.init_app(app)
 register_public_routes(app)
 register_admin_routes(app)
 
-
+# Создаём таблицы (если новые модели добавились)
+with app.app_context():
+    db.create_all()
 
 
 # Jinja2 фильтр для склонения слов
@@ -102,9 +105,8 @@ def migrate_notes_images():
 
 
 def init_journals():
-    """Создание таблиц и начальное заполнение журналами."""
+    """Начальное заполнение журналами."""
     with app.app_context():
-        db.create_all()
         migrate_notes_images()
         print(f"Журналов в БД: {Journal.query.count()}")
         if Journal.query.count() == 0:

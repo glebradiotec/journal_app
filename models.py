@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
@@ -8,6 +8,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 db = SQLAlchemy()
 
 
+def _utcnow():
+    """UTC now, совместимо с Python 3.12+ (datetime.utcnow deprecated)."""
+    return datetime.now(timezone.utc)
+
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -15,7 +20,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='user')  # 'admin' or 'user'
     is_active_user = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -101,7 +106,7 @@ class ActivityLog(db.Model):
     entity_id = db.Column(db.Integer)
     entity_title = db.Column(db.String(300))
     details = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, index=True)
 
 
 class ArticleHistory(db.Model):
@@ -111,6 +116,17 @@ class ArticleHistory(db.Model):
     user_name = db.Column(db.String(150))
     action = db.Column(db.String(50), nullable=False)  # created, updated, status, deleted, moved
     changes = db.Column(db.Text)  # JSON: [{"field": "...", "old": "...", "new": "..."}]
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_utcnow, index=True)
 
     article = db.relationship('Article', backref=db.backref('history', cascade='all, delete-orphan', lazy='dynamic'))
+
+
+class ArticleComment(db.Model):
+    """Комментарии к статье (тред)."""
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id'), nullable=False, index=True)
+    user_name = db.Column(db.String(150), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=_utcnow, index=True)
+
+    article = db.relationship('Article', backref=db.backref('comments', cascade='all, delete-orphan', lazy='dynamic'))

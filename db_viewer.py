@@ -31,7 +31,7 @@ for db_file in db_locations:
             print("\n📈 КОЛИЧЕСТВО ЗАПИСЕЙ:")
             for table in tables:
                 table_name = table[0]
-                c.execute(f"SELECT COUNT(*) FROM {table_name}")
+                c.execute("SELECT COUNT(*) FROM [{}]".format(table_name.replace(']', ']]')))
                 count = c.fetchone()[0]
                 print(f"  ➜ {table_name}: {count} записей")
             
@@ -40,7 +40,7 @@ for db_file in db_locations:
             for table in tables:
                 table_name = table[0]
                 print(f"\n{table_name.upper()}:")
-                c.execute(f"SELECT * FROM {table_name} LIMIT 3")
+                c.execute("SELECT * FROM [{}] LIMIT 3".format(table_name.replace(']', ']]')))
                 rows = c.fetchall()
                 if rows:
                     for row in rows:

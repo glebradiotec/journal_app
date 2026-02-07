@@ -1,7 +1,8 @@
 import csv
 import io
+import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from io import BytesIO
 
@@ -12,19 +13,17 @@ from flask import (
     redirect,
     url_for,
     flash,
-    session,
     current_app,
+    send_file,
 )
 from flask_login import login_required, current_user
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
-from werkzeug.utils import secure_filename
-from sqlalchemy import or_, func
-from flask import send_file
-
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-import json
-from models import db, User, Journal, Issue, Article, ArticleAuthor, ArticleImage, ActivityLog, ArticleHistory
+from werkzeug.utils import secure_filename
+
+from models import db, User, Journal, Issue, Article, ArticleAuthor, ArticleImage, ActivityLog, ArticleHistory, ArticleComment
 
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif', 'bmp'}
@@ -55,7 +54,7 @@ def log_activity(action, entity_type, entity_id=None, entity_title=None, details
         entity_id=entity_id,
         entity_title=entity_title,
         details=details,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.session.add(entry)
 
@@ -69,9 +68,72 @@ def log_article_history(article_id, action, changes=None, user_name=None):
         user_name=user_name,
         action=action,
         changes=json.dumps(changes, ensure_ascii=False) if changes else None,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     db.session.add(entry)
+
+
+def _save_uploaded_file(file, upload_folder):
+    """Сохраняет загруженный файл и возвращает имя файла, или None."""
+    if file and file.filename and allowed_file(file.filename):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+        filename = secure_filename(timestamp + file.filename)
+        file.save(os.path.join(upload_folder, filename))
+        return filename
+    return None
+
+
+def _process_file_uploads(article, upload_folder):
+    """Обрабатывает загрузку файлов (рукопись, рецензия, титульная) для статьи."""
+    for field_name in ('manuscript_file', 'review_file', 'title_pdf'):
+        file = request.files.get(field_name)
+        saved = _save_uploaded_file(file, upload_folder)
+        if saved:
+            setattr(article, field_name, saved)
+
+
+def _process_article_images(article, upload_folder, start_order=0):
+    """Загружает изображения статьи. Возвращает количество добавленных."""
+    images = request.files.getlist('article_images')
+    added = 0
+    for i, img in enumerate(images):
+        saved = _save_uploaded_file(img, upload_folder)
+        if saved:
+            db.session.add(ArticleImage(
+                article_id=article.id,
+                filename=saved,
+                order=start_order + i
+            ))
+            added += 1
+    return added
+
+
+def _process_authors(article):
+    """Парсит авторов из формы и привязывает к статье. Возвращает строку с ФИО."""
+    author_names = request.form.getlist('author_name[]')
+    author_emails = request.form.getlist('author_email[]')
+    author_orgs = request.form.getlist('author_organization[]')
+    author_degrees = request.form.getlist('author_degree[]')
+    author_positions = request.form.getlist('author_position[]')
+    author_phones = request.form.getlist('author_phone[]')
+
+    names_list = []
+    for i, name in enumerate(author_names):
+        if not name:
+            continue
+        names_list.append(name)
+        db.session.add(ArticleAuthor(
+            article_id=article.id,
+            full_name=name,
+            email=author_emails[i] if i < len(author_emails) else '',
+            organization=author_orgs[i] if i < len(author_orgs) else '',
+            degree=author_degrees[i] if i < len(author_degrees) else '',
+            position=author_positions[i] if i < len(author_positions) else '',
+            phone=author_phones[i] if i < len(author_phones) else '',
+            order=i
+        ))
+
+    return ", ".join(names_list) if names_list else None
 
 
 def register_admin_routes(app):
@@ -118,68 +180,14 @@ def register_admin_routes(app):
             issue_id=issue_id
         )
 
-        # Загрузка файлов
-        files_to_process = {
-            'manuscript_file': request.files.get('manuscript_file'),
-            'review_file': request.files.get('review_file'),
-            'title_pdf': request.files.get('title_pdf')
-        }
-
         upload_folder = current_app.config['UPLOAD_FOLDER']
-        for field_name, file in files_to_process.items():
-            if file and file.filename and allowed_file(file.filename):
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                filename = secure_filename(timestamp + file.filename)
-                filepath = os.path.join(upload_folder, filename)
-                file.save(filepath)
-                setattr(article, field_name, filename)
+        _process_file_uploads(article, upload_folder)
 
         db.session.add(article)
         db.session.flush()
-        
-        # Загрузка изображений (несколько)
-        images = request.files.getlist('article_images')
-        for i, img in enumerate(images):
-            if img and img.filename and allowed_file(img.filename):
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                filename = secure_filename(timestamp + img.filename)
-                filepath = os.path.join(upload_folder, filename)
-                img.save(filepath)
-                article_image = ArticleImage(
-                    article_id=article.id,
-                    filename=filename,
-                    order=i
-                )
-                db.session.add(article_image)
 
-        # Добавление авторов
-        author_names = request.form.getlist('author_name[]')
-        author_emails = request.form.getlist('author_email[]')
-        author_orgs = request.form.getlist('author_organization[]')
-        author_degrees = request.form.getlist('author_degree[]')
-        author_positions = request.form.getlist('author_position[]')
-        author_phones = request.form.getlist('author_phone[]')
-
-        # Собираем имена авторов для строкового поля
-        author_names_list = []
-        for i, name in enumerate(author_names):
-            if name:
-                author_names_list.append(name)
-                author = ArticleAuthor(
-                    article_id=article.id,
-                    full_name=name,
-                    email=author_emails[i] if i < len(author_emails) else '',
-                    organization=author_orgs[i] if i < len(author_orgs) else '',
-                    degree=author_degrees[i] if i < len(author_degrees) else '',
-                    position=author_positions[i] if i < len(author_positions) else '',
-                    phone=author_phones[i] if i < len(author_phones) else '',
-                    order=i
-                )
-                db.session.add(author)
-
-        # Записываем ФИО авторов в строковое поле для совместимости
-        if author_names_list:
-            article.authors = ", ".join(author_names_list)
+        _process_article_images(article, upload_folder)
+        article.authors = _process_authors(article)
 
         log_activity('created', 'article', article.id, article.title)
         log_article_history(article.id, 'created', [{'field': 'Статья создана', 'old': '', 'new': article.title}])
@@ -283,42 +291,25 @@ def register_admin_routes(app):
                 article.submission_date = new_date
             
             # Статусы
-            new_payment = 'payment_received' in request.form
-            new_review = 'has_review' in request.form
-            new_edited = 'edited' in request.form
-            status_labels = {'payment_received': 'Оплата', 'has_review': 'Рецензия', 'edited': 'Редактирование'}
-            for field, label in status_labels.items():
+            new_statuses = {
+                'payment_received': ('payment_received' in request.form, 'Оплата'),
+                'has_review': ('has_review' in request.form, 'Рецензия'),
+                'edited': ('edited' in request.form, 'Редактирование'),
+            }
+            for field, (new_val, label) in new_statuses.items():
                 old_val = getattr(article, field)
-                new_val = {'payment_received': new_payment, 'has_review': new_review, 'edited': new_edited}[field]
                 if old_val != new_val:
                     changes.append({'field': label, 'old': 'вкл' if old_val else 'выкл', 'new': 'вкл' if new_val else 'выкл'})
-            article.payment_received = new_payment
-            article.has_review = new_review
-            article.edited = new_edited
+                setattr(article, field, new_val)
             
             # Загрузка файлов
-            files_to_process = {
-                'manuscript_file': request.files.get('manuscript_file'),
-                'review_file': request.files.get('review_file'),
-                'title_pdf': request.files.get('title_pdf')
-            }
-            
             upload_folder = current_app.config['UPLOAD_FOLDER']
-            for field_name, file in files_to_process.items():
-                if file and file.filename and allowed_file(file.filename):
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = secure_filename(timestamp + file.filename)
-                    filepath = os.path.join(upload_folder, filename)
-                    file.save(filepath)
-                    setattr(article, field_name, filename)
+            _process_file_uploads(article, upload_folder)
             
             # Удаление файлов
-            if request.form.get('delete_manuscript'):
-                article.manuscript_file = None
-            if request.form.get('delete_review'):
-                article.review_file = None
-            if request.form.get('delete_title_pdf'):
-                article.title_pdf = None
+            for field_name, form_key in [('manuscript_file', 'delete_manuscript'), ('review_file', 'delete_review'), ('title_pdf', 'delete_title_pdf')]:
+                if request.form.get(form_key):
+                    setattr(article, field_name, None)
             
             # Удаление выбранных изображений
             delete_image_ids = request.form.getlist('delete_image[]')
@@ -328,57 +319,17 @@ def register_admin_routes(app):
                     db.session.delete(img)
             
             # Загрузка новых изображений
-            images = request.files.getlist('article_images')
             current_max_order = max([img.order for img in article.images], default=-1)
-            for i, img in enumerate(images):
-                if img and img.filename and allowed_file(img.filename):
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = secure_filename(timestamp + img.filename)
-                    filepath = os.path.join(upload_folder, filename)
-                    img.save(filepath)
-                    article_image = ArticleImage(
-                        article_id=article.id,
-                        filename=filename,
-                        order=current_max_order + i + 1
-                    )
-                    db.session.add(article_image)
+            _process_article_images(article, upload_folder, start_order=current_max_order + 1)
             
-            # Обновление авторов - удаляем старых и добавляем новых
-            ArticleAuthor.query.filter_by(article_id=article.id).delete()
-            
-            author_names = request.form.getlist('author_name[]')
-            author_emails = request.form.getlist('author_email[]')
-            author_orgs = request.form.getlist('author_organization[]')
-            author_degrees = request.form.getlist('author_degree[]')
-            author_positions = request.form.getlist('author_position[]')
-            author_phones = request.form.getlist('author_phone[]')
-            
-            author_names_list = []
-            for i, name in enumerate(author_names):
-                if name:
-                    author_names_list.append(name)
-                    author = ArticleAuthor(
-                        article_id=article.id,
-                        full_name=name,
-                        email=author_emails[i] if i < len(author_emails) else '',
-                        organization=author_orgs[i] if i < len(author_orgs) else '',
-                        degree=author_degrees[i] if i < len(author_degrees) else '',
-                        position=author_positions[i] if i < len(author_positions) else '',
-                        phone=author_phones[i] if i < len(author_phones) else '',
-                        order=i
-                    )
-                    db.session.add(author)
-            
-            # Отслеживаем изменение авторов
+            # Обновление авторов — удаляем старых и добавляем новых
             old_authors = article.authors or ''
-            new_authors_str = ", ".join(author_names_list) if author_names_list else ''
-            if old_authors != new_authors_str:
-                changes.append({'field': 'Авторы', 'old': old_authors[:100], 'new': new_authors_str[:100]})
+            ArticleAuthor.query.filter_by(article_id=article.id).delete()
+            new_authors_str = _process_authors(article)
 
-            if author_names_list:
-                article.authors = ", ".join(author_names_list)
-            else:
-                article.authors = None
+            if old_authors != (new_authors_str or ''):
+                changes.append({'field': 'Авторы', 'old': old_authors[:100], 'new': (new_authors_str or '')[:100]})
+            article.authors = new_authors_str
 
             log_activity('updated', 'article', article.id, article.title)
             if changes:
@@ -684,11 +635,14 @@ def register_admin_routes(app):
             query = query.filter(Article.edited == False)
         
         if search:
-            search_lower = search.lower()
-            all_articles = query.all()
-            articles = [a for a in all_articles if search_lower in (a.title or '').lower() or search_lower in (a.authors or '').lower()]
-        else:
-            articles = query.order_by(Article.id.desc()).all()
+            like_pattern = f'%{search}%'
+            query = query.filter(
+                db.or_(
+                    Article.title.ilike(like_pattern),
+                    Article.authors.ilike(like_pattern)
+                )
+            )
+        articles = query.order_by(Article.id.desc()).all()
         
         journals = Journal.query.all()
         issues = Issue.query.all()
@@ -713,12 +667,10 @@ def register_admin_routes(app):
             return jsonify({'success': False, 'message': 'Не выбрано ни одной статьи'}), 400
         
         deleted_count = 0
-        for article_id in article_ids:
-            article = Article.query.get(article_id)
+        for aid in article_ids:
+            article = Article.query.get(aid)
             if article:
-                # Удаляем авторов статьи
-                ArticleAuthor.query.filter_by(article_id=article_id).delete()
-                db.session.delete(article)
+                db.session.delete(article)  # каскад удалит авторов, изображения и историю
                 deleted_count += 1
         
         db.session.commit()
@@ -843,7 +795,7 @@ def register_admin_routes(app):
         user = User(username=username, display_name=display_name, role=role)
         user.set_password(password)
         db.session.add(user)
-        db.session.commit()
+        db.session.flush()  # получаем user.id для лога
 
         log_activity('created', 'user', user.id, display_name, f'Роль: {role}')
         db.session.commit()
@@ -879,8 +831,6 @@ def register_admin_routes(app):
         if password:
             user.set_password(password)
 
-        db.session.commit()
-
         log_activity('updated', 'user', user.id, display_name, f'Роль: {role}')
         db.session.commit()
 
@@ -895,10 +845,8 @@ def register_admin_routes(app):
             return jsonify({'success': False, 'error': 'Вы не можете удалить самого себя'}), 400
 
         name = user.display_name
-        db.session.delete(user)
-        db.session.commit()
-
         log_activity('deleted', 'user', user_id, name)
+        db.session.delete(user)
         db.session.commit()
         return jsonify({'success': True})
 
@@ -1016,3 +964,92 @@ def register_admin_routes(app):
                 'date': e.created_at.strftime('%d.%m.%Y %H:%M')
             })
         return jsonify({'article': article.title, 'history': result})
+
+    # =============================================
+    #   QUICK VIEW — JSON-данные статьи
+    # =============================================
+    @app.route('/article/<int:article_id>/json')
+    @login_required
+    def article_json(article_id):
+        article = Article.query.options(
+            joinedload(Article.article_authors),
+            joinedload(Article.images),
+            joinedload(Article.issue).joinedload(Issue.journal)
+        ).get_or_404(article_id)
+
+        authors = []
+        for a in sorted(article.article_authors, key=lambda x: x.order):
+            authors.append({
+                'name': a.full_name,
+                'email': a.email or '',
+                'organization': a.organization or '',
+                'degree': a.degree or '',
+                'position': a.position or '',
+                'phone': a.phone or ''
+            })
+
+        images = [{'filename': img.filename} for img in sorted(article.images, key=lambda x: x.order)]
+
+        issue = article.issue
+        journal = issue.journal if issue else None
+
+        comment_count = ArticleComment.query.filter_by(article_id=article_id).count()
+
+        return jsonify({
+            'id': article.id,
+            'title': article.title,
+            'authors': authors,
+            'authors_str': article.authors or '',
+            'submission_date': article.submission_date or '',
+            'payment': article.payment_received,
+            'review': article.has_review,
+            'edited': article.edited,
+            'notes': article.notes or '',
+            'manuscript_file': article.manuscript_file or '',
+            'review_file': article.review_file or '',
+            'title_pdf': article.title_pdf or '',
+            'images': images,
+            'issue': f'№{issue.number}/{issue.year}' if issue else '',
+            'journal': journal.name if journal else '',
+            'comment_count': comment_count
+        })
+
+    # =============================================
+    #   КОММЕНТАРИИ К СТАТЬЕ
+    # =============================================
+    @app.route('/article/<int:article_id>/comments')
+    @login_required
+    def article_comments(article_id):
+        comments = ArticleComment.query.filter_by(article_id=article_id).order_by(ArticleComment.created_at.asc()).all()
+        return jsonify([{
+            'id': c.id,
+            'user': c.user_name,
+            'text': c.text,
+            'date': c.created_at.strftime('%d.%m.%Y %H:%M')
+        } for c in comments])
+
+    @app.route('/article/<int:article_id>/comments', methods=['POST'])
+    @login_required
+    def add_article_comment(article_id):
+        Article.query.get_or_404(article_id)
+        data = request.get_json()
+        text = (data.get('text') or '').strip()
+        if not text:
+            return jsonify({'success': False, 'error': 'Пустой комментарий'}), 400
+
+        comment = ArticleComment(
+            article_id=article_id,
+            user_name=current_user.display_name,
+            text=text
+        )
+        db.session.add(comment)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'comment': {
+                'id': comment.id,
+                'user': comment.user_name,
+                'text': comment.text,
+                'date': comment.created_at.strftime('%d.%m.%Y %H:%M')
+            }
+        })

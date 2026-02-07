@@ -155,21 +155,44 @@
                     <div class="form-files-grid">
                         <div class="file-upload-item">
                             <label>Текст статьи</label>
-                            <input type="file" name="manuscript_file" accept=".doc,.docx,.pdf">
+                            <div class="file-drop-zone" id="dropManuscript" onclick="document.getElementById('inputManuscript').click()">
+                                <div class="file-drop-icon">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/>
+                                    </svg>
+                                </div>
+                                <span class="file-drop-text">Перетащите или нажмите</span>
+                                <span class="file-drop-hint">.doc, .docx, .pdf</span>
+                                <span class="file-drop-name" id="nameManuscript"></span>
+                            </div>
+                            <input type="file" id="inputManuscript" name="manuscript_file" accept=".doc,.docx,.pdf" style="display:none" onchange="showFileName(this,'nameManuscript')">
                         </div>
                         <div class="file-upload-item">
                             <label>Рецензия</label>
-                            <input type="file" name="review_file" accept=".doc,.docx,.pdf,.txt,.jpg,.png">
+                            <div class="file-drop-zone" id="dropReview" onclick="document.getElementById('inputReview').click()">
+                                <div class="file-drop-icon">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z"/>
+                                    </svg>
+                                </div>
+                                <span class="file-drop-text">Перетащите или нажмите</span>
+                                <span class="file-drop-hint">.doc, .docx, .pdf, .txt</span>
+                                <span class="file-drop-name" id="nameReview"></span>
+                            </div>
+                            <input type="file" id="inputReview" name="review_file" accept=".doc,.docx,.pdf,.txt,.jpg,.png" style="display:none" onchange="showFileName(this,'nameReview')">
                         </div>
-                        <div class="file-upload-item file-upload-images">
+                        <div class="file-upload-item">
                             <label>Изображения</label>
-                            <div class="images-preview-list" id="addFormImagesPreview"></div>
-                            <div id="addFormImagesContainer"></div>
-                            <div class="drop-zone-small" id="addFormDropZone" onclick="triggerAddFormImageSelect()">
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                    <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Z"/>
-                                </svg>
-                                <span>Перетащите или нажмите</span>
+                            <div class="images-preview-list" id="addFormImagesPreview" style="display:none"></div>
+                            <div id="addFormImagesContainer" style="display:none"></div>
+                            <div class="file-drop-zone" id="addFormDropZone" onclick="triggerAddFormImageSelect()">
+                                <div class="file-drop-icon">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h.19l5.613-5.613a1.75 1.75 0 0 1 2.474 0L14.75 12.53V2.75a.25.25 0 0 0-.25-.25Zm12.5 11a.25.25 0 0 0 .25-.25v-.32L10.28 8.71a.25.25 0 0 0-.354 0L5.22 13.416c.035.01.073.016.112.016h8.918ZM4.5 6.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/>
+                                    </svg>
+                                </div>
+                                <span class="file-drop-text">Перетащите или нажмите</span>
+                                <span class="file-drop-hint">.jpg, .png, .gif, .bmp</span>
                             </div>
                             <input type="file" id="addFormImageInput" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp" style="display:none" onchange="handleAddFormImageSelect(this)">
                         </div>
@@ -196,12 +219,39 @@
         </div>
 
         {% if articles %}
+        <!-- Фильтры статей -->
+        <div class="filters-panel">
+            <div class="filters-row">
+                <div class="filter-group">
+                    <span class="filter-label">Статус:</span>
+                    <select class="filter-date-select" id="filterStatus" onchange="applyFilters()">
+                        <option value="all">Все</option>
+                        <option value="paid">Оплачено</option>
+                        <option value="unpaid">Не оплачено</option>
+                        <option value="reviewed">Рецензия</option>
+                        <option value="unreviewed">Без рецензии</option>
+                        <option value="edited">Отредактировано</option>
+                        <option value="unedited">Не отредактировано</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">Дата:</span>
+                    <select class="filter-date-select" id="filterDate" onchange="applyFilters()">
+                        <option value="all">За всё время</option>
+                        <option value="month">За месяц</option>
+                        <option value="week">За неделю</option>
+                    </select>
+                </div>
+            </div>
+            <div class="filters-counter" id="filtersCounter">Показано {{ articles|length }} из {{ articles|length }} статей</div>
+        </div>
+
         <div class="articles-list">
             {% for article in articles %}
-            <div class="article-card">
+            <div class="article-card" data-payment="{{ 'true' if article.payment_received else 'false' }}" data-review="{{ 'true' if article.has_review else 'false' }}" data-edited="{{ 'true' if article.edited else 'false' }}" data-date="{{ article.submission_date or '' }}">
                 <div class="article-card-main">
                     <div class="article-info">
-                        <h3 class="article-title">{{ article.title }}</h3>
+                        <h3 class="article-title" onclick="quickView({{ article.id }})" style="cursor:pointer">{{ article.title }}</h3>
                         <div class="article-authors">
                             {% if article.article_authors %}
                                 {% for author in article.article_authors|sort(attribute='order') %}
@@ -246,20 +296,52 @@
                 {% if article.manuscript_file or article.review_file %}
                 <div class="article-files">
                     {% if article.manuscript_file %}
-                    <a href="/download/{{ article.manuscript_file }}" class="file-link">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Z"/>
-                        </svg>
-                        Текст
-                    </a>
+                    <div class="file-dropdown">
+                        <button class="file-link" onclick="this.parentElement.classList.toggle('open')">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Z"/>
+                            </svg>
+                            Текст
+                            <svg class="file-dropdown-arrow" width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="m4.427 7.427 3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+                        </button>
+                        <div class="file-dropdown-menu">
+                            {% set m_ext = article.manuscript_file.rsplit('.', 1)[-1].lower() %}
+                            {% if m_ext == 'pdf' %}
+                            <button class="file-dropdown-item" onclick="openFilePreview('/uploads/{{ article.manuscript_file }}', 'Текст статьи'); this.closest('.file-dropdown').classList.remove('open')">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.473 0 2.825-.742 3.955-1.715 1.124-.967 1.954-2.096 2.366-2.717a.12.12 0 0 0 0-.136c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5c-1.473 0-2.824.742-3.955 1.715-1.124.967-1.954 2.096-2.366 2.717ZM8 10a2 2 0 1 1-.001-3.999A2 2 0 0 1 8 10Z"/></svg>
+                                Просмотр
+                            </button>
+                            {% endif %}
+                            <a class="file-dropdown-item" href="/download/{{ article.manuscript_file }}" onclick="this.closest('.file-dropdown').classList.remove('open')">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                                Скачать
+                            </a>
+                        </div>
+                    </div>
                     {% endif %}
                     {% if article.review_file %}
-                    <a href="/download/{{ article.review_file }}" class="file-link">
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Z"/>
-                        </svg>
-                        Рецензия
-                    </a>
+                    <div class="file-dropdown">
+                        <button class="file-link" onclick="this.parentElement.classList.toggle('open')">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Z"/>
+                            </svg>
+                            Рецензия
+                            <svg class="file-dropdown-arrow" width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="m4.427 7.427 3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"/></svg>
+                        </button>
+                        <div class="file-dropdown-menu">
+                            {% set r_ext = article.review_file.rsplit('.', 1)[-1].lower() %}
+                            {% if r_ext == 'pdf' %}
+                            <button class="file-dropdown-item" onclick="openFilePreview('/uploads/{{ article.review_file }}', 'Рецензия'); this.closest('.file-dropdown').classList.remove('open')">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.473 0 2.825-.742 3.955-1.715 1.124-.967 1.954-2.096 2.366-2.717a.12.12 0 0 0 0-.136c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5c-1.473 0-2.824.742-3.955 1.715-1.124.967-1.954 2.096-2.366 2.717ZM8 10a2 2 0 1 1-.001-3.999A2 2 0 0 1 8 10Z"/></svg>
+                                Просмотр
+                            </button>
+                            {% endif %}
+                            <a class="file-dropdown-item" href="/download/{{ article.review_file }}" onclick="this.closest('.file-dropdown').classList.remove('open')">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                                Скачать
+                            </a>
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
                 {% endif %}
@@ -292,6 +374,12 @@
                             <path d="M1.643 3.143.427 1.927A.25.25 0 0 1 .604 1.5H3.75a.25.25 0 0 1 .25.25v3.146a.25.25 0 0 1-.427.177L2.322 3.822A6.002 6.002 0 0 0 6 13.5c3.311 0 6-2.689 6-6a.75.75 0 0 1 1.5 0A7.5 7.5 0 1 1 1.643 3.143ZM6.5 5a.75.75 0 0 1 .75.75v3.378l2.652.8a.75.75 0 0 1-.456 1.429l-3.174-.96A.751.751 0 0 1 5.75 9.7V5.75A.75.75 0 0 1 6.5 5Z"/>
                         </svg>
                         История
+                    </button>
+                    <button class="action-btn" onclick="openComments({{ article.id }})">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 13.25 12H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 13.543V12H2.75A1.75 1.75 0 0 1 1 10.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/>
+                        </svg>
+                        Комментарии
                     </button>
                     <button class="action-btn" onclick="openMoveModal('{{ article.id }}')">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
@@ -369,6 +457,59 @@
         </div>
         <div class="modal-body" id="historyBody" style="max-height: 400px; overflow-y: auto;">
             <p style="color:var(--color-fg-muted)">Загрузка...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Quick View Modal -->
+<div id="quickViewModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content qv-modal">
+        <div class="modal-header">
+            <div class="qv-tabs">
+                <button class="qv-tab active" onclick="switchQvTab('info')">Информация</button>
+                <button class="qv-tab" onclick="switchQvTab('comments')">Комментарии <span id="qvCommentBadge" class="qv-badge" style="display:none">0</span></button>
+            </div>
+            <button class="modal-close" onclick="document.getElementById('quickViewModal').style.display='none'">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+            </button>
+        </div>
+        <!-- Tab: Info -->
+        <div class="qv-tab-content" id="qvTabInfo">
+            <div class="modal-body" id="qvBody" style="max-height: 520px; overflow-y: auto;">
+                <p style="color:var(--color-fg-muted)">Загрузка...</p>
+            </div>
+        </div>
+        <!-- Tab: Comments -->
+        <div class="qv-tab-content" id="qvTabComments" style="display:none">
+            <div class="qv-comments-list" id="qvCommentsList" style="max-height: 400px; overflow-y: auto;">
+                <p style="color:var(--color-fg-muted)">Загрузка...</p>
+            </div>
+            <div class="qv-comment-form">
+                <textarea id="qvCommentText" class="qv-comment-input" placeholder="Написать комментарий..." rows="2"></textarea>
+                <button class="qv-comment-send" onclick="sendComment()">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M.989 8 .064 2.68a1.342 1.342 0 0 1 1.85-1.462l13.402 5.744a1.13 1.13 0 0 1 0 2.076L1.913 14.782a1.343 1.343 0 0 1-1.85-1.463L.99 8Zm.603-5.104L2.223 7.25h4.527a.75.75 0 0 1 0 1.5H2.223l-.63 4.354 10.18-4.36a.164.164 0 0 0 0-.288L1.592 2.896Z"/></svg>
+                    Отправить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Preview Modal -->
+<div id="filePreviewModal" class="modal-overlay" style="display: none; z-index: 1100;">
+    <div class="modal-content file-preview-modal">
+        <div class="modal-header">
+            <h3 id="filePreviewTitle">Просмотр файла</h3>
+            <button class="modal-close" onclick="document.getElementById('filePreviewModal').style.display='none'">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+            </button>
+        </div>
+        <div class="file-preview-body">
+            <iframe id="filePreviewFrame" src="" style="width:100%; height:100%; border:none;"></iframe>
         </div>
     </div>
 </div>
@@ -547,6 +688,45 @@ document.addEventListener('DOMContentLoaded', function() {
 // === Работа с изображениями в форме добавления ===
 let addFormImageCounter = 0;
 
+function showFileName(input, nameId) {
+    var nameEl = document.getElementById(nameId);
+    var zone = input.previousElementSibling || input.closest('.file-upload-item').querySelector('.file-drop-zone');
+    if (input.files && input.files.length > 0) {
+        nameEl.textContent = input.files[0].name;
+        nameEl.classList.add('visible');
+        zone.classList.add('has-file');
+    } else {
+        nameEl.textContent = '';
+        nameEl.classList.remove('visible');
+        zone.classList.remove('has-file');
+    }
+}
+
+// Drag-and-drop for file zones
+(function() {
+    var zones = [
+        { drop: 'dropManuscript', input: 'inputManuscript', name: 'nameManuscript' },
+        { drop: 'dropReview', input: 'inputReview', name: 'nameReview' }
+    ];
+    zones.forEach(function(z) {
+        var dropEl = document.getElementById(z.drop);
+        var inputEl = document.getElementById(z.input);
+        if (!dropEl || !inputEl) return;
+        ['dragenter', 'dragover'].forEach(function(ev) {
+            dropEl.addEventListener(ev, function(e) { e.preventDefault(); dropEl.classList.add('drop-active'); });
+        });
+        ['dragleave', 'drop'].forEach(function(ev) {
+            dropEl.addEventListener(ev, function(e) { e.preventDefault(); dropEl.classList.remove('drop-active'); });
+        });
+        dropEl.addEventListener('drop', function(e) {
+            if (e.dataTransfer.files.length) {
+                inputEl.files = e.dataTransfer.files;
+                showFileName(inputEl, z.name);
+            }
+        });
+    });
+})();
+
 function triggerAddFormImageSelect() {
     document.getElementById('addFormImageInput').click();
 }
@@ -566,6 +746,8 @@ function addFormAddImage(file) {
     
     const preview = document.getElementById('addFormImagesPreview');
     const container = document.getElementById('addFormImagesContainer');
+    preview.style.display = '';
+    container.style.display = '';
     
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -625,11 +807,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-zone-active'), false);
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-active'), false);
     });
     
     ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.remove('drop-zone-active'), false);
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('drop-active'), false);
     });
     
     dropZone.addEventListener('drop', function(e) {
@@ -719,6 +901,248 @@ function updateStatCounter(field, delta) {
             statEl.style.fontWeight = '';
         }, 150);
     }
+}
+
+// =============================================
+//   QUICK VIEW
+// =============================================
+var currentQvArticleId = null;
+
+function quickView(articleId) {
+    currentQvArticleId = articleId;
+    var modal = document.getElementById('quickViewModal');
+    var body = document.getElementById('qvBody');
+    body.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
+    // Reset to info tab
+    switchQvTab('info');
+    modal.style.display = 'flex';
+
+    fetch('/article/' + articleId + '/json')
+        .then(r => r.json())
+        .then(data => {
+            var html = '';
+            html += '<h3 class="qv-title">' + escHtml(data.title) + '</h3>';
+            html += '<div class="qv-meta">';
+            if (data.journal) html += '<span class="qv-meta-item">' + escHtml(data.journal) + '</span>';
+            if (data.issue) html += '<span class="qv-meta-item">Выпуск ' + escHtml(data.issue) + '</span>';
+            if (data.submission_date) html += '<span class="qv-meta-item">' + escHtml(data.submission_date) + '</span>';
+            html += '</div>';
+
+            // Statuses
+            html += '<div class="qv-statuses">';
+            html += '<span class="qv-status ' + (data.payment ? 'qv-status-on' : 'qv-status-off') + '">Оплата</span>';
+            html += '<span class="qv-status ' + (data.review ? 'qv-status-on' : 'qv-status-off') + '">Рецензия</span>';
+            html += '<span class="qv-status ' + (data.edited ? 'qv-status-on' : 'qv-status-off') + '">Редакт.</span>';
+            html += '</div>';
+
+            // Authors
+            if (data.authors.length) {
+                html += '<div class="qv-section"><div class="qv-section-title">Авторы</div>';
+                data.authors.forEach(function(a) {
+                    html += '<div class="qv-author">';
+                    html += '<strong>' + escHtml(a.name) + '</strong>';
+                    var details = [];
+                    if (a.degree) details.push(a.degree);
+                    if (a.position) details.push(a.position);
+                    if (a.organization) details.push(a.organization);
+                    if (details.length) html += '<div class="qv-author-details">' + escHtml(details.join(' · ')) + '</div>';
+                    var contacts = [];
+                    if (a.email) contacts.push(a.email);
+                    if (a.phone) contacts.push(a.phone);
+                    if (contacts.length) html += '<div class="qv-author-contacts">' + escHtml(contacts.join(' · ')) + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            // Files
+            var hasFiles = data.manuscript_file || data.review_file || data.title_pdf;
+            if (hasFiles) {
+                html += '<div class="qv-section"><div class="qv-section-title">Файлы</div><div class="qv-files">';
+                if (data.manuscript_file) {
+                    var mExt = data.manuscript_file.split('.').pop().toLowerCase();
+                    if (mExt === 'pdf') {
+                        html += '<button class="qv-file-link" onclick="openFilePreview(\'/uploads/' + encodeURIComponent(data.manuscript_file) + '\', \'Рукопись\')">📄 Рукопись — просмотр</button>';
+                    }
+                    html += '<a class="qv-file-link" href="/download/' + encodeURIComponent(data.manuscript_file) + '">📄 Рукопись — скачать</a>';
+                }
+                if (data.review_file) {
+                    var rExt = data.review_file.split('.').pop().toLowerCase();
+                    if (rExt === 'pdf') {
+                        html += '<button class="qv-file-link" onclick="openFilePreview(\'/uploads/' + encodeURIComponent(data.review_file) + '\', \'Рецензия\')">📋 Рецензия — просмотр</button>';
+                    }
+                    html += '<a class="qv-file-link" href="/download/' + encodeURIComponent(data.review_file) + '">📋 Рецензия — скачать</a>';
+                }
+                if (data.title_pdf) {
+                    html += '<button class="qv-file-link" onclick="openFilePreview(\'/uploads/' + encodeURIComponent(data.title_pdf) + '\', \'Титульный лист\')">📑 Титульный — просмотр</button>';
+                    html += '<a class="qv-file-link" href="/download/' + encodeURIComponent(data.title_pdf) + '">📑 Титульный — скачать</a>';
+                }
+                html += '</div></div>';
+            }
+
+            // Images
+            if (data.images.length) {
+                html += '<div class="qv-section"><div class="qv-section-title">Изображения</div><div class="qv-images">';
+                data.images.forEach(function(img) {
+                    html += '<img class="qv-thumb" src="/uploads/' + encodeURIComponent(img.filename) + '" onclick="window.open(this.src,\'_blank\')" title="' + escHtml(img.filename) + '">';
+                });
+                html += '</div></div>';
+            }
+
+            // Notes
+            if (data.notes) {
+                html += '<div class="qv-section"><div class="qv-section-title">Заметки</div>';
+                html += '<p class="qv-notes">' + escHtml(data.notes) + '</p></div>';
+            }
+
+            body.innerHTML = html;
+
+            // Update comment badge
+            var badge = document.getElementById('qvCommentBadge');
+            if (data.comment_count > 0) {
+                badge.textContent = data.comment_count;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(function() {
+            body.innerHTML = '<p style="color:var(--color-danger-fg)">Ошибка загрузки</p>';
+        });
+}
+
+function openFilePreview(url, title) {
+    document.getElementById('filePreviewTitle').textContent = title || 'Просмотр файла';
+    document.getElementById('filePreviewFrame').src = url;
+    document.getElementById('filePreviewModal').style.display = 'flex';
+}
+
+// Close file dropdowns on outside click
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.file-dropdown')) {
+        document.querySelectorAll('.file-dropdown.open').forEach(function(d) { d.classList.remove('open'); });
+    }
+});
+
+function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function switchQvTab(tab) {
+    var tabs = document.querySelectorAll('.qv-tab');
+    tabs.forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById('qvTabInfo').style.display = tab === 'info' ? '' : 'none';
+    document.getElementById('qvTabComments').style.display = tab === 'comments' ? '' : 'none';
+    if (tab === 'info') tabs[0].classList.add('active');
+    if (tab === 'comments') {
+        tabs[1].classList.add('active');
+        loadComments();
+    }
+}
+
+// =============================================
+//   COMMENTS
+// =============================================
+function loadComments() {
+    if (!currentQvArticleId) return;
+    var list = document.getElementById('qvCommentsList');
+    list.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
+
+    fetch('/article/' + currentQvArticleId + '/comments')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.length) {
+                list.innerHTML = '<p class="qv-no-comments">Комментариев пока нет</p>';
+                return;
+            }
+            var html = '';
+            data.forEach(function(c) {
+                html += '<div class="qv-comment">';
+                html += '<div class="qv-comment-header"><strong>' + escHtml(c.user) + '</strong><span class="qv-comment-date">' + escHtml(c.date) + '</span></div>';
+                html += '<div class="qv-comment-text">' + escHtml(c.text) + '</div>';
+                html += '</div>';
+            });
+            list.innerHTML = html;
+            list.scrollTop = list.scrollHeight;
+        })
+        .catch(function() {
+            list.innerHTML = '<p style="color:var(--color-danger-fg)">Ошибка загрузки</p>';
+        });
+}
+
+function sendComment() {
+    if (!currentQvArticleId) return;
+    var textarea = document.getElementById('qvCommentText');
+    var text = textarea.value.trim();
+    if (!text) return;
+
+    fetch('/article/' + currentQvArticleId + '/comments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: text})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            textarea.value = '';
+            loadComments();
+            // Update badge
+            var badge = document.getElementById('qvCommentBadge');
+            var current = parseInt(badge.textContent) || 0;
+            badge.textContent = current + 1;
+            badge.style.display = 'inline-block';
+        }
+    });
+}
+
+function openComments(articleId) {
+    quickView(articleId);
+    setTimeout(function() { switchQvTab('comments'); }, 300);
+}
+
+// =============================================
+//   FILTERS
+// =============================================
+function applyFilters() {
+    var activeFilter = document.getElementById('filterStatus').value;
+    var dateFilter = document.getElementById('filterDate').value;
+    var cards = document.querySelectorAll('.article-card');
+    var total = cards.length;
+    var shown = 0;
+    var now = new Date();
+
+    cards.forEach(function(card) {
+        var show = true;
+
+        // Status filter
+        if (activeFilter === 'paid' && card.dataset.payment !== 'true') show = false;
+        if (activeFilter === 'unpaid' && card.dataset.payment !== 'false') show = false;
+        if (activeFilter === 'reviewed' && card.dataset.review !== 'true') show = false;
+        if (activeFilter === 'unreviewed' && card.dataset.review !== 'false') show = false;
+        if (activeFilter === 'edited' && card.dataset.edited !== 'true') show = false;
+        if (activeFilter === 'unedited' && card.dataset.edited !== 'false') show = false;
+
+        // Date filter
+        if (dateFilter !== 'all' && card.dataset.date) {
+            var parts = card.dataset.date.split('.');
+            if (parts.length === 3) {
+                var cardDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                var diff = (now - cardDate) / (1000 * 60 * 60 * 24);
+                if (dateFilter === 'week' && diff > 7) show = false;
+                if (dateFilter === 'month' && diff > 30) show = false;
+            }
+        } else if (dateFilter !== 'all' && !card.dataset.date) {
+            show = false;
+        }
+
+        card.style.display = show ? '' : 'none';
+        if (show) shown++;
+    });
+
+    var counter = document.getElementById('filtersCounter');
+    if (counter) counter.textContent = 'Показано ' + shown + ' из ' + total + ' статей';
 }
 </script>
 
@@ -1219,7 +1643,7 @@ function updateStatCounter(field, delta) {
 .file-upload-item {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .file-upload-item label {
@@ -1230,36 +1654,72 @@ function updateStatCounter(field, delta) {
     letter-spacing: 0.3px;
 }
 
-.file-upload-item input[type="file"] {
-    font-size: 13px;
+/* Drop zone for file uploads */
+.file-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 14px 10px;
+    border: 2px dashed var(--color-border-default);
+    border-radius: 10px;
+    background: var(--color-canvas-subtle);
     color: var(--color-fg-muted);
-}
-
-.file-upload-item input[type="file"]::file-selector-button {
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 500;
-    background-color: var(--color-canvas-default);
-    border: 1px solid var(--color-border-default);
-    border-radius: 8px;
     cursor: pointer;
-    margin-right: 10px;
-    transition: all 0.15s;
+    transition: all 0.2s;
+    height: 100%;
+    box-sizing: border-box;
 }
-
-.file-upload-item input[type="file"]::file-selector-button:hover {
-    background-color: var(--color-canvas-subtle);
+.file-drop-zone:hover {
+    border-color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.05);
+    color: var(--color-accent-fg);
 }
-
-/* Images Upload */
-.file-upload-images {
-    grid-column: span 1;
+.file-drop-zone.drop-active {
+    border-color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.1);
+    color: var(--color-accent-fg);
+    transform: scale(1.01);
 }
+.file-drop-zone.has-file {
+    border-style: solid;
+    border-color: #0d9488;
+    background: rgba(13, 148, 136, 0.05);
+}
+.file-drop-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--color-canvas-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.file-drop-zone:hover .file-drop-icon { background: rgba(91, 164, 176, 0.1); }
+.file-drop-icon svg { width: 18px; height: 18px; }
+.file-drop-text { font-size: 12px; font-weight: 500; }
+.file-drop-hint { font-size: 10px; opacity: 0.6; }
+.file-drop-name {
+    display: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0d9488;
+    margin-top: 2px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.file-drop-name.visible { display: block; }
 
 .images-preview-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+.images-preview-list:not(:empty) {
     margin-bottom: 8px;
 }
 
@@ -1315,15 +1775,17 @@ function updateStatCounter(field, delta) {
 
 .drop-zone-small {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 12px;
+    gap: 6px;
+    padding: 20px 12px;
     border: 2px dashed var(--color-border-default);
-    border-radius: 8px;
+    border-radius: 10px;
     background-color: var(--color-canvas-subtle);
     color: var(--color-fg-muted);
     cursor: pointer;
+    min-height: 100px;
     transition: all 0.2s;
     font-size: 12px;
 }
@@ -1334,7 +1796,7 @@ function updateStatCounter(field, delta) {
     color: var(--color-accent-fg);
 }
 
-.drop-zone-small.drop-zone-active {
+.drop-zone-small.drop-active {
     border-color: var(--color-accent-fg);
     background-color: rgba(91, 164, 176, 0.1);
     color: var(--color-accent-fg);
@@ -1503,6 +1965,10 @@ function updateStatCounter(field, delta) {
     color: var(--color-fg-default);
     margin: 0 0 10px 0;
     line-height: 1.4;
+    transition: color 0.15s;
+}
+.article-title:hover {
+    color: var(--color-accent-fg);
 }
 
 .article-authors {
@@ -1622,9 +2088,69 @@ function updateStatCounter(field, delta) {
     transition: all 0.15s;
 }
 
+.file-link {
+    cursor: pointer;
+    font-family: inherit;
+}
 .file-link:hover {
     background-color: var(--color-canvas-inset);
     border-color: var(--color-accent-emphasis);
+    color: var(--color-accent-fg);
+}
+
+/* File Dropdown */
+.file-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.file-dropdown-arrow {
+    transition: transform 0.15s;
+    margin-left: 2px;
+    opacity: 0.5;
+}
+.file-dropdown.open .file-dropdown-arrow {
+    transform: rotate(180deg);
+}
+.file-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 150px;
+    background: var(--color-canvas-overlay, var(--color-canvas-default));
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    z-index: 100;
+    padding: 4px;
+    animation: fdFadeIn 0.12s ease;
+}
+@keyframes fdFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.file-dropdown.open .file-dropdown-menu {
+    display: block;
+}
+.file-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    color: var(--color-fg-default);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.1s;
+    white-space: nowrap;
+}
+.file-dropdown-item:hover {
+    background: var(--color-canvas-subtle);
     color: var(--color-accent-fg);
 }
 
@@ -1860,5 +2386,338 @@ function updateStatCounter(field, delta) {
 .history-new { color: #1a7f37; }
 [data-theme="dark"] .history-old { color: #f85149; }
 [data-theme="dark"] .history-new { color: #3fb950; }
+
+/* ========================================
+   FILTERS PANEL
+   ======================================== */
+.filters-panel {
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+.filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+}
+.filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    margin-right: 4px;
+}
+.filter-date-select {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-default);
+    color: var(--color-fg-default);
+    font-size: 12px;
+    cursor: pointer;
+}
+.filters-counter {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--color-fg-muted);
+}
+
+/* ========================================
+   QUICK VIEW MODAL
+   ======================================== */
+.qv-modal {
+    max-width: 640px;
+    width: 95%;
+}
+.qv-tabs {
+    display: flex;
+    gap: 4px;
+}
+.qv-tab {
+    padding: 6px 16px;
+    border: none;
+    background: none;
+    color: var(--color-fg-muted);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+.qv-tab:hover {
+    color: var(--color-fg-default);
+}
+.qv-tab.active {
+    color: var(--color-accent-fg);
+    border-bottom-color: var(--color-accent-fg);
+}
+.qv-badge {
+    display: inline-block;
+    background: var(--color-accent-fg);
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.qv-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0 0 8px;
+    line-height: 1.3;
+}
+.qv-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.qv-meta-item {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    background: var(--color-canvas-subtle);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.qv-statuses {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.qv-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--color-border-default);
+}
+.qv-status-on {
+    background: #dafbe1;
+    color: #1a7f37;
+    border-color: #1a7f37;
+}
+.qv-status-off {
+    background: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+}
+[data-theme="dark"] .qv-status-on {
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+    border-color: #3fb950;
+}
+.qv-section {
+    margin-bottom: 16px;
+}
+.qv-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--color-fg-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--color-border-default);
+}
+.qv-author {
+    margin-bottom: 8px;
+}
+.qv-author strong {
+    font-size: 14px;
+    color: var(--color-fg-default);
+}
+.qv-author-details {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    margin-top: 2px;
+}
+.qv-author-contacts {
+    font-size: 12px;
+    color: var(--color-accent-fg);
+    margin-top: 1px;
+}
+.qv-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.qv-file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-subtle);
+    color: var(--color-accent-fg);
+    font-size: 13px;
+    text-decoration: none;
+    transition: all 0.15s;
+    cursor: pointer;
+    font-family: inherit;
+}
+.qv-file-link:hover {
+    border-color: var(--color-accent-fg);
+    background: var(--color-accent-subtle);
+}
+.qv-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.qv-thumb {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-default);
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+.qv-thumb:hover {
+    transform: scale(1.05);
+}
+.qv-notes {
+    font-size: 13px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-subtle);
+    padding: 10px 14px;
+    border-radius: 6px;
+    border-left: 3px solid var(--color-accent-fg);
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+/* ========================================
+   COMMENTS
+   ======================================== */
+.qv-comments-list {
+    padding: 16px;
+}
+.qv-comment {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+}
+.qv-comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+.qv-comment-header strong {
+    font-size: 13px;
+    color: var(--color-fg-default);
+}
+.qv-comment-date {
+    font-size: 11px;
+    color: var(--color-fg-muted);
+}
+.qv-comment-text {
+    font-size: 13px;
+    color: var(--color-fg-default);
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+.qv-no-comments {
+    text-align: center;
+    color: var(--color-fg-muted);
+    font-size: 13px;
+    padding: 32px 0;
+}
+.qv-comment-form {
+    padding: 12px 16px;
+    border-top: 1px solid var(--color-border-default);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+.qv-comment-input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-default);
+    color: var(--color-fg-default);
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 36px;
+}
+.qv-comment-input:focus {
+    outline: none;
+    border-color: var(--color-accent-fg);
+    box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.15);
+}
+.qv-comment-send {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background: var(--color-accent-fg);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+.qv-comment-send:hover {
+    background: var(--color-accent-emphasis);
+}
+
+/* ========================================
+   FILE PREVIEW MODAL
+   ======================================== */
+.file-preview-modal {
+    max-width: 900px;
+    width: 95%;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+.file-preview-body {
+    flex: 1;
+    min-height: 0;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+}
+
+@media (max-width: 600px) {
+    .file-preview-modal {
+        height: 90vh;
+        max-width: 100%;
+    }
+    .filters-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .qv-modal {
+        max-width: 100%;
+    }
+    .qv-statuses {
+        flex-wrap: wrap;
+    }
+    .qv-comment-form {
+        flex-direction: column;
+    }
+    .qv-comment-send {
+        width: 100%;
+        justify-content: center;
+    }
+}
 </style>
 {% endblock %}

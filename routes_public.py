@@ -152,12 +152,8 @@ def register_public_routes(app):
         return jsonify(data)
 
     @app.route('/download/<filename>')
-    @login_required
-    def download_file(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
     @app.route('/uploads/<filename>')
     @login_required
-    def uploads_file(filename):
+    def download_file(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 

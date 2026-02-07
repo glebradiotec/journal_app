@@ -22,6 +22,12 @@
 
     <!-- Edit Form -->
     <div class="edit-form-container">
+        <div class="edit-form-header">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Z"/>
+            </svg>
+            Редактирование
+        </div>
         <form method="POST" enctype="multipart/form-data" class="edit-form">
             <!-- Title -->
             <div class="form-section">
@@ -127,7 +133,9 @@
                 <div class="files-grid">
                     <div class="file-item">
                         <div class="file-item-header">
-                            <span class="file-icon">📄</span>
+                            <svg class="file-icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/>
+                            </svg>
                             <span>Текст статьи</span>
                         </div>
                         {% if article.manuscript_file %}
@@ -143,7 +151,9 @@
                     
                     <div class="file-item">
                         <div class="file-item-header">
-                            <span class="file-icon">📋</span>
+                            <svg class="file-icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z"/>
+                            </svg>
                             <span>Рецензия</span>
                         </div>
                         {% if article.review_file %}
@@ -159,7 +169,9 @@
                     
                     <div class="file-item file-item-images">
                         <div class="file-item-header">
-                            <span class="file-icon">🖼️</span>
+                            <svg class="file-icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h.19l5.613-5.613a1.75 1.75 0 0 1 2.474 0L14.75 12.53V2.75a.25.25 0 0 0-.25-.25Zm12.5 11a.25.25 0 0 0 .25-.25v-.32L10.28 8.71a.25.25 0 0 0-.354 0L5.22 13.416c.035.01.073.016.112.016h8.918ZM4.5 6.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/>
+                            </svg>
                             <span>Изображения</span>
                         </div>
                         
@@ -189,7 +201,8 @@
                         <!-- Зона для drag & drop -->
                         <div class="drop-zone" id="imageDropZone" onclick="triggerImageSelect()">
                             <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Z"/>
+                                <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/>
+                                <path d="M11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/>
                             </svg>
                             <span>Перетащите изображения сюда или нажмите для выбора</span>
                         </div>
@@ -198,7 +211,10 @@
                     
                     <div class="file-item">
                         <div class="file-item-header">
-                            <span class="file-icon">📑</span>
+                            <svg class="file-icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/>
+                                <path d="M5.75 7.5a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0V8.25a.75.75 0 0 1 .75-.75Zm1.5-2a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0V6.25a.75.75 0 0 1 .75-.75Zm3 4a.75.75 0 0 1 .75.75v.01a.75.75 0 0 1-1.5 0v-.01a.75.75 0 0 1 .75-.75Z"/>
+                            </svg>
                             <span>Титульная страница</span>
                         </div>
                         {% if article.title_pdf %}
@@ -250,49 +266,64 @@
 .dashboard-header-left {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
 }
 
 .dashboard-title {
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 700;
     color: var(--color-fg-default);
     margin: 0;
+    letter-spacing: -0.3px;
 }
 
 .dashboard-subtitle {
     font-size: 14px;
     color: var(--color-fg-muted);
+    font-weight: 500;
 }
 
 .back-link {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
-    color: var(--color-accent-fg);
+    color: var(--color-fg-muted);
     text-decoration: none;
-    margin-bottom: 4px;
+    transition: color 0.15s;
 }
 
 .back-link:hover {
-    text-decoration: underline;
+    color: var(--color-accent-fg);
 }
 
 .edit-form-container {
     background-color: var(--color-canvas-default);
     border: 1px solid var(--color-border-default);
     border-radius: 14px;
-    padding: 32px;
     margin-top: 24px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.03);
+}
+
+.edit-form-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 22px 32px;
+    background: linear-gradient(135deg, var(--color-canvas-subtle) 0%, var(--color-canvas-default) 100%);
+    border-bottom: 1px solid var(--color-border-default);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-default);
 }
 
 .edit-form {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 28px;
+    padding: 32px;
 }
 
 .form-section {
@@ -302,9 +333,11 @@
 }
 
 .form-label {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--color-fg-default);
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .section-header {
@@ -320,24 +353,25 @@
 }
 
 .form-input, .form-select, .form-textarea {
-    padding: 10px 14px;
+    padding: 12px 16px;
     font-size: 14px;
     color: var(--color-fg-default);
     background-color: var(--color-canvas-default);
     border: 1px solid var(--color-border-default);
-    border-radius: 8px;
+    border-radius: 10px;
     transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
     outline: none;
-    border-color: var(--color-accent-emphasis);
-    box-shadow: 0 0 0 3px rgba(91, 164, 176, 0.1);
+    border-color: #5BA4B0;
+    box-shadow: 0 0 0 4px rgba(91, 164, 176, 0.12);
 }
 
 .form-input-lg {
     font-size: 16px;
-    padding: 12px 16px;
+    padding: 14px 18px;
 }
 
 .date-inputs {
@@ -347,12 +381,15 @@
 
 .date-inputs .form-select {
     flex: 1;
+    padding: 12px 10px;
+    border-radius: 10px;
 }
 
 .status-checkboxes {
     display: flex;
-    gap: 16px;
+    gap: 10px;
     flex-wrap: wrap;
+    padding-top: 4px;
 }
 
 .checkbox-label {
@@ -360,63 +397,100 @@
     align-items: center;
     gap: 8px;
     cursor: pointer;
+    padding: 6px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border-default);
+    background-color: var(--color-canvas-default);
+    transition: all 0.15s;
+}
+
+.checkbox-label:hover {
+    background-color: var(--color-canvas-subtle);
+}
+
+.checkbox-label:has(input:checked) {
+    border-width: 2px;
+    padding: 5px 13px;
 }
 
 .checkbox-label input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     cursor: pointer;
+    accent-color: var(--color-accent-emphasis);
 }
 
 .checkbox-text {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
-    padding: 4px 12px;
-    border-radius: 20px;
+    padding: 0;
+    border-radius: 0;
+    background: none;
 }
 
-.checkbox-green {
-    background-color: rgba(31, 136, 61, 0.1);
+.checkbox-green { color: #1a7f37; }
+.checkbox-blue { color: #5BA4B0; }
+.checkbox-orange { color: #9a6700; }
+
+.checkbox-label:has(input:checked) .checkbox-green {
     color: #1a7f37;
 }
-
-.checkbox-blue {
-    background-color: rgba(91, 164, 176, 0.1);
+.checkbox-label:has(input:checked) .checkbox-blue {
     color: #5BA4B0;
 }
-
-.checkbox-orange {
-    background-color: rgba(154, 103, 0, 0.1);
+.checkbox-label:has(input:checked) .checkbox-orange {
     color: #9a6700;
 }
 
-[data-theme="dark"] .checkbox-green {
-    background-color: rgba(63, 185, 80, 0.15);
-    color: #3fb950;
+/* Highlight checked checkbox labels */
+.checkbox-label:has(.checkbox-green):has(input:checked) {
+    background: linear-gradient(135deg, rgba(31, 136, 61, 0.12) 0%, rgba(31, 136, 61, 0.05) 100%);
+    border-color: rgba(31, 136, 61, 0.4);
+}
+.checkbox-label:has(.checkbox-blue):has(input:checked) {
+    background: linear-gradient(135deg, rgba(91, 164, 176, 0.12) 0%, rgba(91, 164, 176, 0.05) 100%);
+    border-color: rgba(91, 164, 176, 0.4);
+}
+.checkbox-label:has(.checkbox-orange):has(input:checked) {
+    background: linear-gradient(135deg, rgba(154, 103, 0, 0.12) 0%, rgba(154, 103, 0, 0.05) 100%);
+    border-color: rgba(154, 103, 0, 0.4);
 }
 
-[data-theme="dark"] .checkbox-blue {
-    background-color: rgba(124, 197, 208, 0.15);
-    color: #7CC5D0;
-}
+[data-theme="dark"] .checkbox-green { color: #3fb950; }
+[data-theme="dark"] .checkbox-blue { color: #7CC5D0; }
+[data-theme="dark"] .checkbox-orange { color: #d29922; }
 
-[data-theme="dark"] .checkbox-orange {
-    background-color: rgba(210, 153, 34, 0.15);
-    color: #d29922;
+[data-theme="dark"] .checkbox-label:has(.checkbox-green):has(input:checked) {
+    background: linear-gradient(135deg, rgba(63, 185, 80, 0.18) 0%, rgba(63, 185, 80, 0.08) 100%);
+    border-color: rgba(63, 185, 80, 0.4);
+}
+[data-theme="dark"] .checkbox-label:has(.checkbox-blue):has(input:checked) {
+    background: linear-gradient(135deg, rgba(124, 197, 208, 0.18) 0%, rgba(124, 197, 208, 0.08) 100%);
+    border-color: rgba(124, 197, 208, 0.4);
+}
+[data-theme="dark"] .checkbox-label:has(.checkbox-orange):has(input:checked) {
+    background: linear-gradient(135deg, rgba(210, 153, 34, 0.18) 0%, rgba(210, 153, 34, 0.08) 100%);
+    border-color: rgba(210, 153, 34, 0.4);
 }
 
 /* Authors */
 .authors-container {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .author-card {
-    background-color: var(--color-canvas-subtle);
+    background: linear-gradient(135deg, var(--color-canvas-subtle) 0%, var(--color-canvas-default) 100%);
     border: 1px solid var(--color-border-default);
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: border-color 0.15s;
+}
+
+.author-card:hover {
+    border-color: var(--color-accent-emphasis);
 }
 
 .author-main-row {
@@ -436,24 +510,29 @@
 .author-details {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 10px;
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid var(--color-border-muted);
+    border-top: 1px dashed var(--color-border-default);
 }
 
 .btn-toggle-details, .btn-remove-author {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    background: transparent;
+    width: 34px;
+    height: 34px;
+    background: var(--color-canvas-default);
     border: 1px solid var(--color-border-default);
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     color: var(--color-fg-muted);
-    transition: all 0.15s;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-toggle-details {
+    transition: transform 0.2s, background-color 0.15s, color 0.15s;
 }
 
 .btn-toggle-details:hover {
@@ -471,19 +550,18 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 8px 16px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-accent-fg);
     background: transparent;
-    border: 1px solid var(--color-accent-emphasis);
-    border-radius: 6px;
+    border: none;
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: text-decoration 0.15s;
 }
 
 .btn-add:hover {
-    background-color: rgba(91, 164, 176, 0.1);
+    text-decoration: underline;
 }
 
 /* Files */
@@ -494,34 +572,43 @@
 }
 
 .file-item {
-    background-color: var(--color-canvas-subtle);
+    background: linear-gradient(135deg, var(--color-canvas-subtle) 0%, var(--color-canvas-default) 100%);
     border: 1px solid var(--color-border-default);
-    border-radius: 8px;
-    padding: 16px;
+    border-radius: 12px;
+    padding: 18px;
+    transition: border-color 0.15s;
+}
+
+.file-item:hover {
+    border-color: var(--color-accent-emphasis);
 }
 
 .file-item-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    font-weight: 500;
+    gap: 10px;
+    margin-bottom: 14px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--color-fg-default);
 }
 
-.file-icon {
-    font-size: 18px;
+.file-icon-svg {
+    color: var(--color-fg-muted);
+    flex-shrink: 0;
 }
 
 .file-current {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 10px 14px;
     background-color: var(--color-canvas-default);
-    border: 1px solid var(--color-border-muted);
-    border-radius: 6px;
-    margin-bottom: 8px;
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    margin-bottom: 10px;
     font-size: 13px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .file-current a {
@@ -530,7 +617,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 150px;
+    max-width: 180px;
+    font-weight: 500;
 }
 
 .file-current a:hover {
@@ -573,10 +661,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    background-color: var(--color-canvas-subtle);
-    border-radius: 6px;
+    padding: 10px 14px;
+    background-color: var(--color-canvas-default);
+    border-radius: 8px;
     border: 1px solid var(--color-border-default);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .image-link {
@@ -634,10 +723,10 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 24px 16px;
+    padding: 20px 16px;
     border: 2px dashed var(--color-border-default);
-    border-radius: 10px;
-    background-color: var(--color-canvas-subtle);
+    border-radius: 12px;
+    background-color: var(--color-canvas-default);
     color: var(--color-fg-muted);
     cursor: pointer;
     transition: all 0.2s;
@@ -654,6 +743,7 @@
     border-color: var(--color-accent-fg);
     background-color: rgba(91, 164, 176, 0.1);
     color: var(--color-accent-fg);
+    transform: scale(1.01);
 }
 
 .drop-zone svg {
@@ -695,19 +785,21 @@
 }
 
 .form-file::file-selector-button {
-    padding: 6px 12px;
+    padding: 8px 14px;
     margin-right: 12px;
     font-size: 13px;
     font-weight: 500;
     color: var(--color-fg-default);
     background-color: var(--color-canvas-default);
     border: 1px solid var(--color-border-default);
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
+    transition: all 0.15s;
 }
 
 .form-file::file-selector-button:hover {
     background-color: var(--color-canvas-inset);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
 /* Actions */
@@ -715,46 +807,49 @@
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-    padding-top: 16px;
+    padding-top: 24px;
     border-top: 1px solid var(--color-border-default);
 }
 
 .btn-cancel {
     display: inline-flex;
     align-items: center;
-    padding: 10px 20px;
+    padding: 12px 24px;
     font-size: 14px;
     font-weight: 500;
     color: var(--color-fg-default);
     background-color: var(--color-canvas-default);
     border: 1px solid var(--color-border-default);
-    border-radius: 8px;
+    border-radius: 10px;
     text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: all 0.15s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .btn-cancel:hover {
     background-color: var(--color-canvas-subtle);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .btn-save {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 24px;
+    padding: 12px 28px;
     font-size: 14px;
     font-weight: 600;
     color: #ffffff;
     background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(91, 164, 176, 0.3);
+    box-shadow: 0 4px 14px rgba(91, 164, 176, 0.35);
+    transition: all 0.2s;
 }
 
 .btn-save:hover {
-    box-shadow: 0 4px 12px rgba(91, 164, 176, 0.4);
+    box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45);
 }
 
 /* Responsive */
@@ -764,11 +859,11 @@
     }
     
     .dashboard-title {
-        font-size: 20px;
+        font-size: 22px;
     }
     
-    .edit-form-container {
-        padding: 16px;
+    .edit-form {
+        padding: 20px;
     }
     
     .form-row {
@@ -806,6 +901,10 @@
     .btn-cancel, .btn-save {
         width: 100%;
         justify-content: center;
+    }
+    
+    .edit-form-header {
+        padding: 16px 20px;
     }
 }
 </style>
@@ -853,7 +952,7 @@ function toggleAuthorDetails(btn) {
     if (details) {
         const isHidden = details.style.display === 'none';
         details.style.display = isHidden ? 'grid' : 'none';
-        btn.textContent = isHidden ? '▲' : '▼';
+        btn.style.transform = isHidden ? 'rotate(180deg)' : '';
     }
 }
 
