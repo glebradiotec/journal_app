@@ -251,7 +251,7 @@
             <div class="article-card" data-payment="{{ 'true' if article.payment_received else 'false' }}" data-review="{{ 'true' if article.has_review else 'false' }}" data-edited="{{ 'true' if article.edited else 'false' }}" data-date="{{ article.submission_date or '' }}">
                 <div class="article-card-main">
                     <div class="article-info">
-                        <h3 class="article-title" onclick="quickView({{ article.id }})" style="cursor:pointer">{{ article.title }}</h3>
+                        <h3 class="article-title" onclick="quickView({{ article.id }}, null, event)" style="cursor:pointer">{{ article.title }}</h3>
                         <div class="article-authors">
                             {% if article.article_authors %}
                                 {% for author in article.article_authors|sort(attribute='order') %}
@@ -369,19 +369,19 @@
                         </svg>
                         Редактировать
                     </a>
-                    <button class="action-btn" onclick="showHistory({{ article.id }}, '{{ article.title|e }}')">
+                    <button class="action-btn" onclick="showHistory({{ article.id }}, '{{ article.title|e }}', event)">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M1.643 3.143.427 1.927A.25.25 0 0 1 .604 1.5H3.75a.25.25 0 0 1 .25.25v3.146a.25.25 0 0 1-.427.177L2.322 3.822A6.002 6.002 0 0 0 6 13.5c3.311 0 6-2.689 6-6a.75.75 0 0 1 1.5 0A7.5 7.5 0 1 1 1.643 3.143ZM6.5 5a.75.75 0 0 1 .75.75v3.378l2.652.8a.75.75 0 0 1-.456 1.429l-3.174-.96A.751.751 0 0 1 5.75 9.7V5.75A.75.75 0 0 1 6.5 5Z"/>
                         </svg>
                         История
                     </button>
-                    <button class="action-btn" onclick="openComments({{ article.id }})">
+                    <button class="action-btn" onclick="openComments({{ article.id }}, event)">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 13.25 12H9.06l-2.573 2.573A1.458 1.458 0 0 1 4 13.543V12H2.75A1.75 1.75 0 0 1 1 10.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h4.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/>
                         </svg>
                         Комментарии
                     </button>
-                    <button class="action-btn" onclick="openMoveModal('{{ article.id }}')">
+                    <button class="action-btn" onclick="openMoveModal('{{ article.id }}', event)">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                             <path d="m12.836.855 2.309 2.31a.75.75 0 0 1 0 1.06l-2.309 2.31a.75.75 0 1 1-1.06-1.061l1.028-1.029H6.652a.75.75 0 0 1 0-1.5h6.152L11.776 1.916a.75.75 0 0 1 1.06-1.061Zm-1.672 7.619 2.309 2.31a.75.75 0 0 1 0 1.06l-2.309 2.31a.75.75 0 0 1-1.06-1.06l1.028-1.03H3.152a.75.75 0 0 1 0-1.5h6.152l-1.028-1.029a.75.75 0 0 1 1.06-1.061Z"/>
                         </svg>
@@ -417,7 +417,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Переместить статью</h3>
-            <button class="modal-close" onclick="closeModal()">
+            <button class="modal-close" onclick="closeMoveModal()">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
                 </svg>
@@ -438,7 +438,7 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+            <button class="btn-secondary" onclick="closeMoveModal()">Отмена</button>
             <button class="btn-primary" onclick="confirmMove()">Переместить</button>
         </div>
     </div>
@@ -449,7 +449,7 @@
     <div class="modal-content" style="max-width: 560px;">
         <div class="modal-header">
             <h3 id="historyTitle">История изменений</h3>
-            <button class="modal-close" onclick="document.getElementById('historyModal').style.display='none'">
+            <button class="modal-close" onclick="closeModal('historyModal')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
                 </svg>
@@ -469,14 +469,14 @@
                 <button class="qv-tab active" onclick="switchQvTab('info')">Информация</button>
                 <button class="qv-tab" onclick="switchQvTab('comments')">Комментарии <span id="qvCommentBadge" class="qv-badge" style="display:none">0</span></button>
             </div>
-            <button class="modal-close" onclick="document.getElementById('quickViewModal').style.display='none'">
+            <button class="modal-close" onclick="closeModal('quickViewModal')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
                 </svg>
             </button>
         </div>
         <!-- Tab: Info -->
-        <div class="qv-tab-content" id="qvTabInfo">
+        <div class="qv-tab-content qv-tab-visible" id="qvTabInfo">
             <div class="modal-body" id="qvBody" style="max-height: 520px; overflow-y: auto;">
                 <p style="color:var(--color-fg-muted)">Загрузка...</p>
             </div>
@@ -502,7 +502,7 @@
     <div class="modal-content file-preview-modal">
         <div class="modal-header">
             <h3 id="filePreviewTitle">Просмотр файла</h3>
-            <button class="modal-close" onclick="document.getElementById('filePreviewModal').style.display='none'">
+            <button class="modal-close" onclick="closeModal('filePreviewModal')">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
                 </svg>
@@ -583,9 +583,9 @@ function removeAuthorField(num) {
 let currentArticleId = null;
 let journalsData = [];
 
-function openMoveModal(articleId) {
+function openMoveModal(articleId, e) {
     currentArticleId = articleId;
-    document.getElementById('moveModal').style.display = 'flex';
+    openModalFrom(document.getElementById('moveModal'), e);
     
     fetch('/api/journals-and-issues')
         .then(r => r.json())
@@ -630,16 +630,16 @@ function confirmMove() {
     });
 }
 
-function closeModal() {
-    document.getElementById('moveModal').style.display = 'none';
+function closeMoveModal() {
+    closeModal('moveModal');
 }
 
-function showHistory(articleId, title) {
+function showHistory(articleId, title, e) {
     var modal = document.getElementById('historyModal');
     var body = document.getElementById('historyBody');
     document.getElementById('historyTitle').textContent = 'История: ' + title;
     body.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
-    modal.style.display = 'flex';
+    openModalFrom(modal, e);
 
     fetch('/article/' + articleId + '/history', { credentials: 'same-origin' })
         .then(function(r) { return r.json(); })
@@ -904,18 +904,116 @@ function updateStatCounter(field, delta) {
 }
 
 // =============================================
+//   MODAL ANIMATION — expand from click origin
+// =============================================
+var MODAL_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+var MODAL_DURATION = '0.32s';
+var _activeCard = null;
+
+function openModalFrom(modalEl, originEvent) {
+    var content = modalEl.querySelector('.modal-content');
+    
+    // 1. Freeze: no transitions, flatten transform for accurate measurement
+    content.style.transition = 'none';
+    content.style.opacity = '0';
+    content.style.transform = 'none';
+    
+    // 2. Show overlay (invisible) so we can measure content rect
+    modalEl.classList.remove('modal-visible');
+    modalEl.style.display = 'flex';
+    content.offsetHeight; // force layout
+    
+    // 3. Calculate transform-origin from clicked element
+    if (originEvent && originEvent.currentTarget) {
+        var btn = originEvent.currentTarget;
+        var br = btn.getBoundingClientRect();
+        var cx = br.left + br.width / 2;
+        var cy = br.top + br.height / 2;
+        var cr = content.getBoundingClientRect();
+        content.style.transformOrigin = (cx - cr.left) + 'px ' + (cy - cr.top) + 'px';
+    } else {
+        content.style.transformOrigin = '50% 50%';
+    }
+    
+    // 4. Set starting state (small + transparent)
+    content.style.transform = 'scale(0.3)';
+    content.offsetHeight; // force browser to register start state
+    
+    // 5. Enable transitions and animate to final state
+    content.style.transition = 'opacity ' + MODAL_DURATION + ' ' + MODAL_EASING + ', transform ' + MODAL_DURATION + ' ' + MODAL_EASING;
+    
+    // Highlight the source article card while modal is open
+    if (originEvent && originEvent.currentTarget) {
+        var card = originEvent.currentTarget.closest('.article-card');
+        if (card) {
+            if (_activeCard) _activeCard.classList.remove('article-card-active');
+            card.classList.add('article-card-active');
+            _activeCard = card;
+        }
+    }
+    
+    requestAnimationFrame(function() {
+        modalEl.classList.add('modal-visible');  // overlay bg + blur
+        content.style.opacity = '1';             // content fade in
+        content.style.transform = 'scale(1)';   // content scale up
+    });
+}
+
+function closeModal(modalEl) {
+    if (typeof modalEl === 'string') modalEl = document.getElementById(modalEl);
+    if (!modalEl) return;
+    
+    var content = modalEl.querySelector('.modal-content');
+    
+    // Animate overlay out
+    modalEl.classList.remove('modal-visible');
+    
+    // Animate content out (shrink + fade)
+    content.style.opacity = '0';
+    content.style.transform = 'scale(0.3)';
+    
+    // Hide after animation completes, then handle card highlight
+    var card = _activeCard;
+    _activeCard = null;
+    
+    setTimeout(function() {
+        modalEl.style.display = 'none';
+        
+        // Now overlay is gone — check if cursor is still on the card
+        if (card) {
+            if (card.matches(':hover')) {
+                // Cursor on card — keep lifted, remove on leave
+                card.addEventListener('mouseleave', function handler() {
+                    card.classList.remove('article-card-active');
+                    card.removeEventListener('mouseleave', handler);
+                });
+            } else {
+                card.classList.remove('article-card-active');
+            }
+        }
+    }, 320);
+}
+
+// Close modal on click outside (on overlay background)
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay') && e.target.classList.contains('modal-visible')) {
+        closeModal(e.target);
+    }
+});
+
+// =============================================
 //   QUICK VIEW
 // =============================================
 var currentQvArticleId = null;
 
-function quickView(articleId) {
+function quickView(articleId, initialTab, originEvent) {
     currentQvArticleId = articleId;
+    var tab = initialTab || 'info';
     var modal = document.getElementById('quickViewModal');
     var body = document.getElementById('qvBody');
     body.innerHTML = '<p style="color:var(--color-fg-muted)">Загрузка...</p>';
-    // Reset to info tab
-    switchQvTab('info');
-    modal.style.display = 'flex';
+    switchQvTab(tab);
+    openModalFrom(modal, originEvent);
 
     fetch('/article/' + articleId + '/json')
         .then(r => r.json())
@@ -1011,10 +1109,10 @@ function quickView(articleId) {
         });
 }
 
-function openFilePreview(url, title) {
+function openFilePreview(url, title, e) {
     document.getElementById('filePreviewTitle').textContent = title || 'Просмотр файла';
     document.getElementById('filePreviewFrame').src = url;
-    document.getElementById('filePreviewModal').style.display = 'flex';
+    openModalFrom(document.getElementById('filePreviewModal'), e);
 }
 
 // Close file dropdowns on outside click
@@ -1032,9 +1130,23 @@ function escHtml(s) {
 
 function switchQvTab(tab) {
     var tabs = document.querySelectorAll('.qv-tab');
+    var infoPane = document.getElementById('qvTabInfo');
+    var commentsPane = document.getElementById('qvTabComments');
+    
     tabs.forEach(function(t) { t.classList.remove('active'); });
-    document.getElementById('qvTabInfo').style.display = tab === 'info' ? '' : 'none';
-    document.getElementById('qvTabComments').style.display = tab === 'comments' ? '' : 'none';
+    
+    // Fade out current, fade in target
+    var showPane = tab === 'info' ? infoPane : commentsPane;
+    var hidePane = tab === 'info' ? commentsPane : infoPane;
+    
+    hidePane.classList.remove('qv-tab-visible');
+    hidePane.style.display = 'none';
+    
+    showPane.style.display = '';
+    // Force reflow so the animation triggers
+    showPane.offsetHeight;
+    showPane.classList.add('qv-tab-visible');
+    
     if (tab === 'info') tabs[0].classList.add('active');
     if (tab === 'comments') {
         tabs[1].classList.add('active');
@@ -1097,9 +1209,8 @@ function sendComment() {
     });
 }
 
-function openComments(articleId) {
-    quickView(articleId);
-    setTimeout(function() { switchQvTab('comments'); }, 300);
+function openComments(articleId, e) {
+    quickView(articleId, 'comments', e);
 }
 
 // =============================================
@@ -1941,9 +2052,11 @@ function applyFilters() {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
-.article-card:hover {
+.article-card:hover,
+.article-card.article-card-active {
     border-color: var(--color-accent-emphasis);
     box-shadow: 0 4px 16px rgba(91, 164, 176, 0.1);
+    transform: translateY(-2px);
 }
 
 .article-card:last-child {
@@ -2266,12 +2379,18 @@ function applyFilters() {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(4px);
+    background-color: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+.modal-overlay.modal-visible {
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
 }
 
 .modal-content {
@@ -2280,6 +2399,7 @@ function applyFilters() {
     width: 90%;
     max-width: 420px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+    will-change: transform, opacity;
 }
 
 .modal-header {
@@ -2436,6 +2556,15 @@ function applyFilters() {
 .qv-modal {
     max-width: 640px;
     width: 95%;
+}
+.qv-tab-content {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.qv-tab-content.qv-tab-visible {
+    opacity: 1;
+    transform: translateY(0);
 }
 .qv-tabs {
     display: flex;
