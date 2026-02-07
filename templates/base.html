@@ -475,9 +475,14 @@
                     if (el.hasAttribute('data-no-slot')) return;
                     el.dataset.slotBusy = '1';
                     
+                    // Lock element height to prevent layout shift
+                    var origH = el.offsetHeight;
+                    el.style.height = origH + 'px';
+                    el.style.overflow = 'hidden';
+                    
                     var digits = String(target).split('');
-                    var fontSize = parseFloat(getComputedStyle(el).fontSize) || 16;
-                    var cellH = Math.round(fontSize * 1.35);
+                    var cs = getComputedStyle(el);
+                    var cellH = Math.round(parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) * 1.2));
                     
                     el.textContent = '';
                     
@@ -534,6 +539,8 @@
                     // После остановки всех барабанов — возвращаем чистый текст
                     setTimeout(function() {
                         el.textContent = text;
+                        el.style.height = '';
+                        el.style.overflow = '';
                         delete el.dataset.slotBusy;
                     }, longestEnd + 120);
                 });
