@@ -114,6 +114,20 @@
             </svg>
             <span>Добавление новой статьи</span>
         </div>
+
+        <!-- Кнопка авто-заполнения из PDF -->
+        <div class="pdf-parse-section">
+            <button type="button" class="btn-parse-pdf" onclick="document.getElementById('pdfParseInput').click()">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/>
+                </svg>
+                Заполнить из PDF
+            </button>
+            <span class="pdf-parse-hint">Загрузите PDF статьи — название и авторы заполнятся автоматически</span>
+            <input type="file" id="pdfParseInput" accept=".pdf" style="display:none" onchange="parsePdfAndFill(this)">
+            <div id="pdfParseStatus" class="pdf-parse-status" style="display:none"></div>
+        </div>
+
         <form method="POST" action="/issue/{{ issue.id }}/add-article" enctype="multipart/form-data">
             <div class="form-compact">
                 <!-- Row 1: Title + Date -->
@@ -582,6 +596,141 @@ function toggleAuthorDetails(num) {
 
 function removeAuthorField(num) {
     document.getElementById('author-' + num)?.remove();
+}
+
+// === Авто-заполнение из PDF ===
+function parsePdfAndFill(input) {
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+        showToast('Поддерживается только формат PDF', 'error');
+        return;
+    }
+
+    const status = document.getElementById('pdfParseStatus');
+    status.style.display = 'flex';
+    status.className = 'pdf-parse-status loading';
+    status.innerHTML = '<span class="pdf-spinner"></span> Распознаём статью...';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch('/api/parse-pdf', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            status.className = 'pdf-parse-status error';
+            status.textContent = data.error;
+            return;
+        }
+
+        let filled = [];
+
+        // Заполняем название
+        if (data.title) {
+            const titleInput = document.querySelector('#newArticleForm input[name="title"]');
+            if (titleInput) {
+                titleInput.value = data.title;
+                filled.push('название');
+            }
+        }
+
+        // Заполняем авторов
+        if (data.authors && data.authors.length > 0) {
+            // Очищаем текущих авторов
+            const container = document.getElementById('authorsContainer');
+            container.innerHTML = '';
+
+            data.authors.forEach(function(author, i) {
+                const num = i + 1;
+                const html = `
+                <div class="author-compact" id="author-${num}">
+                    <div class="author-compact-main">
+                        <input type="text" name="author_name[]" class="input-name" placeholder="ФИО автора" value="${escapeHtml(author.name || '')}" required>
+                        <input type="email" name="author_email[]" class="input-email" placeholder="Email" value="${escapeHtml(author.email || '')}">
+                        <input type="text" name="author_organization[]" class="input-org" placeholder="Организация" value="${escapeHtml(author.organization || '')}">
+                        <button type="button" class="btn-expand" onclick="toggleAuthorDetails(${num})" title="Дополнительно">
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="btn-remove-author" onclick="removeAuthorField(${num})">
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="author-compact-details" id="author-details-${num}" style="display: none;">
+                        <input type="text" name="author_degree[]" placeholder="Ученая степень">
+                        <input type="text" name="author_position[]" placeholder="Должность">
+                        <input type="tel" name="author_phone[]" placeholder="Телефон">
+                    </div>
+                </div>`;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+            filled.push(data.authors.length + ' ' + pluralizeRu(data.authors.length, 'автор', 'автора', 'авторов'));
+        }
+
+        // Привязываем PDF как рукопись
+        if (data.saved_filename) {
+            // Создаём скрытое поле с именем сохранённого файла
+            let hiddenInput = document.getElementById('parsedManuscriptFile');
+            if (!hiddenInput) {
+                hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'parsed_manuscript_filename';
+                hiddenInput.id = 'parsedManuscriptFile';
+                document.querySelector('#newArticleForm form').appendChild(hiddenInput);
+            }
+            hiddenInput.value = data.saved_filename;
+
+            // Показываем имя файла в зоне загрузки рукописи
+            const nameEl = document.getElementById('nameManuscript');
+            const zone = document.getElementById('dropManuscript');
+            if (nameEl && zone) {
+                nameEl.textContent = file.name;
+                nameEl.classList.add('visible');
+                zone.classList.add('has-file');
+            }
+            filled.push('рукопись');
+        }
+
+        if (filled.length > 0) {
+            status.className = 'pdf-parse-status success';
+            status.textContent = 'Заполнено: ' + filled.join(', ') + '. Проверьте данные.';
+            showToast('PDF распознан — проверьте заполненные поля', 'success');
+        } else {
+            status.className = 'pdf-parse-status warning';
+            status.textContent = 'Не удалось извлечь данные. Заполните вручную.';
+        }
+    })
+    .catch(err => {
+        status.className = 'pdf-parse-status error';
+        status.textContent = 'Ошибка: ' + err.message;
+    });
+
+    // Сбрасываем input чтобы можно было загрузить тот же файл повторно
+    input.value = '';
+}
+
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function pluralizeRu(n, f1, f2, f5) {
+    var abs = Math.abs(n) % 100;
+    if (abs >= 11 && abs <= 19) return f5;
+    abs = abs % 10;
+    if (abs === 1) return f1;
+    if (abs >= 2 && abs <= 4) return f2;
+    return f5;
 }
 
 // Move modal
@@ -1592,6 +1741,79 @@ function applyFilters() {
     font-size: 15px;
     font-weight: 600;
     color: var(--color-fg-default);
+}
+
+/* PDF Parse Section */
+.pdf-parse-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 24px;
+    background: var(--color-canvas-subtle);
+    border-bottom: 1px solid var(--color-border-default);
+    flex-wrap: wrap;
+}
+.btn-parse-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-canvas-default);
+    color: var(--color-fg-default);
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.btn-parse-pdf:hover {
+    border-color: #5BA4B0;
+    color: #5BA4B0;
+    background: rgba(91,164,176,0.06);
+}
+.pdf-parse-hint {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+}
+.pdf-parse-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    width: 100%;
+    margin-top: 4px;
+}
+.pdf-parse-status.loading {
+    color: #5BA4B0;
+    background: rgba(91,164,176,0.08);
+}
+.pdf-parse-status.success {
+    color: var(--color-success-fg);
+    background: rgba(26,127,55,0.08);
+}
+.pdf-parse-status.warning {
+    color: var(--color-attention-fg);
+    background: rgba(154,103,0,0.08);
+}
+.pdf-parse-status.error {
+    color: var(--color-danger-fg);
+    background: rgba(207,34,46,0.08);
+}
+.pdf-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(91,164,176,0.3);
+    border-top-color: #5BA4B0;
+    border-radius: 50%;
+    animation: pdfSpin 0.6s linear infinite;
+    flex-shrink: 0;
+}
+@keyframes pdfSpin {
+    to { transform: rotate(360deg); }
 }
 
 .form-compact {

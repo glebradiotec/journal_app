@@ -184,6 +184,13 @@ def register_admin_routes(app):
         upload_folder = current_app.config['UPLOAD_FOLDER']
         _process_file_uploads(article, upload_folder)
 
+        # Если рукопись была загружена через PDF-парсер
+        parsed_manuscript = request.form.get('parsed_manuscript_filename')
+        if parsed_manuscript and not article.manuscript_file:
+            # Проверяем что файл действительно существует
+            if os.path.exists(os.path.join(upload_folder, parsed_manuscript)):
+                article.manuscript_file = parsed_manuscript
+
         db.session.add(article)
         db.session.flush()
 
@@ -980,6 +987,37 @@ def register_admin_routes(app):
             os.remove(path)
             return jsonify({'success': True})
         return jsonify({'success': False, 'error': 'Файл не найден'}), 404
+
+    # =============================================
+    #   ПАРСИНГ PDF (авто-заполнение из статьи)
+    # =============================================
+    @app.route('/api/parse-pdf', methods=['POST'])
+    @login_required
+    def parse_pdf():
+        """Извлекает название и авторов из загруженного PDF."""
+        file = request.files.get('file')
+        if not file or not file.filename:
+            return jsonify({'error': 'Файл не выбран'}), 400
+
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Поддерживается только формат PDF'}), 400
+
+        # Сохраняем временно для парсинга
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+        filename = secure_filename(timestamp + file.filename)
+        filepath = os.path.join(upload_folder, filename)
+        file.save(filepath)
+
+        try:
+            from pdf_parser import parse_article_pdf
+            result = parse_article_pdf(filepath)
+            result['saved_filename'] = filename
+            return jsonify(result)
+        except ImportError:
+            return jsonify({'error': 'Модуль PyMuPDF не установлен. Выполните: pip install PyMuPDF'}), 500
+        except Exception as e:
+            return jsonify({'error': f'Ошибка парсинга: {str(e)}'}), 500
 
     # =============================================
     #   ИСТОРИЯ ИЗМЕНЕНИЙ СТАТЬИ

@@ -35,3 +35,6 @@ Thumbs.db
 # Environment variables
 .env
 *.env
+
+# Deploy script (local only)
+deploy.ps1

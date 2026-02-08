@@ -1,0 +1,32 @@
+---
+description: Deployment process for journal_app to production server
+alwaysApply: true
+---
+
+# Deployment
+
+## Server Info
+
+- **Server**: root@141.105.68.223
+- **App path**: /var/www/journal_app
+- **Stack**: Gunicorn (3 workers, port 8001) + Nginx (port 8080)
+- **URL**: http://141.105.68.223:8080/
+- **SSH**: Key-based auth configured (no password needed)
+
+## Deploy Command
+
+When the user says "деплой", "залей", "выложи", or "deploy":
+
+1. Commit all changes (if uncommitted)
+2. Push to GitHub
+3. Run on server via SSH:
+
+```
+ssh root@141.105.68.223 "cd /var/www/journal_app && git pull && kill -HUP $(pgrep -f 'gunicorn.*journal_app.*bind' -o)"
+```
+
+## Important
+
+- Do NOT deploy without user's explicit command
+- Always commit before deploying
+- The app runs on plain HTTP (no HTTPS) — do NOT enable SESSION_COOKIE_SECURE
