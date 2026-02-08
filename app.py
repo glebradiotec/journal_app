@@ -1,9 +1,11 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
-from flask import Flask
+from flask import Flask, session
 from flask_compress import Compress
 from flask_login import LoginManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backup import create_backup
 from models import db, User, Journal, Article, ArticleImage, ArticleHistory, ArticleComment
@@ -20,11 +22,30 @@ BASE_DIR = Path(__file__).parent
 app = Flask(__name__)
 Compress(app)  # Gzip/Brotli сжатие ответов (~60-80% меньше трафика)
 
+# === ProxyFix: корректная работа за реверс-прокси (Nginx, Cloudflare и т.д.) ===
+# Без этого Flask не знает реальный протокол (HTTPS) и IP клиента,
+# что приводит к потере сессий при редиректах.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 # Безопасные настройки через переменные окружения
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-insecure-key-change-me')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///journal.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # Кэш статики на 1 год
+
+# === Настройки сессий (критично для продакшена) ===
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Сессия живёт 30 дней
+app.config['SESSION_COOKIE_HTTPONLY'] = True    # Cookie недоступен из JS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Защита от CSRF
+
+# Для HTTPS-деплоя: cookie отправляется только по HTTPS
+if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('HTTPS') == '1':
+    app.config['SESSION_COOKIE_SECURE'] = True
+
+# Flask-Login: настройки "Запомнить меня"
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
 
 # Кэширование шаблонов Jinja2
 app.jinja_env.auto_reload = False
@@ -46,6 +67,12 @@ login_manager.login_message_category = 'info'
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+@app.before_request
+def make_session_permanent():
+    """Делаем сессию постоянной (30 дней) и обновляем таймер при каждом запросе."""
+    session.permanent = True
 
 
 # Инициализация БД и регистрация маршрутов
