@@ -700,7 +700,7 @@ function parsePdfAndFill(input) {
                     <div class="author-compact-main">
                         <input type="text" name="author_name[]" class="input-name" placeholder="ФИО автора" value="${escapeHtml(author.name || '')}" required>
                         <input type="email" name="author_email[]" class="input-email" placeholder="Email" value="${escapeHtml(author.email || '')}">
-                        <input type="text" name="author_organization[]" class="input-org" placeholder="Организация" value="${escapeHtml(author.organization || '')}">
+                        <input type="text" name="author_organization[]" class="input-org" placeholder="Организация" value="${escapeHtml(author.organization || '')}" title="${escapeHtml(author.organization || '')}">
                         <button type="button" class="btn-expand" onclick="toggleAuthorDetails(${num})" title="Дополнительно">
                             <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M12.78 5.22a.749.749 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.06 0L3.22 6.28a.749.749 0 1 1 1.06-1.06L8 8.939l3.72-3.719a.749.749 0 0 1 1.06 0Z"/>
@@ -2022,7 +2022,7 @@ function applyFilters() {
 
 .author-compact-main .input-name { flex: 2; }
 .author-compact-main .input-email { flex: 1.5; }
-.author-compact-main .input-org { flex: 1.5; }
+.author-compact-main .input-org { flex: 2; min-width: 0; text-overflow: ellipsis; }
 
 .btn-expand {
     padding: 8px 10px;

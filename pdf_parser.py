@@ -222,8 +222,8 @@ def _find_authors_and_orgs(blocks, start_idx):
     for text in author_line_texts:
         text_lower = text.lower()
         if any(kw in text_lower for kw in _ORG_KEYWORDS):
-            # Убираем ведущие цифры аффилиаций: "1,2  ВУНЦ ВВС..." -> "ВУНЦ ВВС..."
-            org = re.sub(r'^\s*[\d,\s]+\s+', '', text.strip()).rstrip(',;.')
+            # Убираем ведущие цифры/диапазоны аффилиаций: "1,2 ", "1–3 ", "4−6 " и т.д.
+            org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', text.strip()).rstrip(',;.')
             if org and len(org) > 5 and org not in organizations:
                 organizations.append(org)
 
