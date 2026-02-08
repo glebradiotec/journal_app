@@ -107,51 +107,36 @@
             <p class="adm-welcome-sub">Обзор системы управления журналами</p>
         </div>
 
-        <!-- Stats Grid -->
-        <div class="adm-stats-grid">
-            <div class="adm-stat-card adm-stat-teal">
-                <div class="adm-stat-icon">
-                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
-                    </svg>
-                </div>
-                <div class="adm-stat-data">
-                    <span class="adm-stat-number">{{ stats.journals }}</span>
-                    <span class="adm-stat-label">Журналов</span>
-                </div>
+        <!-- Compact Stats Strip -->
+        <div class="adm-stats-strip">
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-teal">{{ stats.journals }}</span>
+                <span class="adm-strip-label">{{ stats.journals|pluralize_ru('журнал', 'журнала', 'журналов') }}</span>
             </div>
-            <div class="adm-stat-card adm-stat-green">
-                <div class="adm-stat-icon">
-                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Z"/>
-                    </svg>
-                </div>
-                <div class="adm-stat-data">
-                    <span class="adm-stat-number">{{ stats.issues }}</span>
-                    <span class="adm-stat-label">Выпусков</span>
-                </div>
+            <div class="adm-strip-sep"></div>
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-green">{{ stats.issues }}</span>
+                <span class="adm-strip-label">{{ stats.issues|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span>
             </div>
-            <div class="adm-stat-card adm-stat-blue">
-                <div class="adm-stat-icon">
-                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
-                    </svg>
-                </div>
-                <div class="adm-stat-data">
-                    <span class="adm-stat-number">{{ stats.articles }}</span>
-                    <span class="adm-stat-label">Статей</span>
-                </div>
+            <div class="adm-strip-sep"></div>
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-blue">{{ stats.articles }}</span>
+                <span class="adm-strip-label">{{ stats.articles|pluralize_ru('статья', 'статьи', 'статей') }}</span>
             </div>
-            <div class="adm-stat-card adm-stat-orange">
-                <div class="adm-stat-icon">
-                    <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16ZM8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.92 6.085h.001a.749.749 0 1 1-1.342-.67c.169-.339.436-.701.849-.977C6.845 4.16 7.369 4 8 4a2.756 2.756 0 0 1 1.637.525c.503.377.863.965.863 1.725 0 .448-.115.83-.329 1.15-.205.307-.47.513-.692.662-.109.072-.22.138-.313.19l-.265.148a.75.75 0 0 1-.729-1.31l.265-.148c.093-.051.183-.106.258-.153.112-.073.187-.13.232-.18a.369.369 0 0 0 .073-.133.749.749 0 0 0 .05-.225c0-.228-.127-.427-.32-.57A1.27 1.27 0 0 0 8 5.5c-.373 0-.593.097-.728.18a.972.972 0 0 0-.252.253ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/>
-                    </svg>
-                </div>
-                <div class="adm-stat-data">
-                    <span class="adm-stat-number">{{ stats.unpaid }}</span>
-                    <span class="adm-stat-label">Без оплаты</span>
-                </div>
+            <div class="adm-strip-sep"></div>
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-warn">{{ stats.unpaid }}</span>
+                <span class="adm-strip-label">без оплаты</span>
+            </div>
+            <div class="adm-strip-sep"></div>
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-warn">{{ stats.no_review }}</span>
+                <span class="adm-strip-label">без рецензии</span>
+            </div>
+            <div class="adm-strip-sep"></div>
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-warn">{{ stats.not_edited }}</span>
+                <span class="adm-strip-label">не отред.</span>
             </div>
         </div>
 
@@ -209,27 +194,55 @@
             </div>
         </div>
 
-        <!-- Yearly Chart + Activity Row -->
+        <!-- Progress + Activity Row -->
         <div class="adm-duo-row">
-            <!-- Line Chart: Articles by Year -->
-            <div class="adm-card adm-chart-card">
+            <!-- Progress Card -->
+            <div class="adm-card">
                 <div class="adm-card-header">
                     <h2 class="adm-card-title">
                         <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0Z"/>
+                            <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>
                         </svg>
-                        Статьи по годам
+                        Прогресс выполнения
                     </h2>
                 </div>
-                <div class="adm-card-body" style="padding: 16px 20px;">
-                    {% if yearly_data %}
-                    <canvas id="yearlyLineChart" height="200"></canvas>
+                <div class="adm-card-body" style="padding: 18px 22px;">
+                    {% if stats.articles > 0 %}
+                    {% set paid_pct = ((stats.articles - stats.unpaid) / stats.articles * 100)|round(0)|int %}
+                    {% set review_pct = ((stats.articles - stats.no_review) / stats.articles * 100)|round(0)|int %}
+                    {% set edit_pct = ((stats.articles - stats.not_edited) / stats.articles * 100)|round(0)|int %}
+                    <div class="adm-progress-list">
+                        <div class="adm-progress-item">
+                            <div class="adm-progress-head">
+                                <span class="adm-progress-label">Оплата</span>
+                                <span class="adm-progress-val">{{ stats.articles - stats.unpaid }} / {{ stats.articles }} <small>({{ paid_pct }}%)</small></span>
+                            </div>
+                            <div class="adm-progress-track">
+                                <div class="adm-progress-fill adm-fill-green" style="width: {{ paid_pct }}%"></div>
+                            </div>
+                        </div>
+                        <div class="adm-progress-item">
+                            <div class="adm-progress-head">
+                                <span class="adm-progress-label">Рецензирование</span>
+                                <span class="adm-progress-val">{{ stats.articles - stats.no_review }} / {{ stats.articles }} <small>({{ review_pct }}%)</small></span>
+                            </div>
+                            <div class="adm-progress-track">
+                                <div class="adm-progress-fill adm-fill-teal" style="width: {{ review_pct }}%"></div>
+                            </div>
+                        </div>
+                        <div class="adm-progress-item">
+                            <div class="adm-progress-head">
+                                <span class="adm-progress-label">Редактирование</span>
+                                <span class="adm-progress-val">{{ stats.articles - stats.not_edited }} / {{ stats.articles }} <small>({{ edit_pct }}%)</small></span>
+                            </div>
+                            <div class="adm-progress-track">
+                                <div class="adm-progress-fill adm-fill-purple" style="width: {{ edit_pct }}%"></div>
+                            </div>
+                        </div>
+                    </div>
                     {% else %}
                     <div class="adm-empty-small">
-                        <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.3">
-                            <path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25Z"/>
-                        </svg>
-                        <p>Нет данных</p>
+                        <p>Нет статей для анализа</p>
                     </div>
                     {% endif %}
                 </div>
@@ -608,76 +621,115 @@
 }
 
 /* =============================================
-   STATS GRID
+   COMPACT STATS STRIP
    ============================================= */
-.adm-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.adm-stat-card {
+.adm-stats-strip {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 20px;
+    gap: 0;
+    padding: 14px 22px;
     background: var(--color-canvas-default);
     border: 1px solid var(--color-border-default);
     border-radius: 14px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 
-.adm-stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+.adm-strip-item {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: baseline;
+    gap: 6px;
+    padding: 4px 16px;
+    white-space: nowrap;
+}
+
+.adm-strip-sep {
+    width: 1px;
+    height: 28px;
+    background: var(--color-border-muted);
     flex-shrink: 0;
 }
 
-.adm-stat-data {
-    display: flex;
-    flex-direction: column;
-}
-
-.adm-stat-number {
-    font-size: 24px;
+.adm-strip-num {
+    font-size: 22px;
     font-weight: 700;
-    line-height: 1.2;
-    color: var(--color-fg-default);
+    line-height: 1;
 }
 
-.adm-stat-label {
+.adm-strip-label {
     font-size: 13px;
     font-weight: 500;
     color: var(--color-fg-muted);
 }
 
-/* Color variants */
-.adm-stat-teal .adm-stat-icon {
-    background: linear-gradient(135deg, rgba(91,164,176,0.15), rgba(91,164,176,0.05));
-    color: #5BA4B0;
-}
-.adm-stat-green .adm-stat-icon {
-    background: linear-gradient(135deg, rgba(31,136,61,0.15), rgba(31,136,61,0.05));
-    color: #1a7f37;
-}
-.adm-stat-blue .adm-stat-icon {
-    background: linear-gradient(135deg, rgba(130,80,223,0.15), rgba(130,80,223,0.05));
-    color: #8250df;
-}
-.adm-stat-orange .adm-stat-icon {
-    background: linear-gradient(135deg, rgba(154,103,0,0.15), rgba(154,103,0,0.05));
-    color: #9a6700;
+.adm-strip-teal { color: #5BA4B0; }
+.adm-strip-green { color: #1a7f37; }
+.adm-strip-blue { color: #8250df; }
+.adm-strip-warn { color: #9a6700; }
+
+[data-theme="dark"] .adm-strip-teal { color: #7CC5D0; }
+[data-theme="dark"] .adm-strip-green { color: #3fb950; }
+[data-theme="dark"] .adm-strip-blue { color: #a371f7; }
+[data-theme="dark"] .adm-strip-warn { color: #d29922; }
+
+/* =============================================
+   PROGRESS BARS
+   ============================================= */
+.adm-progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
 }
 
-[data-theme="dark"] .adm-stat-teal .adm-stat-icon { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.2), rgba(124,197,208,0.05)); }
-[data-theme="dark"] .adm-stat-green .adm-stat-icon { color: #3fb950; background: linear-gradient(135deg, rgba(63,185,80,0.2), rgba(63,185,80,0.05)); }
-[data-theme="dark"] .adm-stat-blue .adm-stat-icon { color: #a371f7; background: linear-gradient(135deg, rgba(163,113,247,0.2), rgba(163,113,247,0.05)); }
-[data-theme="dark"] .adm-stat-orange .adm-stat-icon { color: #d29922; background: linear-gradient(135deg, rgba(210,153,34,0.2), rgba(210,153,34,0.05)); }
+.adm-progress-item {}
+
+.adm-progress-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.adm-progress-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+}
+
+.adm-progress-val {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-muted);
+}
+
+.adm-progress-val small {
+    font-size: 12px;
+    color: var(--color-fg-subtle);
+}
+
+.adm-progress-track {
+    width: 100%;
+    height: 8px;
+    background: var(--color-canvas-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.adm-progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    min-width: 2px;
+}
+
+.adm-fill-green { background: linear-gradient(90deg, #1a7f37, #2ea043); }
+.adm-fill-teal { background: linear-gradient(90deg, #5BA4B0, #6fbec9); }
+.adm-fill-purple { background: linear-gradient(90deg, #8250df, #9a6ef5); }
+
+[data-theme="dark"] .adm-fill-green { background: linear-gradient(90deg, #238636, #3fb950); }
+[data-theme="dark"] .adm-fill-teal { background: linear-gradient(90deg, #5BA4B0, #7CC5D0); }
+[data-theme="dark"] .adm-fill-purple { background: linear-gradient(90deg, #8250df, #a371f7); }
 
 /* =============================================
    CARDS (generic)
@@ -983,8 +1035,8 @@
    RESPONSIVE
    ============================================= */
 @media (max-width: 1100px) {
-    .adm-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .adm-stats-strip {
+        justify-content: center;
     }
 }
 
@@ -1043,28 +1095,26 @@
         font-size: 22px;
     }
 
-    .adm-stats-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
+    .adm-stats-strip {
+        padding: 10px 12px;
+        gap: 4px;
+        justify-content: center;
     }
 
-    .adm-stat-card {
-        padding: 14px;
-        gap: 12px;
+    .adm-strip-item {
+        padding: 4px 10px;
     }
 
-    .adm-stat-icon {
-        width: 40px;
-        height: 40px;
+    .adm-strip-num {
+        font-size: 18px;
     }
 
-    .adm-stat-icon svg {
-        width: 20px;
-        height: 20px;
+    .adm-strip-label {
+        font-size: 12px;
     }
 
-    .adm-stat-number {
-        font-size: 20px;
+    .adm-strip-sep {
+        height: 22px;
     }
 
     .adm-table-wrap {
@@ -1074,8 +1124,16 @@
 }
 
 @media (max-width: 480px) {
-    .adm-stats-grid {
-        grid-template-columns: 1fr;
+    .adm-stats-strip {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .adm-strip-sep {
+        width: 100%;
+        height: 1px;
+    }
+    .adm-strip-item {
+        justify-content: space-between;
     }
 }
 </style>
@@ -1233,58 +1291,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ---- 3. Line/Bar Chart: Articles by Year ----
-    var yearlyCanvas = document.getElementById('yearlyLineChart');
-    if (yearlyCanvas && typeof Chart !== 'undefined') {
-        var yearlyData = {{ yearly_data | tojson }};
-        var yearLabels = yearlyData.map(function(d) { return d.year; });
-        var yearValues = yearlyData.map(function(d) { return d.count; });
-
-        new Chart(yearlyCanvas, {
-            type: 'bar',
-            data: {
-                labels: yearLabels,
-                datasets: [{
-                    label: 'Статьи',
-                    data: yearValues,
-                    backgroundColor: isDark
-                        ? 'rgba(163, 113, 247, 0.5)'
-                        : 'rgba(130, 80, 223, 0.5)',
-                    borderColor: isDark ? '#a371f7' : '#8250df',
-                    borderWidth: 2,
-                    borderRadius: 8,
-                    borderSkipped: false
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: isDark ? '#2d333b' : '#fff',
-                        titleColor: isDark ? '#adbac7' : '#24292f',
-                        bodyColor: isDark ? '#adbac7' : '#57606a',
-                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        padding: 12
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: textColor, font: { size: 12, weight: 600 } }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: gridColor },
-                        ticks: { color: textColor, font: { size: 12 }, stepSize: 1 }
-                    }
-                }
-            }
-        });
-    }
 });
 </script>
 {% endblock %}

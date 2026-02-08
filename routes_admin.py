@@ -538,15 +538,6 @@ def register_admin_routes(app):
                 'not_edited': not_edited,
             }
             
-            # Данные для графика: статьи по годам
-            yearly_query = (
-                db.session.query(Issue.year, func.count(Article.id))
-                .join(Article, Article.issue_id == Issue.id)
-                .group_by(Issue.year)
-                .order_by(Issue.year.asc())
-                .all()
-            )
-            yearly_data = [{'year': year, 'count': count} for year, count in yearly_query]
             
         except Exception:
             stats = {'journals': 0, 'issues': 0, 'articles': 0, 'unpaid': 0, 'no_review': 0, 'not_edited': 0}
@@ -555,7 +546,6 @@ def register_admin_routes(app):
             chart_data = []
             max_articles = 0
             status_data = {'paid': 0, 'unpaid': 0, 'reviewed': 0, 'no_review': 0, 'edited': 0, 'not_edited': 0}
-            yearly_data = []
 
         return render_template('admin/dashboard.html', 
                                stats=stats, 
@@ -563,8 +553,7 @@ def register_admin_routes(app):
                                recent_activity=recent_activity,
                                chart_data=chart_data,
                                max_articles=max_articles,
-                               status_data=status_data,
-                               yearly_data=yearly_data)
+                               status_data=status_data)
 
     @app.route('/admin/journals')
     @admin_required
@@ -696,6 +685,73 @@ def register_admin_routes(app):
                                current_issue=issue_id,
                                current_status=status_filter,
                                search=search)
+
+    @app.route('/admin/articles/api')
+    @admin_required
+    def admin_articles_api():
+        """JSON API для AJAX-фильтрации статей"""
+        journal_id = request.args.get('journal_id', type=int)
+        status_filter = request.args.get('status', '')
+        search = request.args.get('search', '').strip()
+
+        query = (
+            Article.query
+            .join(Issue).join(Journal)
+            .options(
+                joinedload(Article.issue).joinedload(Issue.journal),
+                joinedload(Article.article_authors)
+            )
+        )
+
+        if journal_id:
+            query = query.filter(Issue.journal_id == journal_id)
+        if status_filter == 'unpaid':
+            query = query.filter(Article.payment_received == False)
+        elif status_filter == 'no_review':
+            query = query.filter(Article.has_review == False)
+        elif status_filter == 'not_edited':
+            query = query.filter(Article.edited == False)
+
+        if search:
+            like_pattern = f'%{search}%'
+            query = query.filter(
+                db.or_(
+                    Article.title.ilike(like_pattern),
+                    Article.authors.ilike(like_pattern)
+                )
+            )
+
+        articles = query.order_by(Article.id.desc()).all()
+        result = []
+        for a in articles:
+            authors_str = ''
+            if a.article_authors:
+                authors_str = ', '.join(au.full_name for au in sorted(a.article_authors, key=lambda x: x.order))
+            else:
+                authors_str = a.authors or '-'
+
+            journal_name = ''
+            issue_label = ''
+            issue_id_val = None
+            if a.issue:
+                issue_id_val = a.issue_id
+                if a.issue.journal:
+                    journal_name = a.issue.journal.name
+                issue_label = f'\u2116{a.issue.number}/{a.issue.year}'
+
+            result.append({
+                'id': a.id,
+                'title': a.title or '',
+                'authors': authors_str,
+                'journal_name': journal_name,
+                'issue_label': issue_label,
+                'issue_id': issue_id_val,
+                'payment': a.payment_received,
+                'review': a.has_review,
+                'edited': a.edited,
+            })
+
+        return jsonify({'articles': result, 'total': len(result)})
 
     @app.route('/admin/articles/bulk-delete', methods=['POST'])
     @admin_required

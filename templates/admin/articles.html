@@ -93,10 +93,10 @@
 
         <!-- Filters -->
         <div class="art-card art-filters-card">
-            <form method="GET" class="art-filters">
+            <div class="art-filters">
                 <div class="art-filter-group">
                     <label class="art-filter-label">Журнал</label>
-                    <select name="journal_id" class="art-select" onchange="this.form.submit()">
+                    <select id="filterJournal" class="art-select">
                         <option value="">Все журналы</option>
                         {% for journal in journals %}
                         <option value="{{ journal.id }}" {% if current_journal == journal.id %}selected{% endif %}>{{ journal.name }}</option>
@@ -105,7 +105,7 @@
                 </div>
                 <div class="art-filter-group">
                     <label class="art-filter-label">Статус</label>
-                    <select name="status" class="art-select" onchange="this.form.submit()">
+                    <select id="filterStatus" class="art-select">
                         <option value="">Все статусы</option>
                         <option value="unpaid" {% if current_status == 'unpaid' %}selected{% endif %}>Без оплаты</option>
                         <option value="no_review" {% if current_status == 'no_review' %}selected{% endif %}>Без рецензии</option>
@@ -116,16 +116,13 @@
                     <label class="art-filter-label">Поиск</label>
                     <div class="art-search-wrap">
                         <svg class="art-search-icon" width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
-                        <input type="text" name="search" class="art-search-input" placeholder="Название или автор..." value="{{ search }}">
+                        <input type="text" id="filterSearch" class="art-search-input" placeholder="Название или автор..." value="{{ search }}">
                     </div>
                 </div>
                 <div class="art-filter-actions">
-                    <button type="submit" class="art-btn art-btn-search">Найти</button>
-                    {% if current_journal or current_status or search %}
-                    <a href="{{ url_for('admin_articles') }}" class="art-btn art-btn-reset">Сбросить</a>
-                    {% endif %}
+                    <button type="button" class="art-btn art-btn-reset" id="filterReset" style="{% if not current_journal and not current_status and not search %}display:none{% endif %}">Сбросить</button>
                 </div>
-            </form>
+            </div>
         </div>
 
         <!-- Bulk Actions (hidden) -->
@@ -163,7 +160,7 @@
         </div>
 
         <!-- Articles Table -->
-        <div class="art-card art-table-card">
+        <div class="art-card art-table-card" id="tableCard">
             <div class="art-table-wrap">
                 <table class="art-table">
                     <thead>
@@ -179,7 +176,7 @@
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="articlesBody">
                         {% for article in articles %}
                         <tr>
                             <td><input type="checkbox" class="art-checkbox article-cb" value="{{ article.id }}" onchange="updateBulk()"></td>
@@ -235,29 +232,22 @@
                         {% endfor %}
                     </tbody>
                 </table>
-                {% if not articles %}
-                <div class="art-empty">
-                    <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.2">
-                        <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Z"/>
-                    </svg>
-                    <p>Статьи не найдены</p>
-                    {% if current_journal or current_status or search %}
-                    <a href="{{ url_for('admin_articles') }}" class="art-btn art-btn-reset" style="margin-top:8px">Сбросить фильтры</a>
-                    {% endif %}
-                </div>
-                {% endif %}
+            </div>
+            <div class="art-empty" id="emptyState" style="{% if articles %}display:none{% endif %}">
+                <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.2">
+                    <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Z"/>
+                </svg>
+                <p>Статьи не найдены</p>
             </div>
         </div>
 
         <!-- Export all -->
-        {% if articles %}
-        <div class="art-export-row">
+        <div class="art-export-row" id="exportRow" style="{% if not articles %}display:none{% endif %}">
             <a href="{{ url_for('bulk_export_articles') }}" class="art-btn art-btn-export-all">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
                 Экспортировать все в Excel
             </a>
         </div>
-        {% endif %}
     </div>
 </div>
 
@@ -405,61 +395,196 @@ function toggleSidebar() {
     document.getElementById('sidebarOverlay').classList.toggle('active');
 }
 
+/* ===== SVG-иконки для таблицы ===== */
+var SVG_OK = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>';
+var SVG_NO = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg>';
+var SVG_EDIT = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>';
+var SVG_ISSUE = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/></svg>';
+
+function truncate(s, max) { return s.length > max ? s.substring(0, max) + '...' : s; }
+
+function statusIcon(val) {
+    return val ? '<span class="art-ok">' + SVG_OK + '</span>' : '<span class="art-no">' + SVG_NO + '</span>';
+}
+
+function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+/* ===== Рендер таблицы из JSON ===== */
+function renderArticles(articles) {
+    var tbody = document.getElementById('articlesBody');
+    var empty = document.getElementById('emptyState');
+    var exportRow = document.getElementById('exportRow');
+
+    if (!articles.length) {
+        tbody.innerHTML = '';
+        empty.style.display = '';
+        if (exportRow) exportRow.style.display = 'none';
+        return;
+    }
+
+    empty.style.display = 'none';
+    if (exportRow) exportRow.style.display = '';
+
+    var html = '';
+    for (var i = 0; i < articles.length; i++) {
+        var a = articles[i];
+        var title = escapeHtml(truncate(a.title, 55));
+        var authors = escapeHtml(truncate(a.authors, 35));
+        var jName = escapeHtml(truncate(a.journal_name, 22));
+
+        html += '<tr>' +
+            '<td><input type="checkbox" class="art-checkbox article-cb" value="' + a.id + '" onchange="updateBulk()"></td>' +
+            '<td class="art-td-id">#' + a.id + '</td>' +
+            '<td class="art-td-title"><a href="/article/' + a.id + '/edit">' + title + '</a></td>' +
+            '<td class="art-td-authors">' + authors + '</td>' +
+            '<td class="art-td-meta">' +
+                (a.issue_id ? '<span class="art-meta-journal">' + jName + '</span><span class="art-meta-badge">' + escapeHtml(a.issue_label) + '</span>' : '-') +
+            '</td>' +
+            '<td class="art-th-center">' + statusIcon(a.payment) + '</td>' +
+            '<td class="art-th-center">' + statusIcon(a.review) + '</td>' +
+            '<td class="art-th-center">' + statusIcon(a.edited) + '</td>' +
+            '<td><div class="art-row-actions">' +
+                '<a href="/article/' + a.id + '/edit" class="art-action-btn" title="Редактировать">' + SVG_EDIT + '</a>' +
+                (a.issue_id ? '<a href="/issue/' + a.issue_id + '" class="art-action-btn" title="К выпуску">' + SVG_ISSUE + '</a>' : '') +
+            '</div></td>' +
+        '</tr>';
+    }
+    tbody.innerHTML = html;
+
+    /* Сбросить select all */
+    var sa = document.getElementById('selectAll');
+    if (sa) { sa.checked = false; sa.indeterminate = false; }
+    updateBulk();
+}
+
+/* ===== AJAX фильтрация ===== */
+var _filterTimer = null;
+var _filterController = null;
+
+function applyFilters() {
+    var journal = document.getElementById('filterJournal').value;
+    var status = document.getElementById('filterStatus').value;
+    var search = document.getElementById('filterSearch').value.trim();
+
+    /* Кнопка «Сбросить» */
+    var resetBtn = document.getElementById('filterReset');
+    if (journal || status || search) {
+        resetBtn.style.display = '';
+    } else {
+        resetBtn.style.display = 'none';
+    }
+
+    /* Обновляем URL без перезагрузки */
+    var params = new URLSearchParams();
+    if (journal) params.set('journal_id', journal);
+    if (status) params.set('status', status);
+    if (search) params.set('search', search);
+    var qs = params.toString();
+    var newUrl = '/admin/articles' + (qs ? '?' + qs : '');
+    history.replaceState(null, '', newUrl);
+
+    /* Отменяем предыдущий запрос */
+    if (_filterController) _filterController.abort();
+    _filterController = new AbortController();
+
+    /* Обновляем подпись «Найдено: ...» */
+    var sub = document.querySelector('.adm-welcome-sub');
+    if (sub) sub.textContent = 'Загрузка...';
+
+    fetch('/admin/articles/api?' + (qs || ''), { signal: _filterController.signal })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            renderArticles(data.articles);
+            if (sub) sub.textContent = 'Найдено: ' + data.total;
+        })
+        .catch(function(e) {
+            if (e.name !== 'AbortError') {
+                console.error('Filter error:', e);
+                if (sub) sub.textContent = 'Ошибка загрузки';
+            }
+        });
+}
+
+function applyFiltersDebounced() {
+    clearTimeout(_filterTimer);
+    _filterTimer = setTimeout(applyFilters, 300);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('filterJournal').addEventListener('change', applyFilters);
+    document.getElementById('filterStatus').addEventListener('change', applyFilters);
+    document.getElementById('filterSearch').addEventListener('input', applyFiltersDebounced);
+    document.getElementById('filterSearch').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_filterTimer); applyFilters(); }
+    });
+    document.getElementById('filterReset').addEventListener('click', function() {
+        document.getElementById('filterJournal').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('filterSearch').value = '';
+        applyFilters();
+    });
+});
+
+/* ===== Bulk actions (без изменений) ===== */
 function getSelectedIds() {
-    return Array.from(document.querySelectorAll('.article-cb:checked')).map(cb => parseInt(cb.value));
+    return Array.from(document.querySelectorAll('.article-cb:checked')).map(function(cb) { return parseInt(cb.value); });
 }
 
 function updateBulk() {
-    const ids = getSelectedIds();
-    const bar = document.getElementById('bulkBar');
+    var ids = getSelectedIds();
+    var bar = document.getElementById('bulkBar');
     document.getElementById('selectedCount').textContent = ids.length;
     bar.style.display = ids.length > 0 ? 'flex' : 'none';
 
-    const all = document.querySelectorAll('.article-cb');
-    const sa = document.getElementById('selectAll');
+    var all = document.querySelectorAll('.article-cb');
+    var sa = document.getElementById('selectAll');
     sa.checked = all.length > 0 && ids.length === all.length;
     sa.indeterminate = ids.length > 0 && ids.length < all.length;
 }
 
 function toggleSelectAll() {
-    const checked = document.getElementById('selectAll').checked;
-    document.querySelectorAll('.article-cb').forEach(cb => cb.checked = checked);
+    var checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.article-cb').forEach(function(cb) { cb.checked = checked; });
     updateBulk();
 }
 
 async function bulkDelete() {
-    const ids = getSelectedIds();
+    var ids = getSelectedIds();
     if (!ids.length) { showToast('Выберите статьи', 'warning'); return; }
     if (!confirm('Удалить ' + ids.length + ' статей? Это действие необратимо!')) return;
     try {
-        const r = await fetch('/admin/articles/bulk-delete', {
+        var r = await fetch('/admin/articles/bulk-delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids })
+            body: JSON.stringify({ ids: ids })
         });
-        const data = await r.json();
-        if (data.success) { showToast(data.message || 'Статьи удалены', 'success'); setTimeout(function() { location.reload(); }, 500); }
+        var data = await r.json();
+        if (data.success) { showToast(data.message || 'Статьи удалены', 'success'); setTimeout(applyFilters, 300); }
         else showToast(data.message || 'Ошибка', 'error');
     } catch (e) { showToast('Ошибка сети', 'error'); }
 }
 
 async function bulkToggle(field, value) {
-    const ids = getSelectedIds();
+    var ids = getSelectedIds();
     if (!ids.length) { showToast('Выберите статьи', 'warning'); return; }
     try {
-        const r = await fetch('/admin/articles/bulk-toggle', {
+        var r = await fetch('/admin/articles/bulk-toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, field, value })
+            body: JSON.stringify({ ids: ids, field: field, value: value })
         });
-        const data = await r.json();
-        if (data.success) { showToast(data.message || 'Статусы обновлены', 'success'); setTimeout(function() { location.reload(); }, 500); }
+        var data = await r.json();
+        if (data.success) { showToast(data.message || 'Статусы обновлены', 'success'); setTimeout(applyFilters, 300); }
         else showToast(data.message || 'Ошибка', 'error');
     } catch (e) { showToast('Ошибка сети', 'error'); }
 }
 
 function bulkExport() {
-    const ids = getSelectedIds();
+    var ids = getSelectedIds();
     if (!ids.length) return;
     window.location.href = '/admin/articles/bulk-export?ids=' + ids.join(',');
 }
