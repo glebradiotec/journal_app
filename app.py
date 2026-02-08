@@ -39,8 +39,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True    # Cookie недоступен и
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Защита от CSRF
 
 # Для HTTPS-деплоя: cookie отправляется только по HTTPS
-if os.environ.get('FLASK_ENV') == 'production' or os.environ.get('HTTPS') == '1':
+# Включайте только если сайт работает через HTTPS (переменная SECURE_COOKIES=1)
+if os.environ.get('SECURE_COOKIES') == '1':
     app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['REMEMBER_COOKIE_SECURE'] = True
 
 # Flask-Login: настройки "Запомнить меня"
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
