@@ -50,7 +50,10 @@ _STOP_MARKERS = (
     'постановка', 'рецензи', 'поступила', 'received',
 )
 
-# Маркеры, которые нужно пропускать в зоне авторов (до авторов)
+# Маркеры начала блока авторов (разделяют заголовок и авторов)
+_AUTHOR_MARKERS = ('авторы', 'authors', 'автор:', 'author:')
+
+# Маркеры, которые нужно пропускать (до заголовка)
 _SKIP_MARKERS = (
     'удк', 'udc', 'doi:', 'doi ', 'научная статья', 'original article',
     'http', 'https',
@@ -122,12 +125,16 @@ def _find_title(blocks):
 
     for i, b in enumerate(blocks):
         if abs(b["size"] - max_size) < 0.5 and len(b["text"]) > 3:
-            text_lower = b["text"].lower()
-            # Пропускаем стоп-маркеры
+            text_lower = b["text"].lower().strip()
+            # Стоп: дошли до аннотации/введения
             if any(m in text_lower for m in _STOP_MARKERS):
                 break
-            # Пропускаем строки, похожие на колонтитулы
-            if any(m in text_lower for m in _SKIP_MARKERS):
+            # Стоп: дошли до маркера авторов («Авторы», «Authors»)
+            if any(text_lower == m or text_lower.startswith(m + ' ') for m in _AUTHOR_MARKERS):
+                last_idx = i  # запоминаем позицию для поиска авторов
+                break
+            # Пропускаем служебные строки
+            if any(text_lower.startswith(m) for m in _SKIP_MARKERS):
                 continue
 
             if last_idx == -1 or i == last_idx + 1:
@@ -168,10 +175,8 @@ def _find_authors_and_orgs(blocks, start_idx):
     organizations = []
     author_line_texts = []
 
-    # Разделяем блоки на: строки авторов, строки организаций, строки email
-    name_lines = []
-    org_lines = []
-
+    # --- Шаг 1: собираем сырые строки между заголовком и аннотацией ---
+    raw_lines = []
     for b in blocks[start_idx + 1:]:
         text = b["text"].strip()
         text_lower = text.lower()
@@ -179,6 +184,10 @@ def _find_authors_and_orgs(blocks, start_idx):
         # Стоп — дошли до аннотации/введения
         if any(text_lower.startswith(m) or text_lower == m for m in _STOP_MARKERS):
             break
+
+        # Пропускаем маркер «Авторы»
+        if any(text_lower == m or text_lower.startswith(m + ' ') for m in _AUTHOR_MARKERS):
+            continue
 
         # Пропускаем служебные строки (УДК, DOI, и т.д.)
         if any(text_lower.startswith(m) for m in _SKIP_MARKERS):
@@ -188,13 +197,49 @@ def _find_authors_and_orgs(blocks, start_idx):
         if len(text) <= 3:
             continue
 
-        author_line_texts.append(text)
+        raw_lines.append(text)
 
-        # Классифицируем строку
-        if any(kw in text_lower for kw in _ORG_KEYWORDS):
+    # --- Шаг 2: склеиваем строки с переносами (напр. «Государ-» + «ственный ...») ---
+    merged_lines = []
+    for line in raw_lines:
+        if merged_lines and merged_lines[-1].endswith('-'):
+            prev = merged_lines[-1]
+            # Убираем дефис переноса и склеиваем
+            merged_lines[-1] = prev[:-1] + line
+        elif merged_lines and line and line[0].islower():
+            # Продолжение предыдущей строки (начинается со строчной)
+            merged_lines[-1] = merged_lines[-1] + ' ' + line
+        else:
+            merged_lines.append(line)
+
+    # --- Шаг 3: классифицируем склеенные строки ---
+    name_lines = []
+    org_lines = []
+    for text in merged_lines:
+        author_line_texts.append(text)
+        text_lower = text.lower()
+        has_org_kw = any(kw in text_lower for kw in _ORG_KEYWORDS)
+        has_email = bool(_EMAIL_RE.search(text))
+
+        if has_org_kw:
             org_lines.append(text)
-        elif _EMAIL_RE.search(text):
-            pass  # строка с email — не ищем в ней имена
+            if has_email:
+                # Строка с email + орг = смешанная, ищем имена
+                name_lines.append(text)
+            else:
+                # Проверяем: начинается ли строка с ФИО? (напр. «Гладышев В.О., ... Университет ...»)
+                # Если да — это смешанная строка автор+орг, ищем имена
+                # Имя должно начинаться в первых 5 символах строки
+                line_start = text.lstrip()[:60]
+                starts_with_name = False
+                for pattern in _RU_NAME_PATTERNS + _EN_NAME_PATTERNS:
+                    m = pattern.search(line_start)
+                    if m and m.start() < 5:
+                        starts_with_name = True
+                        break
+                if starts_with_name:
+                    name_lines.append(text)
+                # Иначе — чистая строка организации, имена не ищем
         else:
             name_lines.append(text)
 
@@ -203,32 +248,63 @@ def _find_authors_and_orgs(blocks, start_idx):
     # Извлекаем email
     emails = _EMAIL_RE.findall(full_text)
 
-    # Ищем имена ТОЛЬКО в строках авторов (не в организациях!)
+    # Ищем имена в строках авторов
     name_text = _clean_superscripts("\n".join(name_lines))
-    all_names = _find_names_in_text(name_text)
+    raw_names = _find_names_in_text(name_text)
+
+    # Фильтруем ложные имена:
+    # 1) Имена, содержащие ключевые слова организаций (напр. "Московский ... Университет")
+    # 2) Имена, которые являются частью "им./имени" конструкций (напр. "Н.Э. Баумана")
+    org_text_lower = " ".join(author_line_texts).lower()
+    all_names = []
+    for name in raw_names:
+        name_lower = name.lower()
+        # Фильтр 1: имя содержит ключевое слово организации
+        if any(kw in name_lower for kw in _ORG_KEYWORDS):
+            continue
+        # Фильтр 2: имя стоит после "им.", "имени", "named after"
+        idx = org_text_lower.find(name_lower)
+        if idx != -1:
+            before = org_text_lower[max(0, idx - 15):idx]
+            if any(m in before for m in ('им.', 'имени', 'named', 'name')):
+                continue
+        all_names.append(name)
 
     # Фоллбэк: ищем в строке копирайта © Букин М.В., Керхайли А.А., ...
     if not all_names:
         for b in blocks:
             if '©' in b["text"]:
                 copyright_text = b["text"].split('©')[-1]
-                # Убираем год и лишнее
                 copyright_text = re.sub(r',?\s*\d{4}\s*$', '', copyright_text)
                 all_names = _find_names_in_text(copyright_text)
                 if all_names:
                     break
 
-    # Извлекаем организации
-    for text in author_line_texts:
-        text_lower = text.lower()
-        if any(kw in text_lower for kw in _ORG_KEYWORDS):
-            # Убираем ведущие цифры/диапазоны аффилиаций: "1,2 ", "1–3 ", "4−6 " и т.д.
-            org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', text.strip()).rstrip(',;.')
-            if org and len(org) > 5 and org not in organizations:
-                organizations.append(org)
+    # Извлекаем организации — вырезаем только часть с названием организации
+    for text in org_lines:
+        # Убираем ведущие цифры/диапазоны аффилиаций: "1,2 ", "1–3 ", "4−6 " и т.д.
+        org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', text.strip()).rstrip(',;.')
+        # Ищем первое ключевое слово организации и берём от него
+        best_org = None
+        for kw in _ORG_KEYWORDS:
+            idx = org.lower().find(kw)
+            if idx != -1:
+                # Ищем начало названия организации (обычно перед ключевым словом есть полное название)
+                # Ищем с начала, если это чистая org-строка, или от ключевого слова назад до запятой
+                # Находим начало: идём назад от ключевого слова до запятой или начала строки
+                start = org.rfind(',', 0, idx)
+                start = start + 1 if start != -1 else 0
+                org_part = org[start:]
+                # Обрезаем после адреса/email/улицы
+                org_part = re.split(r',\s*(?:улица|ул\.|e-mail|email|тел|phone|spin|адрес|д\.\s*\d)',
+                                    org_part, flags=re.IGNORECASE)[0].strip().rstrip(',;.')
+                if org_part and len(org_part) > 5:
+                    best_org = org_part
+                    break
+        if best_org and best_org not in organizations:
+            organizations.append(best_org)
 
     # Собираем авторов с привязкой email/org
-    # Определяем привязку по номерам аффилиаций (если есть)
     authors = []
     for i, name in enumerate(all_names):
         author = {"name": name, "email": "", "organization": ""}
@@ -241,8 +317,6 @@ def _find_authors_and_orgs(blocks, start_idx):
         if len(organizations) == 1:
             author["organization"] = organizations[0]
         elif organizations:
-            # Пытаемся определить аффилиацию по номерам в оригинальном тексте
-            # Если не получается — берём по порядку, потом повторяем последнюю
             if i < len(organizations):
                 author["organization"] = organizations[i]
             else:
