@@ -9,7 +9,7 @@ alwaysApply: true
 
 - **Server**: root@141.105.68.223
 - **App path**: /var/www/journal_app
-- **Stack**: Gunicorn (3 workers, port 8001) + Nginx (port 8080)
+- **Stack**: Gunicorn (3 workers, port 8001) + Nginx (port 8080), managed by systemd (journal.service)
 - **URL**: http://141.105.68.223:8080/
 - **SSH**: Key-based auth configured (no password needed)
 
@@ -22,7 +22,7 @@ When the user says "деплой", "залей", "выложи", or "deploy":
 3. Run on server via SSH:
 
 ```
-ssh root@141.105.68.223 "cd /var/www/journal_app && git pull && kill -HUP $(pgrep -f 'gunicorn.*journal_app.*bind' -o)"
+ssh root@141.105.68.223 "cd /var/www/journal_app && git pull && systemctl restart journal.service"
 ```
 
 ## Important
