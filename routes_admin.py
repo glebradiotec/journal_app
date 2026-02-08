@@ -994,13 +994,15 @@ def register_admin_routes(app):
     @app.route('/api/parse-pdf', methods=['POST'])
     @login_required
     def parse_pdf():
-        """Извлекает название и авторов из загруженного PDF."""
+        """Извлекает название и авторов из загруженного PDF или Word-документа."""
         file = request.files.get('file')
         if not file or not file.filename:
             return jsonify({'error': 'Файл не выбран'}), 400
 
-        if not file.filename.lower().endswith('.pdf'):
-            return jsonify({'error': 'Поддерживается только формат PDF'}), 400
+        fname_lower = file.filename.lower()
+        allowed_ext = ('.pdf', '.docx', '.doc')
+        if not fname_lower.endswith(allowed_ext):
+            return jsonify({'error': 'Поддерживаются форматы: PDF, DOCX, DOC'}), 400
 
         # Сохраняем временно для парсинга
         upload_folder = current_app.config['UPLOAD_FOLDER']
@@ -1010,12 +1012,16 @@ def register_admin_routes(app):
         file.save(filepath)
 
         try:
-            from pdf_parser import parse_article_pdf
-            result = parse_article_pdf(filepath)
+            if fname_lower.endswith('.pdf'):
+                from pdf_parser import parse_article_pdf
+                result = parse_article_pdf(filepath)
+            else:
+                from pdf_parser import parse_article_docx
+                result = parse_article_docx(filepath)
             result['saved_filename'] = filename
             return jsonify(result)
-        except ImportError:
-            return jsonify({'error': 'Модуль PyMuPDF не установлен. Выполните: pip install PyMuPDF'}), 500
+        except ImportError as e:
+            return jsonify({'error': f'Отсутствует модуль: {str(e)}'}), 500
         except Exception as e:
             return jsonify({'error': f'Ошибка парсинга: {str(e)}'}), 500
 

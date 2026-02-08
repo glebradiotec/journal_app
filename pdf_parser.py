@@ -385,3 +385,87 @@ def parse_article_pdf(file_path):
         "raw_text": raw_text[:500],
         "method": "heuristic",
     }
+
+
+def parse_article_docx(file_path):
+    """
+    Парсит Word-документ (.docx) научной статьи и извлекает метаданные.
+    Сначала пробует AI (GigaChat), при неудаче — эвристический парсер.
+
+    Returns:
+        dict: {title, authors: [{name, email, organization}], raw_text, method}
+    """
+    try:
+        from docx import Document as DocxDocument
+    except ImportError:
+        return {"error": "Модуль python-docx не установлен", "title": "", "authors": []}
+
+    try:
+        doc = DocxDocument(file_path)
+    except Exception as e:
+        return {"error": f"Не удалось открыть документ: {str(e)}", "title": "", "authors": []}
+
+    # Извлекаем текст из параграфов
+    paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+    if not paragraphs:
+        return {"error": "Документ пустой", "title": "", "authors": []}
+
+    raw_text = "\n".join(paragraphs)
+
+    # === Попытка 1: AI-парсинг (GigaChat) ===
+    try:
+        from ai_parser import parse_with_ai
+        ai_result = parse_with_ai(raw_text)
+        if ai_result and (ai_result.get("title") or ai_result.get("authors")):
+            return {
+                "title": ai_result.get("title", ""),
+                "authors": ai_result.get("authors", []),
+                "raw_text": raw_text[:500],
+                "method": "ai",
+            }
+    except Exception:
+        pass
+
+    # === Попытка 2: эвристика по тексту ===
+    # Первый непустой параграф — предположительно название
+    title = paragraphs[0] if paragraphs else ""
+
+    # Ищем авторов и организации в оставшемся тексте
+    remaining = "\n".join(paragraphs[1:20])  # Берём первые ~20 параграфов
+    emails = _EMAIL_RE.findall(remaining)
+    all_names = []
+    for pat in _RU_NAME_PATTERNS + _EN_NAME_PATTERNS:
+        for m in pat.finditer(remaining):
+            name = m.group().strip().rstrip(',;.')
+            if name and name not in all_names:
+                all_names.append(name)
+
+    organizations = []
+    for p in paragraphs[1:20]:
+        p_lower = p.lower()
+        for kw in _ORG_KEYWORDS:
+            if kw in p_lower:
+                # Обрезаем после адреса
+                org = re.split(r',\s*(?:улица|ул\.|e-mail|email|тел|phone|spin|адрес|д\.\s*\d)',
+                               p, flags=re.IGNORECASE)[0].strip().rstrip(',;.')
+                if org and len(org) > 5 and org not in organizations:
+                    organizations.append(org)
+                break
+
+    authors = []
+    for i, name in enumerate(all_names):
+        author = {"name": name, "email": "", "organization": ""}
+        if i < len(emails):
+            author["email"] = emails[i]
+        if len(organizations) == 1:
+            author["organization"] = organizations[0]
+        elif organizations and i < len(organizations):
+            author["organization"] = organizations[i]
+        authors.append(author)
+
+    return {
+        "title": title,
+        "authors": authors,
+        "raw_text": raw_text[:500],
+        "method": "heuristic",
+    }
