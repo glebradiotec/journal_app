@@ -18,7 +18,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
@@ -134,6 +134,50 @@ def _process_authors(article):
         ))
 
     return ", ".join(names_list) if names_list else None
+
+
+def _filtered_articles_query(journal_id=None, status_filter='', search=''):
+    """Общий запрос статей с фильтрами. Используется в API, экспорте и странице статей."""
+    query = (
+        Article.query
+        .join(Issue).join(Journal)
+        .options(
+            joinedload(Article.issue).joinedload(Issue.journal),
+            joinedload(Article.article_authors)
+        )
+    )
+    if journal_id:
+        query = query.filter(Issue.journal_id == journal_id)
+    if status_filter == 'unpaid':
+        query = query.filter(Article.payment_received == False)
+    elif status_filter == 'no_review':
+        query = query.filter(Article.has_review == False)
+    elif status_filter == 'not_edited':
+        query = query.filter(Article.edited == False)
+    if search:
+        like_pattern = f'%{search}%'
+        query = query.filter(
+            db.or_(
+                Article.title.ilike(like_pattern),
+                Article.authors.ilike(like_pattern)
+            )
+        )
+    return query.order_by(Article.id.desc())
+
+
+def _build_filter_description(journal_id=None, status_filter='', search=''):
+    """Строит текстовое описание применённых фильтров для экспорта."""
+    parts = []
+    if journal_id:
+        journal = Journal.query.get(journal_id)
+        if journal:
+            parts.append(f'Журнал: {journal.name}')
+    status_names = {'unpaid': 'Без оплаты', 'no_review': 'Без рецензии', 'not_edited': 'Не отредактировано'}
+    if status_filter in status_names:
+        parts.append(f'Статус: {status_names[status_filter]}')
+    if search:
+        parts.append(f'Поиск: «{search}»')
+    return ', '.join(parts) if parts else 'Все статьи'
 
 
 def register_admin_routes(app):
@@ -694,34 +738,7 @@ def register_admin_routes(app):
         status_filter = request.args.get('status', '')
         search = request.args.get('search', '').strip()
 
-        query = (
-            Article.query
-            .join(Issue).join(Journal)
-            .options(
-                joinedload(Article.issue).joinedload(Issue.journal),
-                joinedload(Article.article_authors)
-            )
-        )
-
-        if journal_id:
-            query = query.filter(Issue.journal_id == journal_id)
-        if status_filter == 'unpaid':
-            query = query.filter(Article.payment_received == False)
-        elif status_filter == 'no_review':
-            query = query.filter(Article.has_review == False)
-        elif status_filter == 'not_edited':
-            query = query.filter(Article.edited == False)
-
-        if search:
-            like_pattern = f'%{search}%'
-            query = query.filter(
-                db.or_(
-                    Article.title.ilike(like_pattern),
-                    Article.authors.ilike(like_pattern)
-                )
-            )
-
-        articles = query.order_by(Article.id.desc()).all()
+        articles = _filtered_articles_query(journal_id, status_filter, search).all()
         result = []
         for a in articles:
             authors_str = ''
@@ -806,63 +823,220 @@ def register_admin_routes(app):
     @app.route('/admin/articles/bulk-export')
     @admin_required
     def bulk_export_articles():
-        """Экспорт выбранных статей в Excel"""
+        """Экспорт статей в Excel (с фильтрами или по ID)."""
         article_ids = request.args.get('ids', '')
-        
+        journal_id = request.args.get('journal_id', type=int)
+        status_filter = request.args.get('status', '')
+        search = request.args.get('search', '').strip()
+
         if article_ids:
             ids_list = [int(x) for x in article_ids.split(',') if x.isdigit()]
-            articles = Article.query.filter(Article.id.in_(ids_list)).all()
+            articles = (
+                Article.query
+                .filter(Article.id.in_(ids_list))
+                .options(
+                    joinedload(Article.issue).joinedload(Issue.journal),
+                    joinedload(Article.article_authors)
+                )
+                .all()
+            )
+            filter_desc = f'Выбранные статьи ({len(ids_list)} шт.)'
         else:
-            articles = Article.query.all()
-        
+            articles = _filtered_articles_query(journal_id, status_filter, search).all()
+            filter_desc = _build_filter_description(journal_id, status_filter, search)
+
         wb = Workbook()
         ws = wb.active
         ws.title = "Статьи"
-        
-        header_fill = PatternFill(start_color="007BFF", end_color="007BFF", fill_type="solid")
-        header_font = Font(bold=True, color="FFFFFF", size=11)
-        
-        headers = ["ID", "Название", "Авторы", "Журнал", "Выпуск", "Дата поступления", "Оплата", "Рецензия", "Редакт."]
-        ws.append(headers)
-        
-        for cell in ws[1]:
+
+        # --- Стили ---
+        thin_border = Border(
+            left=Side(style='thin', color='D0D7DE'),
+            right=Side(style='thin', color='D0D7DE'),
+            top=Side(style='thin', color='D0D7DE'),
+            bottom=Side(style='thin', color='D0D7DE'),
+        )
+        title_font = Font(bold=True, size=14, color='24292F')
+        subtitle_font = Font(size=11, color='57606A')
+        header_fill = PatternFill(start_color='2D333B', end_color='2D333B', fill_type='solid')
+        header_font = Font(bold=True, color='FFFFFF', size=11)
+        header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        row_even_fill = PatternFill(start_color='F6F8FA', end_color='F6F8FA', fill_type='solid')
+        status_yes_fill = PatternFill(start_color='DAFBE1', end_color='DAFBE1', fill_type='solid')
+        status_yes_font = Font(bold=True, color='1A7F37', size=11)
+        status_no_fill = PatternFill(start_color='FFEBE9', end_color='FFEBE9', fill_type='solid')
+        status_no_font = Font(bold=True, color='CF222E', size=11)
+        summary_fill = PatternFill(start_color='DDF4FF', end_color='DDF4FF', fill_type='solid')
+        summary_font = Font(bold=True, size=11, color='0969DA')
+
+        # --- Заголовок отчёта ---
+        ws.merge_cells('A1:I1')
+        title_cell = ws['A1']
+        title_cell.value = 'Экспорт статей'
+        title_cell.font = title_font
+        title_cell.alignment = Alignment(vertical='center')
+        ws.row_dimensions[1].height = 28
+
+        ws.merge_cells('A2:I2')
+        sub_cell = ws['A2']
+        sub_cell.value = f'{filter_desc}  |  Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}'
+        sub_cell.font = subtitle_font
+        sub_cell.alignment = Alignment(vertical='center')
+        ws.row_dimensions[2].height = 20
+
+        # пустая строка-разделитель
+        ws.row_dimensions[3].height = 6
+
+        # --- Заголовки таблицы (строка 4) ---
+        headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.']
+        for col_idx, h in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col_idx, value=h)
             cell.fill = header_fill
             cell.font = header_font
-            cell.alignment = Alignment(horizontal="center")
-        
-        for article in articles:
+            cell.alignment = header_align
+            cell.border = thin_border
+        ws.row_dimensions[4].height = 26
+
+        # --- Данные ---
+        paid_count = reviewed_count = edited_count = 0
+        for row_idx, article in enumerate(articles, 1):
+            r = row_idx + 4  # строки данных начинаются с 5
+
             authors = ", ".join([a.full_name for a in article.article_authors]) if article.article_authors else (article.authors or "-")
             journal_name = article.issue.journal.name if article.issue and article.issue.journal else "-"
             issue_info = f"№{article.issue.number}/{article.issue.year}" if article.issue else "-"
-            
-            ws.append([
-                article.id,
+
+            if article.payment_received:
+                paid_count += 1
+            if article.has_review:
+                reviewed_count += 1
+            if article.edited:
+                edited_count += 1
+
+            row_data = [
+                row_idx,
                 article.title or "-",
                 authors,
                 journal_name,
                 issue_info,
                 article.submission_date or "-",
-                "✓" if article.payment_received else "✗",
-                "✓" if article.has_review else "✗",
-                "✓" if article.edited else "✗"
-            ])
-        
-        ws.column_dimensions['A'].width = 6
-        ws.column_dimensions['B'].width = 40
-        ws.column_dimensions['C'].width = 30
-        ws.column_dimensions['D'].width = 20
-        ws.column_dimensions['E'].width = 12
-        ws.column_dimensions['F'].width = 15
-        ws.column_dimensions['G'].width = 10
-        ws.column_dimensions['H'].width = 10
-        ws.column_dimensions['I'].width = 10
-        
+                'Да' if article.payment_received else 'Нет',
+                'Да' if article.has_review else 'Нет',
+                'Да' if article.edited else 'Нет',
+            ]
+
+            for col_idx, val in enumerate(row_data, 1):
+                cell = ws.cell(row=r, column=col_idx, value=val)
+                cell.border = thin_border
+                cell.alignment = Alignment(vertical='center', wrap_text=(col_idx == 2))
+
+                # Чередование строк
+                if row_idx % 2 == 0:
+                    cell.fill = row_even_fill
+
+            # Условное форматирование статусов (колонки 7, 8, 9)
+            for col in (7, 8, 9):
+                cell = ws.cell(row=r, column=col)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                if cell.value == 'Да':
+                    cell.fill = status_yes_fill
+                    cell.font = status_yes_font
+                else:
+                    cell.fill = status_no_fill
+                    cell.font = status_no_font
+
+        total = len(articles)
+
+        # --- Итоговая строка ---
+        if total > 0:
+            sr = total + 5  # строка итого
+            ws.row_dimensions[sr].height = 26
+            ws.merge_cells(start_row=sr, start_column=1, end_row=sr, end_column=2)
+            summary_cell = ws.cell(row=sr, column=1, value=f'Итого: {total} статей')
+            summary_cell.font = summary_font
+            summary_cell.fill = summary_fill
+            summary_cell.alignment = Alignment(vertical='center')
+            summary_cell.border = thin_border
+            ws.cell(row=sr, column=2).fill = summary_fill
+            ws.cell(row=sr, column=2).border = thin_border
+
+            for c in range(3, 7):
+                cell = ws.cell(row=sr, column=c, value='')
+                cell.fill = summary_fill
+                cell.border = thin_border
+
+            for col, count, label in [(7, paid_count, 'Оплата'), (8, reviewed_count, 'Рецензия'), (9, edited_count, 'Редакт.')]:
+                cell = ws.cell(row=sr, column=col, value=f'{count}/{total}')
+                cell.font = summary_font
+                cell.fill = summary_fill
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = thin_border
+
+        # --- Ширина колонок (auto-fit-like) ---
+        col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11}
+        for col_letter, w in col_widths.items():
+            ws.column_dimensions[col_letter].width = w
+
+        # Закрепление заголовка
+        ws.freeze_panes = 'A5'
+
         output = BytesIO()
         wb.save(output)
         output.seek(0)
-        
+
         filename = f"articles_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True, download_name=filename)
+
+    @app.route('/admin/articles/bulk-export-csv')
+    @admin_required
+    def bulk_export_articles_csv():
+        """Экспорт статей в CSV (с фильтрами или по ID)."""
+        article_ids = request.args.get('ids', '')
+        journal_id = request.args.get('journal_id', type=int)
+        status_filter = request.args.get('status', '')
+        search = request.args.get('search', '').strip()
+
+        if article_ids:
+            ids_list = [int(x) for x in article_ids.split(',') if x.isdigit()]
+            articles = (
+                Article.query
+                .filter(Article.id.in_(ids_list))
+                .options(
+                    joinedload(Article.issue).joinedload(Issue.journal),
+                    joinedload(Article.article_authors)
+                )
+                .all()
+            )
+        else:
+            articles = _filtered_articles_query(journal_id, status_filter, search).all()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.'])
+
+        for idx, article in enumerate(articles, 1):
+            authors = ", ".join([a.full_name for a in article.article_authors]) if article.article_authors else (article.authors or "-")
+            journal_name = article.issue.journal.name if article.issue and article.issue.journal else "-"
+            issue_info = f"№{article.issue.number}/{article.issue.year}" if article.issue else "-"
+
+            writer.writerow([
+                idx,
+                article.title or "-",
+                authors,
+                journal_name,
+                issue_info,
+                article.submission_date or "-",
+                "Да" if article.payment_received else "Нет",
+                "Да" if article.has_review else "Нет",
+                "Да" if article.edited else "Нет",
+            ])
+
+        output.seek(0)
+        bytes_output = BytesIO(output.getvalue().encode('utf-8-sig'))
+
+        filename = f"articles_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return send_file(bytes_output, mimetype='text/csv; charset=utf-8',
                          as_attachment=True, download_name=filename)
 
     # ==================== USER MANAGEMENT ====================
@@ -946,6 +1120,17 @@ def register_admin_routes(app):
         db.session.delete(user)
         db.session.commit()
         return jsonify({'success': True})
+
+    # =============================================
+    #   СТРАНИЦА ЭКСПОРТА
+    # =============================================
+    @app.route('/admin/export')
+    @admin_required
+    def admin_export():
+        """Страница экспорта с выбором формата и фильтров."""
+        journals = Journal.query.order_by(Journal.name).all()
+        total_articles = Article.query.count()
+        return render_template('admin/export.html', journals=journals, total_articles=total_articles)
 
     # =============================================
     #   БЭКАПЫ

@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+{% block title %}Экспорт{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<!-- Mobile overlay -->
+<div class="adm-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="adm-layout">
+    <!-- Sidebar -->
+    <aside class="adm-sidebar" id="sidebar">
+        <div class="adm-sidebar-header">
+            <div class="adm-logo">
+                <div class="adm-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/>
+                    </svg>
+                </div>
+                <span class="adm-logo-text">Журналы</span>
+            </div>
+            <button class="adm-sidebar-close" onclick="toggleSidebar()">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
+        </div>
+        <nav class="adm-nav">
+            <div class="adm-nav-label">Меню</div>
+            <a href="{{ url_for('admin_dashboard') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h3.5C6.216 0 7 .784 7 1.75v3.5A1.75 1.75 0 0 1 5.25 7h-3.5A1.75 1.75 0 0 1 0 5.25Zm9 0C9 .784 9.784 0 10.75 0h3.5C15.216 0 16 .784 16 1.75v3.5A1.75 1.75 0 0 1 14.25 7h-3.5A1.75 1.75 0 0 1 9 5.25Zm0 9C9 9.784 9.784 9 10.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 14.25 16h-3.5A1.75 1.75 0 0 1 9 14.25Zm-9 0C0 9.784.784 9 1.75 9h3.5c.966 0 1.75.784 1.75 1.75v3.5A1.75 1.75 0 0 1 5.25 16h-3.5A1.75 1.75 0 0 1 0 14.25Z"/></svg>
+                Dashboard
+            </a>
+            <a href="{{ url_for('admin_journals') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/></svg>
+                Журналы
+            </a>
+            <a href="{{ url_for('admin_articles') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/></svg>
+                Все статьи
+            </a>
+            <a href="{{ url_for('admin_export') }}" class="adm-nav-item adm-nav-active">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                Экспорт
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.001 4.001 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.56 3.012.749.749 0 0 1-.885.954.752.752 0 0 1-.549-.514 3.507 3.507 0 0 0-2.522-2.372.75.75 0 0 1-.574-.73v-.352a.75.75 0 0 1 .416-.672A1.5 1.5 0 0 0 11 5.5.75.75 0 0 1 11 4Zm-5.5-.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 3.5Z"/></svg>
+                Пользователи
+            </a>
+            <a href="{{ url_for('admin_backups') }}" class="adm-nav-item">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M5.75 1a.75.75 0 0 0-.75.75v3c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-3a.75.75 0 0 0-.75-.75h-4.5ZM2.5 3.25a.25.25 0 0 1 .25-.25H4v3.25c0 .966.784 1.75 1.75 1.75h4.5A1.75 1.75 0 0 0 12 6.25V3h1.25a.25.25 0 0 1 .25.25v9.5a.25.25 0 0 1-.25.25h-2.5a.75.75 0 0 0-.75.75v.25H6v-.25a.75.75 0 0 0-.75-.75h-2.5a.25.25 0 0 1-.25-.25v-9.5Z"/></svg>
+                Бэкапы
+            </a>
+        </nav>
+        <div class="adm-sidebar-footer">
+            <div class="adm-user-block">
+                <div class="adm-user-avatar">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.431-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></svg>
+                </div>
+                <div class="adm-user-info">
+                    <span class="adm-user-name">{{ current_user.display_name }}</span>
+                    <span class="adm-user-role">{{ current_user.role }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="adm-main">
+        <!-- Top-right toolbar -->
+        <div class="adm-toolbar">
+            <a href="/" class="adm-toolbar-btn" title="На главную">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            </a>
+            <button class="adm-toolbar-btn" onclick="toggleAdmTheme()" title="Переключить тему">
+                <span class="adm-theme-icon">🌙</span>
+            </button>
+            <a href="/logout" class="adm-toolbar-btn adm-toolbar-exit" title="Выйти">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h2.5a.75.75 0 0 1 0 1.5h-2.5A1.75 1.75 0 0 1 2 13.25Zm10.44 4.5-1.97-1.97a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l3.25 3.25a.75.75 0 0 1 0 1.06l-3.25 3.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l1.97-1.97H6.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </a>
+        </div>
+
+        <!-- Mobile header -->
+        <div class="adm-mobile-header">
+            <button class="adm-hamburger" onclick="toggleSidebar()">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"/></svg>
+            </button>
+            <span class="adm-mobile-title">Экспорт</span>
+        </div>
+
+        <!-- Welcome -->
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Экспорт статей</h1>
+            <p class="adm-welcome-sub">Выберите формат и фильтры для выгрузки</p>
+        </div>
+
+        <div class="exp-grid">
+            <!-- Filters card -->
+            <div class="exp-card exp-card-filters">
+                <div class="exp-card-header">
+                    <h2 class="exp-card-title">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M.75 3h14.5a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1 0-1.5ZM3 7.75A.75.75 0 0 1 3.75 7h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 7.75Zm3 4a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"/></svg>
+                        Фильтры
+                    </h2>
+                </div>
+                <div class="exp-card-body">
+                    <div class="exp-field">
+                        <label class="exp-label">Журнал</label>
+                        <select id="expJournal" class="exp-select">
+                            <option value="">Все журналы</option>
+                            {% for journal in journals %}
+                            <option value="{{ journal.id }}">{{ journal.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="exp-field">
+                        <label class="exp-label">Статус</label>
+                        <select id="expStatus" class="exp-select">
+                            <option value="">Все статусы</option>
+                            <option value="unpaid">Без оплаты</option>
+                            <option value="no_review">Без рецензии</option>
+                            <option value="not_edited">Не отредактировано</option>
+                        </select>
+                    </div>
+                    <div class="exp-field">
+                        <label class="exp-label">Поиск</label>
+                        <input type="text" id="expSearch" class="exp-input" placeholder="Название или автор...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview card -->
+            <div class="exp-card exp-card-preview">
+                <div class="exp-card-header">
+                    <h2 class="exp-card-title">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.932a.12.12 0 0 0 0 .136c.411.622 1.241 1.75 2.366 2.717C5.176 11.758 6.527 12.5 8 12.5c1.473 0 2.825-.742 3.955-1.715 1.124-.967 1.954-2.096 2.366-2.717a.12.12 0 0 0 0-.136c-.412-.621-1.242-1.75-2.366-2.717C10.824 4.242 9.473 3.5 8 3.5c-1.473 0-2.824.742-3.955 1.715-1.124.967-1.954 2.096-2.366 2.717ZM8 10a2 2 0 1 1-.001-3.999A2 2 0 0 1 8 10Z"/></svg>
+                        Предпросмотр
+                    </h2>
+                </div>
+                <div class="exp-card-body exp-preview-body">
+                    <div class="exp-preview-count">
+                        <span class="exp-count-num" id="expCount">{{ total_articles }}</span>
+                        <span class="exp-count-label" id="expCountLabel">статей будет экспортировано</span>
+                    </div>
+                    <div class="exp-preview-info" id="expFilterInfo">
+                        <span class="exp-info-tag">Все статьи</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download cards -->
+        <div class="exp-download-row">
+            <div class="exp-card exp-card-dl" id="dlExcel">
+                <div class="exp-dl-icon exp-dl-excel">
+                    <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 13.5h-13A.5.5 0 0 1 1 13V3a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5ZM2 12h12V4H2v8Z"/><path d="m5.5 10.5 2-2.5-2-2.5h1.25L8 7.25 9.25 5.5H10.5L8.5 8l2 2.5H9.25L8 8.75 6.75 10.5H5.5Z"/></svg>
+                </div>
+                <div class="exp-dl-info">
+                    <strong>Excel (.xlsx)</strong>
+                    <span>Красивое форматирование, итоги, условные цвета</span>
+                </div>
+                <button class="exp-dl-btn exp-dl-btn-excel" onclick="downloadExport('excel')">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                    Скачать
+                </button>
+            </div>
+            <div class="exp-card exp-card-dl" id="dlCsv">
+                <div class="exp-dl-icon exp-dl-csv">
+                    <svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 13.5h-13A.5.5 0 0 1 1 13V3a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v10a.5.5 0 0 1-.5.5ZM2 12h12V4H2v8Z"/><path d="M4.5 7h2v1h-2V7Zm0 2h2v1h-2V9Zm3-2h2v1h-2V7Zm0 2h2v1h-2V9Zm3-2h2v1h-2V7Zm0 2h2v1h-2V9Z"/></svg>
+                </div>
+                <div class="exp-dl-info">
+                    <strong>CSV (.csv)</strong>
+                    <span>Простой текстовый формат, UTF-8</span>
+                </div>
+                <button class="exp-dl-btn exp-dl-btn-csv" onclick="downloadExport('csv')">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
+                    Скачать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* =============================================
+   ADMIN LAYOUT (shared)
+   ============================================= */
+.adm-layout { display: flex; min-height: 100vh; }
+.adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 998; backdrop-filter: blur(2px); }
+.adm-overlay.active { display: block; }
+
+.adm-sidebar { width: 260px; min-height: 100vh; background: var(--color-canvas-subtle); border-right: 1px solid var(--color-border-default); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 999; }
+.adm-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 20px 20px; border-bottom: 1px solid var(--color-border-muted); }
+.adm-sidebar-close { display: none; background: none; border: none; color: var(--color-fg-muted); cursor: pointer; padding: 4px; border-radius: 6px; }
+.adm-sidebar-close:hover { background: var(--color-canvas-inset); }
+.adm-logo { display: flex; align-items: center; gap: 12px; }
+.adm-logo-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #5BA4B0, #4A8E99); color: #fff; display: flex; align-items: center; justify-content: center; }
+[data-theme="dark"] .adm-logo-icon { background: linear-gradient(135deg, #5BA4B0, #7CC5D0); }
+.adm-logo-text { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+
+.adm-nav { padding: 16px 12px; }
+.adm-nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-fg-muted); padding: 0 12px; margin-bottom: 8px; }
+.adm-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 14px; font-weight: 500; color: var(--color-fg-muted); text-decoration: none; border-radius: 8px; margin-bottom: 2px; transition: background 0.15s, color 0.15s; }
+.adm-nav-item:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+.adm-nav-active { background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.06)); color: #5BA4B0; font-weight: 600; }
+[data-theme="dark"] .adm-nav-active { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.06)); }
+.adm-nav-active:hover { background: linear-gradient(135deg, rgba(91,164,176,0.18), rgba(91,164,176,0.1)); }
+
+.adm-sidebar-footer { padding: 8px 12px 20px; border-top: 1px solid var(--color-border-muted); margin-top: 8px; }
+.adm-user-block { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.adm-user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--color-canvas-inset); border: 2px solid var(--color-border-default); display: flex; align-items: center; justify-content: center; color: var(--color-fg-muted); flex-shrink: 0; }
+.adm-user-info { display: flex; flex-direction: column; min-width: 0; }
+.adm-user-name { font-size: 13px; font-weight: 600; color: var(--color-fg-default); }
+.adm-user-role { font-size: 12px; color: var(--color-fg-muted); }
+
+.adm-main { flex: 1; min-width: 0; padding: 32px 36px 48px; background: var(--color-canvas-default); position: relative; }
+
+.adm-toolbar { position: absolute; top: 20px; right: 24px; display: flex; gap: 6px; z-index: 10; }
+.adm-toolbar-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.adm-toolbar-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); border-color: var(--color-border-muted); }
+.adm-toolbar-exit:hover { color: #cf222e; border-color: rgba(207,34,46,0.3); background: rgba(207,34,46,0.06); }
+[data-theme="dark"] .adm-toolbar-exit:hover { color: #f85149; border-color: rgba(248,81,73,0.3); background: rgba(248,81,73,0.08); }
+
+.adm-mobile-header { display: none; align-items: center; gap: 12px; margin-bottom: 24px; }
+.adm-hamburger { background: none; border: 1px solid var(--color-border-default); border-radius: 8px; padding: 8px; color: var(--color-fg-default); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.adm-hamburger:hover { background: var(--color-canvas-subtle); }
+.adm-mobile-title { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+.adm-welcome { margin-bottom: 24px; }
+.adm-welcome-title { font-size: 26px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 4px 0; }
+.adm-welcome-sub { font-size: 15px; color: var(--color-fg-muted); margin: 0; }
+
+/* =============================================
+   EXPORT PAGE
+   ============================================= */
+.exp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.exp-card {
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.exp-card-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--color-border-muted);
+}
+
+.exp-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
+.exp-card-title svg { color: var(--color-fg-muted); }
+
+.exp-card-body { padding: 20px 22px; }
+
+/* Fields */
+.exp-field { margin-bottom: 16px; }
+.exp-field:last-child { margin-bottom: 0; }
+.exp-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--color-fg-muted); margin-bottom: 6px; }
+.exp-select, .exp-input { width: 100%; padding: 9px 12px; font-size: 13px; color: var(--color-fg-default); background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 8px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box; }
+.exp-select:focus, .exp-input:focus { border-color: var(--color-accent-emphasis); box-shadow: 0 0 0 3px rgba(91,164,176,0.2); }
+.exp-input::placeholder { color: var(--color-fg-muted); }
+
+/* Preview */
+.exp-preview-body { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 32px 22px; }
+.exp-preview-count { text-align: center; }
+.exp-count-num { display: block; font-size: 48px; font-weight: 700; color: #5BA4B0; line-height: 1; }
+[data-theme="dark"] .exp-count-num { color: #7CC5D0; }
+.exp-count-label { display: block; font-size: 14px; color: var(--color-fg-muted); margin-top: 6px; }
+.exp-preview-info { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.exp-info-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; font-size: 12px; font-weight: 600; background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default); border-radius: 20px; color: var(--color-fg-muted); }
+
+/* Download cards */
+.exp-download-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.exp-card-dl {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    cursor: default;
+}
+
+.exp-dl-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.exp-dl-excel {
+    background: linear-gradient(135deg, rgba(31,136,61,0.12), rgba(31,136,61,0.04));
+    color: #1a7f37;
+}
+[data-theme="dark"] .exp-dl-excel { color: #3fb950; background: linear-gradient(135deg, rgba(63,185,80,0.15), rgba(63,185,80,0.05)); }
+
+.exp-dl-csv {
+    background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.04));
+    color: #5BA4B0;
+}
+[data-theme="dark"] .exp-dl-csv { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.05)); }
+
+.exp-dl-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.exp-dl-info strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin-bottom: 2px;
+}
+
+.exp-dl-info span {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+}
+
+.exp-dl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, transform 0.1s;
+    flex-shrink: 0;
+    color: #fff;
+}
+
+.exp-dl-btn:active { transform: scale(0.97); }
+
+.exp-dl-btn-excel { background: #1a7f37; }
+.exp-dl-btn-excel:hover { background: #178132; }
+[data-theme="dark"] .exp-dl-btn-excel { background: #238636; }
+[data-theme="dark"] .exp-dl-btn-excel:hover { background: #2ea043; }
+
+.exp-dl-btn-csv { background: #5BA4B0; }
+.exp-dl-btn-csv:hover { background: #4A8E99; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .exp-grid, .exp-download-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .adm-sidebar { position: fixed; left: -280px; top: 0; height: 100vh; width: 270px; transition: left 0.25s ease; box-shadow: none; }
+    .adm-sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.15); }
+    .adm-sidebar-close { display: flex; }
+    .adm-mobile-header { display: flex; }
+    .adm-toolbar { display: none; }
+    .adm-main { padding: 20px 16px 36px; }
+    .adm-welcome-title { font-size: 22px; }
+}
+</style>
+
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+function toggleAdmTheme() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = next === 'dark' ? '☀️' : '🌙'; });
+    var hi = document.getElementById('theme-icon');
+    if (hi) hi.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+    var t = localStorage.getItem('theme') || 'light';
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
+})();
+
+/* ===== Filter-driven preview ===== */
+var _expTimer = null;
+var _expController = null;
+
+function getFilterParams() {
+    var params = new URLSearchParams();
+    var j = document.getElementById('expJournal').value;
+    var s = document.getElementById('expStatus').value;
+    var q = document.getElementById('expSearch').value.trim();
+    if (j) params.set('journal_id', j);
+    if (s) params.set('status', s);
+    if (q) params.set('search', q);
+    return params;
+}
+
+function updatePreview() {
+    var params = getFilterParams();
+
+    if (_expController) _expController.abort();
+    _expController = new AbortController();
+
+    var countEl = document.getElementById('expCount');
+    var labelEl = document.getElementById('expCountLabel');
+    var infoEl = document.getElementById('expFilterInfo');
+
+    countEl.textContent = '...';
+
+    fetch('/admin/articles/api?' + params.toString(), { signal: _expController.signal })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            countEl.textContent = data.total;
+            labelEl.textContent = data.total === 0 ? 'статей по данным фильтрам' : 'статей будет экспортировано';
+
+            /* Build filter tags */
+            var tags = [];
+            var jSel = document.getElementById('expJournal');
+            if (jSel.value) tags.push(jSel.options[jSel.selectedIndex].text);
+            var sSel = document.getElementById('expStatus');
+            if (sSel.value) tags.push(sSel.options[sSel.selectedIndex].text);
+            var q = document.getElementById('expSearch').value.trim();
+            if (q) tags.push('Поиск: ' + q);
+
+            if (tags.length === 0) {
+                infoEl.innerHTML = '<span class="exp-info-tag">Все статьи</span>';
+            } else {
+                infoEl.innerHTML = tags.map(function(t) { return '<span class="exp-info-tag">' + t + '</span>'; }).join('');
+            }
+        })
+        .catch(function(e) {
+            if (e.name !== 'AbortError') countEl.textContent = '?';
+        });
+}
+
+function updatePreviewDebounced() {
+    clearTimeout(_expTimer);
+    _expTimer = setTimeout(updatePreview, 300);
+}
+
+function downloadExport(format) {
+    var params = getFilterParams();
+    var url = format === 'csv'
+        ? '/admin/articles/bulk-export-csv?' + params.toString()
+        : '/admin/articles/bulk-export?' + params.toString();
+    window.location.href = url;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('expJournal').addEventListener('change', updatePreview);
+    document.getElementById('expStatus').addEventListener('change', updatePreview);
+    document.getElementById('expSearch').addEventListener('input', updatePreviewDebounced);
+    document.getElementById('expSearch').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_expTimer); updatePreview(); }
+    });
+});
+</script>
+{% endblock %}

@@ -88,6 +88,9 @@
         }
 
         .breadcrumbs a {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
             color: var(--color-accent-fg);
             text-decoration: none;
             transition: color 0.15s;
@@ -95,6 +98,10 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .breadcrumbs a svg {
+            flex-shrink: 0;
         }
 
         .breadcrumbs a:hover {
@@ -289,6 +296,14 @@
             if (window.__skipPageAnimation) {
                 pageWrap.classList.add('no-anim');
             }
+            
+            // После завершения входной анимации убираем transform,
+            // иначе position:fixed модалки внутри page-wrap ломаются
+            pageWrap.addEventListener('animationend', function() {
+                pageWrap.style.opacity = '1';
+                pageWrap.style.transform = 'none';
+                pageWrap.style.animation = 'none';
+            }, { once: true });
         })();
         
         // ========== SPA Router — мгновенные переходы без перезагрузки ==========
