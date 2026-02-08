@@ -750,7 +750,10 @@ function parsePdfAndFill(input) {
 
         if (filled.length > 0) {
             status.className = 'pdf-parse-status success';
-            status.textContent = 'Заполнено: ' + filled.join(', ') + '. Проверьте данные.';
+            var methodBadge = data.method === 'ai'
+                ? '<span class="parse-method-badge ai">GigaChat AI</span>'
+                : '<span class="parse-method-badge heuristic">Локальный парсер</span>';
+            status.innerHTML = methodBadge + ' Заполнено: ' + filled.join(', ') + '. Проверьте данные.';
             dropHint.textContent = 'Данные извлечены — проверьте поля ниже';
             showToast('PDF распознан — проверьте заполненные поля', 'success');
         } else {
@@ -1850,6 +1853,23 @@ function applyFilters() {
 .pdf-parse-status.error {
     color: var(--color-danger-fg);
     background: rgba(207,34,46,0.08);
+}
+.parse-method-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.parse-method-badge.ai {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+}
+.parse-method-badge.heuristic {
+    background: rgba(99,110,123,0.15);
+    color: #636e7b;
 }
 .pdf-spinner {
     width: 14px;
