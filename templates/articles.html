@@ -1048,9 +1048,10 @@ function toggleStatus(btn) {
             // Обновляем счётчик в статистике
             updateStatCounter(field, newActive ? 1 : -1);
 
-            // Toast уведомление
+            // Toast уведомление (цвет совпадает с кнопкой)
             const labels = {payment: 'Оплата', review: 'Рецензия', edited: 'Редактирование'};
-            showToast((labels[field] || field) + ': ' + (newActive ? 'включено' : 'выключено'), newActive ? 'success' : 'info');
+            const toastType = field === 'payment' ? 'success' : field === 'review' ? 'info' : 'warning';
+            showToast((labels[field] || field) + ': ' + (newActive ? 'включено' : 'выключено'), toastType);
         }
     })
     .catch(err => { console.error('Ошибка:', err); showToast('Ошибка сети', 'error'); })
