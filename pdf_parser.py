@@ -335,9 +335,10 @@ def _find_authors_and_orgs(blocks, start_idx):
 def parse_article_pdf(file_path):
     """
     Парсит PDF-файл научной статьи и извлекает метаданные.
+    Сначала пробует AI (GigaChat), при неудаче — эвристический парсер.
 
     Returns:
-        dict: {title, authors: [{name, email, organization}], raw_text}
+        dict: {title, authors: [{name, email, organization}], raw_text, method}
     """
     try:
         doc = fitz.open(file_path)
@@ -349,6 +350,24 @@ def parse_article_pdf(file_path):
         return {"error": "PDF пустой", "title": "", "authors": []}
 
     page = doc[0]
+    raw_text = page.get_text("text")
+
+    # === Попытка 1: AI-парсинг (GigaChat) ===
+    try:
+        from ai_parser import parse_with_ai
+        ai_result = parse_with_ai(raw_text)
+        if ai_result and (ai_result.get("title") or ai_result.get("authors")):
+            doc.close()
+            return {
+                "title": ai_result.get("title", ""),
+                "authors": ai_result.get("authors", []),
+                "raw_text": raw_text[:500],
+                "method": "ai",
+            }
+    except Exception:
+        pass  # AI недоступен — переходим к эвристике
+
+    # === Попытка 2: эвристический парсер ===
     blocks = _extract_text_blocks(page)
 
     # Если мало текста на первой — добавляем вторую
@@ -357,12 +376,12 @@ def parse_article_pdf(file_path):
 
     title, title_end_idx = _find_title(blocks)
     authors = _find_authors_and_orgs(blocks, title_end_idx)
-    raw_text = page.get_text("text")[:500]
 
     doc.close()
 
     return {
         "title": title,
         "authors": authors,
-        "raw_text": raw_text,
+        "raw_text": raw_text[:500],
+        "method": "heuristic",
     }
