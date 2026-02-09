@@ -1969,7 +1969,48 @@ function updateArticleCard(article) {
         card.dataset.review = article.review ? 'true' : 'false';
         card.dataset.edited = article.edited ? 'true' : 'false';
         card.dataset.expertise = article.expertise ? 'true' : 'false';
-        if (article.submission_date) card.dataset.date = article.submission_date;
+        card.dataset.date = article.submission_date || '';
+
+        // Update visible date
+        var dateEl = card.querySelector('.article-date');
+        var infoEl = card.querySelector('.article-info');
+        var dateSvg = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.25c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 16H2.75A1.75 1.75 0 0 1 1 14.25V3.75C1 2.784 1.784 2 2.75 2H4V.75A.75.75 0 0 1 4.75 0Zm0 3.5h8.5a.25.25 0 0 1 .25.25V6h-11V3.75a.25.25 0 0 1 .25-.25Zm-2.25 4v6.75c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V7.5Z"/></svg>';
+        if (article.submission_date) {
+            if (dateEl) {
+                // Update existing date text (keep SVG, replace text node)
+                dateEl.innerHTML = dateSvg + ' ' + escHtml(article.submission_date);
+            } else if (infoEl) {
+                // Create date element
+                var newDate = document.createElement('div');
+                newDate.className = 'article-date';
+                newDate.innerHTML = dateSvg + ' ' + escHtml(article.submission_date);
+                infoEl.appendChild(newDate);
+            }
+        } else {
+            // Date removed
+            if (dateEl) dateEl.remove();
+        }
+
+        // Update notes
+        var notesEl = card.querySelector('.article-notes');
+        if (article.notes) {
+            if (notesEl) {
+                notesEl.innerHTML = '<span class="notes-label">Примечания:</span> ' + escHtml(article.notes);
+            } else {
+                var newNotes = document.createElement('div');
+                newNotes.className = 'article-notes';
+                newNotes.innerHTML = '<span class="notes-label">Примечания:</span> ' + escHtml(article.notes);
+                // Insert before article-actions
+                var actions = card.querySelector('.article-actions');
+                if (actions) {
+                    card.insertBefore(newNotes, actions);
+                } else {
+                    card.appendChild(newNotes);
+                }
+            }
+        } else {
+            if (notesEl) notesEl.remove();
+        }
 
         // Update status buttons visually
         var statusMap = {
