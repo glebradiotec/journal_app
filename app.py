@@ -2,9 +2,14 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()  # Загружаем переменные из .env файла
+
 from flask import Flask, session
 from flask_compress import Compress
 from flask_login import LoginManager
+from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backup import create_backup
@@ -21,6 +26,7 @@ BASE_DIR = Path(__file__).parent
 
 app = Flask(__name__)
 Compress(app)  # Gzip/Brotli сжатие ответов (~60-80% меньше трафика)
+CSRFProtect(app)  # Защита от CSRF-атак (токен проверяется на каждом POST)
 
 # === ProxyFix: корректная работа за реверс-прокси (Nginx, Cloudflare и т.д.) ===
 # Без этого Flask не знает реальный протокол (HTTPS) и IP клиента,
@@ -79,6 +85,7 @@ def make_session_permanent():
 
 # Инициализация БД и регистрация маршрутов
 db.init_app(app)
+migrate = Migrate(app, db)  # Миграции БД (flask db init/migrate/upgrade)
 register_public_routes(app)
 register_admin_routes(app)
 

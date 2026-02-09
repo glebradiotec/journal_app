@@ -3,8 +3,8 @@ import os
 import requests
 from datetime import datetime, timedelta
 
-TELEGRAM_BOT_TOKEN = '8568162243:AAFIJGHdgjb4swYCUuBU2pzMHggp9pRGMhA'
-TELEGRAM_CHAT_ID = '134711555'
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
 
 
 def send_to_telegram(backup_file):

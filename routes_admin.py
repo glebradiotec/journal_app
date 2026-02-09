@@ -875,6 +875,8 @@ def register_admin_routes(app):
     @admin_required
     def bulk_export_articles():
         """Экспорт статей в Excel (с фильтрами или по ID)."""
+        from excel_export import generate_articles_excel
+
         article_ids = request.args.get('ids', '')
         journal_id = request.args.get('journal_id', type=int)
         status_filter = request.args.get('status', '')
@@ -896,147 +898,23 @@ def register_admin_routes(app):
             articles = _filtered_articles_query(journal_id, status_filter, search).all()
             filter_desc = _build_filter_description(journal_id, status_filter, search)
 
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Статьи"
-
-        # --- Стили ---
-        thin_border = Border(
-            left=Side(style='thin', color='D0D7DE'),
-            right=Side(style='thin', color='D0D7DE'),
-            top=Side(style='thin', color='D0D7DE'),
-            bottom=Side(style='thin', color='D0D7DE'),
-        )
-        title_font = Font(bold=True, size=14, color='24292F')
-        subtitle_font = Font(size=11, color='57606A')
-        header_fill = PatternFill(start_color='2D333B', end_color='2D333B', fill_type='solid')
-        header_font = Font(bold=True, color='FFFFFF', size=11)
-        header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
-        row_even_fill = PatternFill(start_color='F6F8FA', end_color='F6F8FA', fill_type='solid')
-        status_yes_fill = PatternFill(start_color='DAFBE1', end_color='DAFBE1', fill_type='solid')
-        status_yes_font = Font(bold=True, color='1A7F37', size=11)
-        status_no_fill = PatternFill(start_color='FFEBE9', end_color='FFEBE9', fill_type='solid')
-        status_no_font = Font(bold=True, color='CF222E', size=11)
-        summary_fill = PatternFill(start_color='DDF4FF', end_color='DDF4FF', fill_type='solid')
-        summary_font = Font(bold=True, size=11, color='0969DA')
-
-        # --- Заголовок отчёта ---
-        ws.merge_cells('A1:J1')
-        title_cell = ws['A1']
-        title_cell.value = 'Экспорт статей'
-        title_cell.font = title_font
-        title_cell.alignment = Alignment(vertical='center')
-        ws.row_dimensions[1].height = 28
-
-        ws.merge_cells('A2:J2')
-        sub_cell = ws['A2']
-        sub_cell.value = f'{filter_desc}  |  Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}'
-        sub_cell.font = subtitle_font
-        sub_cell.alignment = Alignment(vertical='center')
-        ws.row_dimensions[2].height = 20
-
-        # пустая строка-разделитель
-        ws.row_dimensions[3].height = 6
-
-        # --- Заголовки таблицы (строка 4) ---
-        headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.', 'Акт эксп.']
-        for col_idx, h in enumerate(headers, 1):
-            cell = ws.cell(row=4, column=col_idx, value=h)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = header_align
-            cell.border = thin_border
-        ws.row_dimensions[4].height = 26
-
-        # --- Данные ---
-        paid_count = reviewed_count = edited_count = expertise_count = 0
-        for row_idx, article in enumerate(articles, 1):
-            r = row_idx + 4  # строки данных начинаются с 5
-
+        # Преобразуем ORM-объекты в формат для общего модуля
+        rows = []
+        for article in articles:
             authors = ", ".join([a.full_name for a in article.article_authors]) if article.article_authors else (article.authors or "-")
-            journal_name = article.issue.journal.name if article.issue and article.issue.journal else "-"
-            issue_info = f"№{article.issue.number}/{article.issue.year}" if article.issue else "-"
+            rows.append({
+                'title': article.title,
+                'authors': authors,
+                'journal_name': article.issue.journal.name if article.issue and article.issue.journal else '-',
+                'issue_info': f"№{article.issue.number}/{article.issue.year}" if article.issue else '-',
+                'submission_date': article.submission_date,
+                'payment': article.payment_received,
+                'review': article.has_review,
+                'edited': article.edited,
+                'expertise': article.has_expertise_act,
+            })
 
-            if article.payment_received:
-                paid_count += 1
-            if article.has_review:
-                reviewed_count += 1
-            if article.edited:
-                edited_count += 1
-            if article.has_expertise_act:
-                expertise_count += 1
-
-            row_data = [
-                row_idx,
-                article.title or "-",
-                authors,
-                journal_name,
-                issue_info,
-                article.submission_date or "-",
-                'Да' if article.payment_received else 'Нет',
-                'Да' if article.has_review else 'Нет',
-                'Да' if article.edited else 'Нет',
-                'Да' if article.has_expertise_act else 'Нет',
-            ]
-
-            for col_idx, val in enumerate(row_data, 1):
-                cell = ws.cell(row=r, column=col_idx, value=val)
-                cell.border = thin_border
-                cell.alignment = Alignment(vertical='center', wrap_text=(col_idx == 2))
-
-                # Чередование строк
-                if row_idx % 2 == 0:
-                    cell.fill = row_even_fill
-
-            # Условное форматирование статусов (колонки 7, 8, 9)
-            for col in (7, 8, 9, 10):
-                cell = ws.cell(row=r, column=col)
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-                if cell.value == 'Да':
-                    cell.fill = status_yes_fill
-                    cell.font = status_yes_font
-                else:
-                    cell.fill = status_no_fill
-                    cell.font = status_no_font
-
-        total = len(articles)
-
-        # --- Итоговая строка ---
-        if total > 0:
-            sr = total + 5  # строка итого
-            ws.row_dimensions[sr].height = 26
-            ws.merge_cells(start_row=sr, start_column=1, end_row=sr, end_column=2)
-            summary_cell = ws.cell(row=sr, column=1, value=f'Итого: {total} статей')
-            summary_cell.font = summary_font
-            summary_cell.fill = summary_fill
-            summary_cell.alignment = Alignment(vertical='center')
-            summary_cell.border = thin_border
-            ws.cell(row=sr, column=2).fill = summary_fill
-            ws.cell(row=sr, column=2).border = thin_border
-
-            for c in range(3, 7):
-                cell = ws.cell(row=sr, column=c, value='')
-                cell.fill = summary_fill
-                cell.border = thin_border
-
-            for col, count, label in [(7, paid_count, 'Оплата'), (8, reviewed_count, 'Рецензия'), (9, edited_count, 'Редакт.'), (10, expertise_count, 'Акт эксп.')]:
-                cell = ws.cell(row=sr, column=col, value=f'{count}/{total}')
-                cell.font = summary_font
-                cell.fill = summary_fill
-                cell.alignment = Alignment(horizontal='center', vertical='center')
-                cell.border = thin_border
-
-        # --- Ширина колонок (auto-fit-like) ---
-        col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11, 'J': 12}
-        for col_letter, w in col_widths.items():
-            ws.column_dimensions[col_letter].width = w
-
-        # Закрепление заголовка
-        ws.freeze_panes = 'A5'
-
-        output = BytesIO()
-        wb.save(output)
-        output.seek(0)
+        output, total = generate_articles_excel(rows, filter_desc)
 
         filename = f"articles_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         return send_file(output, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

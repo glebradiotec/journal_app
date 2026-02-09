@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');</script>
     <title>{% block title %}Научные журналы{% endblock %}</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -235,6 +236,49 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" defer></script>
     <script>
+        // ========== CSRF Protection ==========
+        (function() {
+            var token = document.querySelector('meta[name="csrf-token"]');
+            var csrfToken = token ? token.getAttribute('content') : '';
+
+            // 1. Авто-вставка hidden-поля во все HTML-формы с method=POST
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+                    if (!form.querySelector('input[name="csrf_token"]')) {
+                        var input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'csrf_token';
+                        input.value = csrfToken;
+                        form.prepend(input);
+                    }
+                });
+            });
+
+            // 2. Перехват fetch — автоматически добавляем заголовок X-CSRFToken
+            var originalFetch = window.fetch;
+            window.fetch = function(url, options) {
+                options = options || {};
+                var method = (options.method || 'GET').toUpperCase();
+                if (method !== 'GET' && method !== 'HEAD') {
+                    options.headers = options.headers || {};
+                    // Поддержка и Headers-объекта, и обычного объекта
+                    if (options.headers instanceof Headers) {
+                        if (!options.headers.has('X-CSRFToken')) {
+                            options.headers.set('X-CSRFToken', csrfToken);
+                        }
+                    } else {
+                        if (!options.headers['X-CSRFToken']) {
+                            options.headers['X-CSRFToken'] = csrfToken;
+                        }
+                    }
+                }
+                return originalFetch.call(this, url, options);
+            };
+
+            // Экспортируем для использования в шаблонах (если нужно)
+            window.CSRF_TOKEN = csrfToken;
+        })();
+
         // ========== Global Toast System ==========
         (function() {
             var ICONS = {

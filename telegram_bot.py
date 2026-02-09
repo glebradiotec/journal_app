@@ -5,17 +5,18 @@ Telegram-бот для Radiotec Journal App.
 """
 
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Загружаем переменные из .env файла
+
 import time
 import sqlite3
 import requests
 import shutil
 from datetime import datetime
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-TELEGRAM_BOT_TOKEN = '8568162243:AAFIJGHdgjb4swYCUuBU2pzMHggp9pRGMhA'
-TELEGRAM_CHAT_ID = '134711555'
-BOT_PASSWORD = '1845'
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
+BOT_PASSWORD = os.environ.get('BOT_PASSWORD', '1845')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_APP_URL = 'http://127.0.0.1:8001'
 
@@ -67,12 +68,14 @@ def handle_start(chat_id):
 
 def generate_excel(filepath):
     """Генерирует Excel-выгрузку статей напрямую из SQLite."""
+    from excel_export import generate_articles_excel
+
     db_path = os.path.join(BASE_DIR, 'instance', 'journal.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
-    rows = c.execute('''
+    db_rows = c.execute('''
         SELECT a.id, a.title, a.authors, a.submission_date,
                a.payment_received, a.has_review, a.edited, a.has_expertise_act,
                j.name as journal_name, i.number as issue_num, i.year as issue_year
@@ -82,124 +85,33 @@ def generate_excel(filepath):
         ORDER BY a.id DESC
     ''').fetchall()
 
-    # Авторы из отдельной таблицы
     authors_map = {}
     for row in c.execute('SELECT article_id, full_name FROM article_author ORDER BY "order"'):
         authors_map.setdefault(row[0], []).append(row[1])
     conn.close()
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Статьи"
-
-    # Стили
-    thin_border = Border(
-        left=Side(style='thin', color='D0D7DE'), right=Side(style='thin', color='D0D7DE'),
-        top=Side(style='thin', color='D0D7DE'), bottom=Side(style='thin', color='D0D7DE'),
-    )
-    title_font = Font(bold=True, size=14, color='24292F')
-    subtitle_font = Font(size=11, color='57606A')
-    header_fill = PatternFill(start_color='2D333B', end_color='2D333B', fill_type='solid')
-    header_font = Font(bold=True, color='FFFFFF', size=11)
-    header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    row_even_fill = PatternFill(start_color='F6F8FA', end_color='F6F8FA', fill_type='solid')
-    status_yes_fill = PatternFill(start_color='DAFBE1', end_color='DAFBE1', fill_type='solid')
-    status_yes_font = Font(bold=True, color='1A7F37', size=11)
-    status_no_fill = PatternFill(start_color='FFEBE9', end_color='FFEBE9', fill_type='solid')
-    status_no_font = Font(bold=True, color='CF222E', size=11)
-    summary_fill = PatternFill(start_color='DDF4FF', end_color='DDF4FF', fill_type='solid')
-    summary_font = Font(bold=True, size=11, color='0969DA')
-
-    # Заголовок
-    ws.merge_cells('A1:I1')
-    ws['A1'].value = 'Экспорт статей — Radiotec Journal App'
-    ws['A1'].font = title_font
-    ws['A1'].alignment = Alignment(vertical='center')
-    ws.row_dimensions[1].height = 28
-
-    ws.merge_cells('A2:J2')
-    ws['A2'].value = f'Все статьи  |  Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}'
-    ws['A2'].font = subtitle_font
-    ws['A2'].alignment = Alignment(vertical='center')
-    ws.row_dimensions[2].height = 20
-    ws.row_dimensions[3].height = 6
-
-    # Заголовки таблицы
-    headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.', 'Акт эксп.']
-    for col_idx, h in enumerate(headers, 1):
-        cell = ws.cell(row=4, column=col_idx, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = header_align
-        cell.border = thin_border
-    ws.row_dimensions[4].height = 26
-
-    # Данные
-    paid_count = reviewed_count = edited_count = expertise_count = 0
-    for row_idx, article in enumerate(rows, 1):
-        r = row_idx + 4
-
+    # Преобразуем в формат для общего модуля
+    rows = []
+    for article in db_rows:
         authors = ', '.join(authors_map.get(article['id'], [])) or article['authors'] or '-'
-        journal_name = article['journal_name'] or '-'
         issue_info = f"№{article['issue_num']}/{article['issue_year']}" if article['issue_num'] else '-'
+        rows.append({
+            'title': article['title'],
+            'authors': authors,
+            'journal_name': article['journal_name'],
+            'issue_info': issue_info,
+            'submission_date': article['submission_date'],
+            'payment': bool(article['payment_received']),
+            'review': bool(article['has_review']),
+            'edited': bool(article['edited']),
+            'expertise': bool(article['has_expertise_act']),
+        })
 
-        is_paid = bool(article['payment_received'])
-        is_reviewed = bool(article['has_review'])
-        is_edited = bool(article['edited'])
-        has_expertise = bool(article['has_expertise_act'])
-        if is_paid: paid_count += 1
-        if is_reviewed: reviewed_count += 1
-        if is_edited: edited_count += 1
-        if has_expertise: expertise_count += 1
+    output, total = generate_articles_excel(rows)
 
-        row_data = [
-            row_idx, article['title'] or '-', authors, journal_name,
-            issue_info, article['submission_date'] or '-',
-            'Да' if is_paid else 'Нет',
-            'Да' if is_reviewed else 'Нет',
-            'Да' if is_edited else 'Нет',
-            'Да' if has_expertise else 'Нет',
-        ]
+    with open(filepath, 'wb') as f:
+        f.write(output.read())
 
-        for col_idx, val in enumerate(row_data, 1):
-            cell = ws.cell(row=r, column=col_idx, value=val)
-            cell.border = thin_border
-            cell.alignment = Alignment(vertical='center', wrap_text=(col_idx == 2))
-            if row_idx % 2 == 0:
-                cell.fill = row_even_fill
-
-        for col in (7, 8, 9, 10):
-            cell = ws.cell(row=r, column=col)
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-            if cell.value == 'Да':
-                cell.fill = status_yes_fill
-                cell.font = status_yes_font
-            else:
-                cell.fill = status_no_fill
-                cell.font = status_no_font
-
-    total = len(rows)
-    if total > 0:
-        sr = total + 5
-        ws.row_dimensions[sr].height = 26
-        ws.merge_cells(start_row=sr, start_column=1, end_row=sr, end_column=2)
-        sc = ws.cell(row=sr, column=1, value=f'Итого: {total} статей')
-        sc.font = summary_font; sc.fill = summary_fill; sc.alignment = Alignment(vertical='center'); sc.border = thin_border
-        ws.cell(row=sr, column=2).fill = summary_fill; ws.cell(row=sr, column=2).border = thin_border
-        for c in range(3, 7):
-            cell = ws.cell(row=sr, column=c, value='')
-            cell.fill = summary_fill; cell.border = thin_border
-        for col, count in [(7, paid_count), (8, reviewed_count), (9, edited_count), (10, expertise_count)]:
-            cell = ws.cell(row=sr, column=col, value=f'{count}/{total}')
-            cell.font = summary_font; cell.fill = summary_fill
-            cell.alignment = Alignment(horizontal='center', vertical='center'); cell.border = thin_border
-
-    col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11, 'J': 12}
-    for col_letter, w in col_widths.items():
-        ws.column_dimensions[col_letter].width = w
-    ws.freeze_panes = 'A5'
-
-    wb.save(filepath)
     return total
 
 

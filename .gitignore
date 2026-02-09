@@ -28,6 +28,9 @@ uploads/
 *.swp
 *.swo
 
+# Test cache
+.pytest_cache/
+
 # OS
 .DS_Store
 Thumbs.db
