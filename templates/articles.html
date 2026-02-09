@@ -1598,7 +1598,7 @@ function closeEditPanel() {
     setTimeout(function() {
         overlay.classList.remove('open');
         document.body.style.overflow = '';
-    }, 350);
+    }, 250);
     _spArticleId = null;
     _spNewImages = [];
 }
@@ -3835,20 +3835,27 @@ function updateArticleCard(article) {
 
 .sp-panel {
     position: fixed;
-    top: 0; right: 0;
-    width: 600px;
-    max-width: 100vw;
-    height: 100vh;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    width: 640px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 48px);
     z-index: 1201;
     display: flex;
     flex-direction: column;
     background: var(--color-canvas-default);
-    border-left: 1px solid var(--color-border-default);
-    box-shadow: -8px 0 32px rgba(0,0,0,0.15);
-    transform: translateX(100%);
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--color-border-default);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.sp-panel.open { transform: translateX(0); }
+.sp-panel.open {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
 
 .sp-header {
     display: flex;
@@ -3857,6 +3864,7 @@ function updateArticleCard(article) {
     padding: 16px 24px;
     border-bottom: 1px solid var(--color-border-default);
     background: var(--color-canvas-subtle);
+    border-radius: 16px 16px 0 0;
     flex-shrink: 0;
 }
 .sp-title {
@@ -3887,6 +3895,7 @@ function updateArticleCard(article) {
     padding: 14px 24px;
     border-top: 1px solid var(--color-border-default);
     background: var(--color-canvas-subtle);
+    border-radius: 0 0 16px 16px;
     flex-shrink: 0;
 }
 
@@ -4120,7 +4129,19 @@ function updateArticleCard(article) {
 }
 
 @media (max-width: 640px) {
-    .sp-panel { width: 100vw; }
+    .sp-panel {
+        width: 100vw;
+        max-width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+        top: 0; left: 0;
+        transform: translateY(100%);
+        opacity: 1;
+    }
+    .sp-panel.open {
+        transform: translateY(0);
+    }
+    .sp-header, .sp-footer { border-radius: 0; }
     .sp-files-grid { grid-template-columns: 1fr; }
 }
 </style>
