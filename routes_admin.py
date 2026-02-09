@@ -353,18 +353,20 @@ def register_admin_routes(app):
                     changes.append({'field': 'Дата поступления', 'old': article.submission_date or '', 'new': new_date})
                 article.submission_date = new_date
             
-            # Статусы
-            new_statuses = {
-                'payment_received': ('payment_received' in request.form, 'Оплата'),
-                'has_review': ('has_review' in request.form, 'Рецензия'),
-                'edited': ('edited' in request.form, 'Редактирование'),
-                'has_expertise_act': ('has_expertise_act' in request.form, 'Акт эксп.'),
-            }
-            for field, (new_val, label) in new_statuses.items():
-                old_val = getattr(article, field)
-                if old_val != new_val:
-                    changes.append({'field': label, 'old': 'вкл' if old_val else 'выкл', 'new': 'вкл' if new_val else 'выкл'})
-                setattr(article, field, new_val)
+            # Статусы — только при обычной отправке формы (не AJAX из slide-panel)
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            if not is_ajax:
+                new_statuses = {
+                    'payment_received': ('payment_received' in request.form, 'Оплата'),
+                    'has_review': ('has_review' in request.form, 'Рецензия'),
+                    'edited': ('edited' in request.form, 'Редактирование'),
+                    'has_expertise_act': ('has_expertise_act' in request.form, 'Акт эксп.'),
+                }
+                for field, (new_val, label) in new_statuses.items():
+                    old_val = getattr(article, field)
+                    if old_val != new_val:
+                        changes.append({'field': label, 'old': 'вкл' if old_val else 'выкл', 'new': 'вкл' if new_val else 'выкл'})
+                    setattr(article, field, new_val)
             
             # Загрузка файлов
             upload_folder = current_app.config['UPLOAD_FOLDER']
@@ -402,6 +404,33 @@ def register_admin_routes(app):
             if changes:
                 log_article_history(article.id, 'updated', changes)
             db.session.commit()
+
+            # AJAX-ответ для slide-panel
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                # Собираем обновлённые данные для карточки
+                authors_list = []
+                for a in sorted(article.article_authors, key=lambda x: x.order):
+                    authors_list.append({'name': a.full_name, 'degree': a.degree or ''})
+                return jsonify({
+                    'success': True,
+                    'message': 'Статья обновлена',
+                    'article': {
+                        'id': article.id,
+                        'title': article.title,
+                        'authors': authors_list,
+                        'authors_str': article.authors or '',
+                        'submission_date': article.submission_date or '',
+                        'payment': article.payment_received,
+                        'review': article.has_review,
+                        'edited': article.edited,
+                        'expertise': article.has_expertise_act,
+                        'expertise_act_file': article.expertise_act_file or '',
+                        'manuscript_file': article.manuscript_file or '',
+                        'review_file': article.review_file or '',
+                        'notes': article.notes or '',
+                    }
+                })
+
             flash('Статья обновлена', 'success')
             return redirect(f'/issue/{article.issue_id}')
         
@@ -1359,6 +1388,59 @@ def register_admin_routes(app):
             'issue': f'№{issue.number}/{issue.year}' if issue else '',
             'journal': journal.name if journal else '',
             'comment_count': comment_count
+        })
+
+    # =============================================
+    #   EDIT-DATA — JSON-данные для панели редактирования
+    # =============================================
+    @app.route('/article/<int:article_id>/edit-data')
+    @login_required
+    def article_edit_data(article_id):
+        article = Article.query.options(
+            joinedload(Article.article_authors),
+            joinedload(Article.images),
+            joinedload(Article.issue).joinedload(Issue.journal)
+        ).get_or_404(article_id)
+
+        authors = []
+        for a in sorted(article.article_authors, key=lambda x: x.order):
+            authors.append({
+                'name': a.full_name,
+                'email': a.email or '',
+                'organization': a.organization or '',
+                'degree': a.degree or '',
+                'position': a.position or '',
+                'phone': a.phone or ''
+            })
+
+        images = [{'id': img.id, 'filename': img.filename} for img in sorted(article.images, key=lambda x: x.order)]
+
+        # Разбиваем дату
+        day, month, year = '', '', ''
+        if article.submission_date:
+            parts = article.submission_date.split('.')
+            if len(parts) == 3:
+                day, month, year = parts
+
+        issue = article.issue
+        journal = issue.journal if issue else None
+
+        return jsonify({
+            'id': article.id,
+            'title': article.title or '',
+            'authors': authors,
+            'submission_day': day,
+            'submission_month': month,
+            'submission_year': year,
+            'notes': article.notes or '',
+            'manuscript_file': article.manuscript_file or '',
+            'review_file': article.review_file or '',
+            'title_pdf': article.title_pdf or '',
+            'expertise_act_file': article.expertise_act_file or '',
+            'images': images,
+            'issue_id': article.issue_id,
+            'journal_name': journal.name if journal else '',
+            'issue_label': f'№{issue.number}/{issue.year}' if issue else '',
         })
 
     # =============================================

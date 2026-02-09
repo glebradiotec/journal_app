@@ -469,7 +469,7 @@
                 {% endif %}
 
                 <div class="article-actions">
-                    <a href="/article/{{ article.id }}/edit" class="action-btn">
+                    <a href="javascript:void(0)" class="action-btn" onclick="openEditPanel({{ article.id }})">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                             <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/>
                         </svg>
@@ -617,6 +617,29 @@
         <div class="file-preview-body">
             <iframe id="filePreviewFrame" src="" style="width:100%; height:100%; border:none;"></iframe>
         </div>
+    </div>
+</div>
+
+<!-- Slide-over Edit Panel -->
+<div class="sp-overlay" id="spOverlay" onclick="closeEditPanel()"></div>
+<div class="sp-panel" id="spPanel">
+    <div class="sp-header">
+        <h3 class="sp-title">Редактирование статьи</h3>
+        <button class="sp-close" onclick="closeEditPanel()">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
+            </svg>
+        </button>
+    </div>
+    <div class="sp-body" id="spBody">
+        <p style="color:var(--color-fg-muted)">Загрузка...</p>
+    </div>
+    <div class="sp-footer">
+        <button type="button" class="sp-btn sp-btn-cancel" onclick="closeEditPanel()">Отмена</button>
+        <button type="button" class="sp-btn sp-btn-save" id="spSaveBtn" onclick="saveArticle()">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>
+            Сохранить
+        </button>
     </div>
 </div>
 
@@ -1534,6 +1557,420 @@ function applyFilters() {
 
     var counter = document.getElementById('filtersCounter');
     if (counter) counter.textContent = 'Показано ' + shown + ' из ' + total + ' статей';
+}
+
+// =============================================
+//   SLIDE-OVER EDIT PANEL
+// =============================================
+var _spArticleId = null;
+var _spNewImages = []; // {file, previewUrl}
+var _spDeleteImages = []; // image IDs to delete
+var _spDeleteFiles = {}; // {field: true}
+
+function openEditPanel(articleId) {
+    _spArticleId = articleId;
+    _spNewImages = [];
+    _spDeleteImages = [];
+    _spDeleteFiles = {};
+    var overlay = document.getElementById('spOverlay');
+    var panel = document.getElementById('spPanel');
+    var body = document.getElementById('spBody');
+    body.innerHTML = '<p style="color:var(--color-fg-muted);text-align:center;padding:40px 0">Загрузка...</p>';
+    overlay.classList.add('open');
+    // small delay for animation
+    requestAnimationFrame(function() { panel.classList.add('open'); });
+    document.body.style.overflow = 'hidden';
+
+    fetch('/article/' + articleId + '/edit-data')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            body.innerHTML = buildEditForm(data);
+            initSpDragDrop();
+        })
+        .catch(function(err) {
+            body.innerHTML = '<p style="color:var(--color-danger-fg);text-align:center;padding:40px 0">Ошибка загрузки</p>';
+        });
+}
+
+function closeEditPanel() {
+    var overlay = document.getElementById('spOverlay');
+    var panel = document.getElementById('spPanel');
+    panel.classList.remove('open');
+    setTimeout(function() {
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+    }, 350);
+    _spArticleId = null;
+    _spNewImages = [];
+}
+
+function escAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function buildEditForm(data) {
+    var h = '';
+
+    // Title
+    h += '<div class="sp-section">';
+    h += '<label class="sp-label">Название статьи</label>';
+    h += '<input type="text" class="sp-input" id="spTitle" value="' + escAttr(data.title) + '">';
+    h += '</div>';
+
+    // Date
+    h += '<div class="sp-section">';
+    h += '<label class="sp-label">Дата поступления</label>';
+    h += '<div class="sp-date-row">';
+    h += buildDaySelect(data.submission_day);
+    h += buildMonthSelect(data.submission_month);
+    h += buildYearSelect(data.submission_year);
+    h += '</div>';
+    h += '</div>';
+
+    // Authors
+    h += '<div class="sp-section">';
+    h += '<div class="sp-section-title">Авторы</div>';
+    h += '<div id="spAuthors">';
+    if (data.authors && data.authors.length) {
+        data.authors.forEach(function(a, i) { h += buildAuthorCard(a, i); });
+    } else {
+        h += buildAuthorCard({name:'',email:'',organization:'',degree:'',position:'',phone:''}, 0);
+    }
+    h += '</div>';
+    h += '<button type="button" class="sp-add-author" onclick="spAddAuthor()">+ Добавить автора</button>';
+    h += '</div>';
+
+    // Files
+    h += '<div class="sp-section">';
+    h += '<div class="sp-section-title">Файлы</div>';
+    h += '<div class="sp-files-grid">';
+    h += buildFileItem('Текст статьи', 'manuscript_file', data.manuscript_file, '.doc,.docx,.pdf');
+    h += buildFileItem('Рецензия', 'review_file', data.review_file, '.doc,.docx,.pdf,.txt');
+    h += buildFileItem('Титульная', 'title_pdf', data.title_pdf, '.pdf');
+    h += buildFileItem('Акт эксп.', 'expertise_act_file', data.expertise_act_file, '.pdf,.jpg,.png,.doc,.docx');
+    h += '</div>';
+    h += '</div>';
+
+    // Images
+    h += '<div class="sp-section">';
+    h += '<div class="sp-section-title">Изображения</div>';
+    h += '<div class="sp-images-grid" id="spImagesGrid">';
+    if (data.images && data.images.length) {
+        data.images.forEach(function(img) {
+            h += '<div class="sp-img-item" id="spImg' + img.id + '">';
+            h += '<img src="/uploads/' + encodeURIComponent(img.filename) + '" alt="">';
+            h += '<button class="sp-img-delete" onclick="spToggleDeleteImage(' + img.id + ', this)" title="Удалить">&times;</button>';
+            h += '</div>';
+        });
+    }
+    h += '<div class="sp-img-drop" id="spImgDrop" onclick="document.getElementById(\'spImgInput\').click()"';
+    h += ' ondragenter="event.preventDefault();this.classList.add(\'drop-active\')"';
+    h += ' ondragover="event.preventDefault();this.classList.add(\'drop-active\')"';
+    h += ' ondragleave="event.preventDefault();this.classList.remove(\'drop-active\')"';
+    h += ' ondrop="event.preventDefault();this.classList.remove(\'drop-active\');spHandleImageDrop(event)">';
+    h += 'Перетащите или нажмите</div>';
+    h += '</div>';
+    h += '<input type="file" id="spImgInput" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp" multiple style="display:none" onchange="spHandleImageSelect(this)">';
+    h += '</div>';
+
+    // Notes
+    h += '<div class="sp-section">';
+    h += '<label class="sp-label">Заметки</label>';
+    h += '<textarea class="sp-textarea" id="spNotes" rows="3">' + escAttr(data.notes) + '</textarea>';
+    h += '</div>';
+
+    return h;
+}
+
+// --- Date builders ---
+function buildDaySelect(val) {
+    var h = '<select class="sp-select" id="spDay"><option value="">День</option>';
+    for (var d = 1; d <= 31; d++) {
+        var ds = d < 10 ? '0' + d : '' + d;
+        h += '<option value="' + ds + '"' + (ds === val ? ' selected' : '') + '>' + d + '</option>';
+    }
+    return h + '</select>';
+}
+function buildMonthSelect(val) {
+    var months = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    var h = '<select class="sp-select" id="spMonth"><option value="">Месяц</option>';
+    for (var m = 1; m <= 12; m++) {
+        var ms = m < 10 ? '0' + m : '' + m;
+        h += '<option value="' + ms + '"' + (ms === val ? ' selected' : '') + '>' + months[m] + '</option>';
+    }
+    return h + '</select>';
+}
+function buildYearSelect(val) {
+    var h = '<select class="sp-select" id="spYear"><option value="">Год</option>';
+    var now = new Date().getFullYear();
+    for (var y = now; y >= 2000; y--) {
+        var ys = '' + y;
+        h += '<option value="' + ys + '"' + (ys === val ? ' selected' : '') + '>' + y + '</option>';
+    }
+    return h + '</select>';
+}
+
+// --- Author cards ---
+var _spAuthorIdx = 100;
+function buildAuthorCard(a, idx) {
+    var id = 'spA' + idx;
+    var hasExtra = a.degree || a.position || a.phone;
+    var h = '<div class="sp-author-card" id="' + id + '">';
+    h += '<div class="sp-author-main">';
+    h += '<input class="sp-input sp-author-name" placeholder="ФИО *" value="' + escAttr(a.name) + '">';
+    h += '<input class="sp-input sp-author-email" placeholder="Email" value="' + escAttr(a.email) + '" style="max-width:180px">';
+    h += '</div>';
+    h += '<input class="sp-input sp-author-org" placeholder="Организация" value="' + escAttr(a.organization) + '" style="margin-bottom:6px">';
+    h += '<div class="sp-author-extra' + (hasExtra ? ' open' : '') + '">';
+    h += '<input class="sp-input sp-author-degree" placeholder="Учёная степень" value="' + escAttr(a.degree) + '">';
+    h += '<input class="sp-input sp-author-position" placeholder="Должность" value="' + escAttr(a.position) + '">';
+    h += '<input class="sp-input sp-author-phone" placeholder="Телефон" value="' + escAttr(a.phone) + '">';
+    h += '</div>';
+    h += '<div class="sp-author-actions">';
+    h += '<button type="button" class="sp-author-toggle" onclick="this.closest(\'.sp-author-card\').querySelector(\'.sp-author-extra\').classList.toggle(\'open\')">Подробнее</button>';
+    h += '<button type="button" class="sp-author-remove" onclick="spRemoveAuthor(this)">&times; Удалить</button>';
+    h += '</div>';
+    h += '</div>';
+    return h;
+}
+
+function spAddAuthor() {
+    var container = document.getElementById('spAuthors');
+    _spAuthorIdx++;
+    container.insertAdjacentHTML('beforeend', buildAuthorCard({name:'',email:'',organization:'',degree:'',position:'',phone:''}, _spAuthorIdx));
+}
+
+function spRemoveAuthor(btn) {
+    var card = btn.closest('.sp-author-card');
+    var container = document.getElementById('spAuthors');
+    if (container.querySelectorAll('.sp-author-card').length > 1) {
+        card.remove();
+    } else {
+        showToast('Должен быть хотя бы один автор', 'error');
+    }
+}
+
+// --- File items ---
+function buildFileItem(label, fieldName, currentFile, accept) {
+    var h = '<div class="sp-file-item" data-field="' + fieldName + '">';
+    h += '<div class="sp-file-label">' + label + '</div>';
+    if (currentFile) {
+        h += '<div class="sp-file-current" id="spCur_' + fieldName + '">';
+        h += '<a href="/uploads/' + encodeURIComponent(currentFile) + '" target="_blank" title="' + escAttr(currentFile) + '">' + escAttr(currentFile.length > 25 ? currentFile.substring(0,22) + '...' : currentFile) + '</a>';
+        h += '<span class="sp-file-delete" onclick="spDeleteFile(\'' + fieldName + '\')">Удалить</span>';
+        h += '</div>';
+    }
+    h += '<div class="sp-file-drop" id="spDrop_' + fieldName + '" onclick="document.getElementById(\'spFile_' + fieldName + '\').click()"';
+    h += ' ondragenter="event.preventDefault();this.classList.add(\'drop-active\')"';
+    h += ' ondragover="event.preventDefault();this.classList.add(\'drop-active\')"';
+    h += ' ondragleave="event.preventDefault();this.classList.remove(\'drop-active\')"';
+    h += ' ondrop="event.preventDefault();this.classList.remove(\'drop-active\');spDropFile(event,\'' + fieldName + '\')">';
+    h += '<span class="sp-file-drop-text">Перетащите или нажмите</span>';
+    h += '</div>';
+    h += '<input type="file" id="spFile_' + fieldName + '" accept="' + accept + '" style="display:none" onchange="spFileSelected(this,\'' + fieldName + '\')">';
+    h += '</div>';
+    return h;
+}
+
+function spDeleteFile(fieldName) {
+    _spDeleteFiles[fieldName] = true;
+    var cur = document.getElementById('spCur_' + fieldName);
+    if (cur) cur.style.display = 'none';
+}
+
+function spDropFile(e, fieldName) {
+    var input = document.getElementById('spFile_' + fieldName);
+    if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        spFileSelected(input, fieldName);
+    }
+}
+
+function spFileSelected(input, fieldName) {
+    var drop = document.getElementById('spDrop_' + fieldName);
+    if (input.files && input.files.length) {
+        drop.innerHTML = '<span class="sp-file-drop-name">' + escHtml(input.files[0].name) + '</span>';
+        drop.classList.add('has-file');
+        // If replacing, remove delete flag
+        delete _spDeleteFiles[fieldName];
+    }
+}
+
+// --- Images ---
+function spToggleDeleteImage(imgId, btn) {
+    var item = document.getElementById('spImg' + imgId);
+    var idx = _spDeleteImages.indexOf(imgId);
+    if (idx === -1) {
+        _spDeleteImages.push(imgId);
+        item.classList.add('marked-delete');
+    } else {
+        _spDeleteImages.splice(idx, 1);
+        item.classList.remove('marked-delete');
+    }
+}
+
+function spHandleImageDrop(e) {
+    var files = e.dataTransfer.files;
+    for (var i = 0; i < files.length; i++) {
+        if (files[i].type.startsWith('image/')) spAddNewImage(files[i]);
+    }
+}
+
+function spHandleImageSelect(input) {
+    if (input.files) {
+        for (var i = 0; i < input.files.length; i++) {
+            spAddNewImage(input.files[i]);
+        }
+    }
+    input.value = '';
+}
+
+function spAddNewImage(file) {
+    var url = URL.createObjectURL(file);
+    var idx = _spNewImages.length;
+    _spNewImages.push({file: file, url: url});
+    var grid = document.getElementById('spImagesGrid');
+    var drop = document.getElementById('spImgDrop');
+    var div = document.createElement('div');
+    div.className = 'sp-img-item';
+    div.id = 'spNewImg' + idx;
+    div.innerHTML = '<img src="' + url + '" alt=""><button class="sp-img-delete" onclick="spRemoveNewImage(' + idx + ')" title="Удалить">&times;</button>';
+    grid.insertBefore(div, drop);
+}
+
+function spRemoveNewImage(idx) {
+    _spNewImages[idx] = null;
+    var el = document.getElementById('spNewImg' + idx);
+    if (el) el.remove();
+}
+
+// --- Drag & Drop initialization for file zones ---
+function initSpDragDrop() {
+    // Already handled via inline events in HTML
+}
+
+// --- Save ---
+function saveArticle() {
+    if (!_spArticleId) return;
+    var btn = document.getElementById('spSaveBtn');
+    var origHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="sp-spinner"></span> Сохранение...';
+    btn.disabled = true;
+
+    var fd = new FormData();
+
+    // Title
+    fd.append('title', document.getElementById('spTitle').value);
+
+    // Date
+    fd.append('submission_day', document.getElementById('spDay').value);
+    fd.append('submission_month', document.getElementById('spMonth').value);
+    fd.append('submission_year', document.getElementById('spYear').value);
+
+    // Notes
+    fd.append('notes', document.getElementById('spNotes').value);
+
+    // Authors
+    var cards = document.querySelectorAll('#spAuthors .sp-author-card');
+    cards.forEach(function(card) {
+        fd.append('author_name[]', card.querySelector('.sp-author-name').value);
+        fd.append('author_email[]', card.querySelector('.sp-author-email').value);
+        fd.append('author_organization[]', card.querySelector('.sp-author-org').value);
+        fd.append('author_degree[]', card.querySelector('.sp-author-degree').value);
+        fd.append('author_position[]', card.querySelector('.sp-author-position').value);
+        fd.append('author_phone[]', card.querySelector('.sp-author-phone').value);
+    });
+
+    // Files
+    var fileFields = ['manuscript_file', 'review_file', 'title_pdf', 'expertise_act_file'];
+    fileFields.forEach(function(field) {
+        var input = document.getElementById('spFile_' + field);
+        if (input && input.files && input.files.length) {
+            fd.append(field, input.files[0]);
+        }
+    });
+
+    // Delete files
+    if (_spDeleteFiles['manuscript_file']) fd.append('delete_manuscript', '1');
+    if (_spDeleteFiles['review_file']) fd.append('delete_review', '1');
+    if (_spDeleteFiles['title_pdf']) fd.append('delete_title_pdf', '1');
+    if (_spDeleteFiles['expertise_act_file']) fd.append('delete_expertise_act', '1');
+
+    // Delete images
+    _spDeleteImages.forEach(function(id) {
+        fd.append('delete_image[]', id);
+    });
+
+    // New images
+    _spNewImages.forEach(function(item) {
+        if (item && item.file) fd.append('article_images', item.file);
+    });
+
+    fetch('/article/' + _spArticleId + '/edit', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: fd
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            showToast(data.message || 'Статья сохранена', 'success');
+            updateArticleCard(data.article);
+            closeEditPanel();
+        } else {
+            showToast('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'error');
+        }
+    })
+    .catch(function(err) {
+        showToast('Ошибка сети', 'error');
+    })
+    .finally(function() {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    });
+}
+
+// Close panel on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && _spArticleId) closeEditPanel();
+});
+
+function updateArticleCard(article) {
+    // Find the card by article ID
+    var cards = document.querySelectorAll('.article-card');
+    cards.forEach(function(card) {
+        // Match by edit button data or by title link
+        var editBtn = card.querySelector('[onclick*="openEditPanel(' + article.id + ')"]');
+        if (!editBtn) return;
+
+        // Update title
+        var titleEl = card.querySelector('.article-title');
+        if (titleEl) titleEl.textContent = article.title;
+
+        // Update authors
+        var authorsEl = card.querySelector('.article-authors');
+        if (authorsEl && article.authors) {
+            var authHtml = '';
+            article.authors.forEach(function(a, i) {
+                authHtml += '<span class="author-chip"><span class="author-name">' + escHtml(a.name) + '</span>';
+                if (a.degree) authHtml += '<span class="author-degree">' + escHtml(a.degree) + '</span>';
+                authHtml += '</span>';
+                if (i < article.authors.length - 1) authHtml += '<span class="author-sep">,</span> ';
+            });
+            authorsEl.innerHTML = authHtml;
+        }
+
+        // Update data attributes
+        card.dataset.payment = article.payment ? 'true' : 'false';
+        card.dataset.review = article.review ? 'true' : 'false';
+        card.dataset.edited = article.edited ? 'true' : 'false';
+        card.dataset.expertise = article.expertise ? 'true' : 'false';
+        if (article.submission_date) card.dataset.date = article.submission_date;
+
+        // Update expertise button has-file
+        var expBtn = card.querySelector('[data-field="expertise"]');
+        if (expBtn) {
+            expBtn.dataset.hasFile = article.expertise_act_file ? 'true' : 'false';
+        }
+    });
 }
 </script>
 
@@ -3313,6 +3750,312 @@ function applyFilters() {
         width: 100%;
         justify-content: center;
     }
+}
+
+/* ========================================
+   SLIDE-OVER EDIT PANEL
+   ======================================== */
+.sp-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1200;
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.sp-overlay.open { display: block; opacity: 1; }
+
+.sp-panel {
+    position: fixed;
+    top: 0; right: 0;
+    width: 600px;
+    max-width: 100vw;
+    height: 100vh;
+    z-index: 1201;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-canvas-default);
+    border-left: 1px solid var(--color-border-default);
+    box-shadow: -8px 0 32px rgba(0,0,0,0.15);
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sp-panel.open { transform: translateX(0); }
+
+.sp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--color-border-default);
+    background: var(--color-canvas-subtle);
+    flex-shrink: 0;
+}
+.sp-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+.sp-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--color-fg-muted);
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+.sp-close:hover { color: var(--color-fg-default); background: var(--color-canvas-inset); }
+
+.sp-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+}
+
+.sp-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--color-border-default);
+    background: var(--color-canvas-subtle);
+    flex-shrink: 0;
+}
+
+.sp-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-default);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.sp-btn-cancel {
+    background: var(--color-canvas-default);
+    color: var(--color-fg-muted);
+}
+.sp-btn-cancel:hover { background: var(--color-canvas-subtle); }
+.sp-btn-save {
+    background: var(--color-accent-emphasis);
+    color: #fff;
+    border-color: var(--color-accent-emphasis);
+}
+.sp-btn-save:hover { opacity: 0.9; }
+.sp-btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Form sections inside panel */
+.sp-section { margin-bottom: 20px; }
+.sp-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border-muted);
+}
+.sp-input, .sp-select, .sp-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    background: var(--color-canvas-default);
+    color: var(--color-fg-default);
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+.sp-input:focus, .sp-select:focus, .sp-textarea:focus {
+    outline: none;
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 0 0 3px rgba(91,164,176,0.15);
+}
+.sp-textarea { resize: vertical; min-height: 60px; }
+.sp-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-muted);
+    margin-bottom: 4px;
+}
+.sp-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.sp-row > * { flex: 1; }
+
+/* Authors inside panel */
+.sp-author-card {
+    padding: 12px;
+    border: 1px solid var(--color-border-default);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: var(--color-canvas-subtle);
+    position: relative;
+}
+.sp-author-main { display: flex; gap: 8px; margin-bottom: 6px; }
+.sp-author-main .sp-input { flex: 1; }
+.sp-author-extra { display: none; gap: 8px; flex-wrap: wrap; }
+.sp-author-extra.open { display: flex; }
+.sp-author-extra .sp-input { flex: 1; min-width: 140px; }
+.sp-author-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+}
+.sp-author-toggle, .sp-author-remove {
+    background: none; border: none; cursor: pointer;
+    font-size: 12px; color: var(--color-fg-muted);
+    padding: 2px 6px; border-radius: 4px;
+}
+.sp-author-toggle:hover, .sp-author-remove:hover {
+    background: var(--color-canvas-inset);
+    color: var(--color-fg-default);
+}
+.sp-author-remove:hover { color: var(--color-danger-fg); }
+.sp-add-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none; border: 1px dashed var(--color-border-default);
+    border-radius: 8px; padding: 8px 14px; cursor: pointer;
+    font-size: 13px; color: var(--color-fg-muted);
+    transition: all 0.15s;
+    width: 100%;
+    justify-content: center;
+}
+.sp-add-author:hover { border-color: var(--color-accent-fg); color: var(--color-accent-fg); }
+
+/* Files inside panel */
+.sp-files-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sp-file-item {
+    border: 1px solid var(--color-border-default);
+    border-radius: 10px;
+    padding: 10px;
+    background: var(--color-canvas-subtle);
+}
+.sp-file-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    margin-bottom: 6px;
+}
+.sp-file-current {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: var(--color-canvas-default);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+.sp-file-current a {
+    color: var(--color-accent-fg);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+}
+.sp-file-current a:hover { text-decoration: underline; }
+.sp-file-delete {
+    font-size: 11px;
+    color: var(--color-danger-fg);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.sp-file-drop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 8px;
+    border: 2px dashed var(--color-border-default);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    transition: all 0.2s;
+    min-height: 40px;
+}
+.sp-file-drop:hover { border-color: var(--color-accent-fg); color: var(--color-accent-fg); }
+.sp-file-drop.drop-active { border-color: var(--color-accent-fg); background: rgba(91,164,176,0.1); }
+.sp-file-drop.has-file { border-color: var(--color-success-fg, #2da44e); border-style: solid; background: rgba(45,164,78,0.05); }
+.sp-file-drop-name { font-weight: 500; color: var(--color-fg-default); word-break: break-all; text-align: center; }
+
+/* Images in panel */
+.sp-images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+}
+.sp-img-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--color-border-default);
+    aspect-ratio: 1;
+}
+.sp-img-item img {
+    width: 100%; height: 100%; object-fit: cover;
+    display: block;
+}
+.sp-img-delete {
+    position: absolute; top: 2px; right: 2px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(207,34,46,0.85);
+    color: #fff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; line-height: 1;
+    opacity: 0; transition: opacity 0.15s;
+}
+.sp-img-item:hover .sp-img-delete { opacity: 1; }
+.sp-img-item.marked-delete { opacity: 0.35; }
+.sp-img-drop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--color-border-default);
+    border-radius: 8px;
+    min-height: 80px;
+    cursor: pointer;
+    color: var(--color-fg-muted);
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+    transition: all 0.2s;
+    grid-column: 1 / -1;
+}
+.sp-img-drop:hover { border-color: var(--color-accent-fg); color: var(--color-accent-fg); }
+.sp-img-drop.drop-active { border-color: var(--color-accent-fg); background: rgba(91,164,176,0.1); }
+
+/* Date row */
+.sp-date-row { display: flex; gap: 8px; }
+.sp-date-row .sp-select { width: auto; min-width: 70px; }
+
+/* Loading state */
+.sp-saving .sp-btn-save { pointer-events: none; }
+@keyframes spSpin {
+    to { transform: rotate(360deg); }
+}
+.sp-spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spSpin 0.6s linear infinite;
+}
+
+@media (max-width: 640px) {
+    .sp-panel { width: 100vw; }
+    .sp-files-grid { grid-template-columns: 1fr; }
 }
 </style>
 {% endblock %}
