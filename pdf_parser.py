@@ -39,6 +39,8 @@ _ORG_KEYWORDS = (
     'университет', 'институт', 'академия', 'нии',
     'мгту', 'мгу', 'мирэа', 'мфти', 'мифи', 'вунц',
     'факультет', 'кафедра', 'лаборатория', 'центр',
+    'им.', 'имени',  # Учреждения «имени кого-то» (РХТУ им. Менделеева, и т.д.)
+    'фгаоу', 'фгбоу', 'фгбну', 'фгуп',  # Федеральные учреждения
     'university', 'institute', 'academy', 'college', 'department',
     'laboratory', 'research center', 'school of',
 )
@@ -548,10 +550,13 @@ def parse_article_docx(file_path):
             last_email_idx = idx_m.group(1)
         else:
             # Вариант 2: индекс через пробел перед email: "1 tujh98@mail.ru"
-            before = author_text_raw[max(0, m.start() - 5):m.start()]
-            before_idx = re.search(r'(\d{1,2})\s*$', before)
-            if before_idx:
-                last_email_idx = before_idx.group(1)
+            # Ищем от последнего разделителя (запятая/перенос строки) до email
+            # и проверяем, что между ними только 1-2 цифры (а не "д. 36" из адреса)
+            sep_pos = max(author_text_raw.rfind('\n', 0, m.start()),
+                          author_text_raw.rfind(',', 0, m.start()))
+            between = author_text_raw[sep_pos + 1:m.start()].strip()
+            if re.match(r'^\d{1,2}$', between):
+                last_email_idx = between
         clean = _strip_leading_indices(raw_email)
         emails_flat.append(clean)
         if last_email_idx is not None:
@@ -627,26 +632,28 @@ def parse_article_docx(file_path):
                     break
 
     # --- Шаг 6: собираем авторов ---
-    has_indices = bool(name_to_index)
+    # Email и организации привязываем по индексам независимо друг от друга;
+    # если индексированных данных нет — фоллбэк по порядку
+    use_email_idx = bool(email_by_index)
+    use_org_idx = bool(org_by_index)
     authors = []
     for i, name in enumerate(all_names):
         author = {"name": name, "email": "", "organization": ""}
+        idx = name_to_index.get(name)
 
-        if has_indices and name in name_to_index:
-            # Привязка по индексам аффилиаций
-            idx = name_to_index[name]
-            if idx in email_by_index:
-                author["email"] = ", ".join(email_by_index[idx])
-            if idx in org_by_index:
-                author["organization"] = "; ".join(org_by_index[idx])
-        else:
-            # Фоллбэк: по порядку
-            if i < len(emails_flat):
-                author["email"] = emails_flat[i]
-            if len(organizations) == 1:
-                author["organization"] = organizations[0]
-            elif organizations and i < len(organizations):
-                author["organization"] = organizations[i]
+        # --- Email ---
+        if use_email_idx and idx and idx in email_by_index:
+            author["email"] = ", ".join(email_by_index[idx])
+        elif i < len(emails_flat):
+            author["email"] = emails_flat[i]
+
+        # --- Организация ---
+        if use_org_idx and idx and idx in org_by_index:
+            author["organization"] = "; ".join(org_by_index[idx])
+        elif len(organizations) == 1:
+            author["organization"] = organizations[0]
+        elif organizations and i < len(organizations):
+            author["organization"] = organizations[i]
 
         authors.append(author)
 
