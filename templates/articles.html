@@ -169,7 +169,7 @@
                                 <option value="10">10</option><option value="11">11</option><option value="12">12</option>
                             </select>
                             <select name="submission_year" class="form-select-sm">
-                                {% for y in range(2024, 2031) %}<option value="{{ y }}" {% if y == 2026 %}selected{% endif %}>{{ y }}</option>{% endfor %}
+                                {% for y in range(2025, 2028) %}<option value="{{ y }}" {% if y == 2026 %}selected{% endif %}>{{ y }}</option>{% endfor %}
                             </select>
                         </div>
                     </div>
@@ -1706,8 +1706,7 @@ function buildMonthSelect(val) {
 }
 function buildYearSelect(val) {
     var h = '<select class="sp-select" id="spYear"><option value="">Год</option>';
-    var now = new Date().getFullYear();
-    for (var y = now; y >= 2000; y--) {
+    for (var y = 2025; y <= 2027; y++) {
         var ys = '' + y;
         h += '<option value="' + ys + '"' + (ys === val ? ' selected' : '') + '>' + y + '</option>';
     }

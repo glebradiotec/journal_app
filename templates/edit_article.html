@@ -65,7 +65,7 @@
                         </select>
                         <select name="submission_year" class="form-select">
                             <option value="">Год</option>
-                            {% for y in range(2020, 2031) %}
+                            {% for y in range(2025, 2028) %}
                             <option value="{{ y }}" {% if date_parts[2]|string == y|string %}selected{% endif %}>{{ y }}</option>
                             {% endfor %}
                         </select>
