@@ -157,6 +157,8 @@ def _filtered_articles_query(journal_id=None, status_filter='', search=''):
         query = query.filter(Article.has_review == False)
     elif status_filter == 'not_edited':
         query = query.filter(Article.edited == False)
+    elif status_filter == 'no_expertise':
+        query = query.filter(Article.has_expertise_act == False)
     if search:
         like_pattern = f'%{search}%'
         query = query.filter(
@@ -175,7 +177,7 @@ def _build_filter_description(journal_id=None, status_filter='', search=''):
         journal = Journal.query.get(journal_id)
         if journal:
             parts.append(f'Журнал: {journal.name}')
-    status_names = {'unpaid': 'Без оплаты', 'no_review': 'Без рецензии', 'not_edited': 'Не отредактировано'}
+    status_names = {'unpaid': 'Без оплаты', 'no_review': 'Без рецензии', 'not_edited': 'Не отредактировано', 'no_expertise': 'Без акта эксп.'}
     if status_filter in status_names:
         parts.append(f'Статус: {status_names[status_filter]}')
     if search:
@@ -551,6 +553,7 @@ def register_admin_routes(app):
             unpaid = Article.query.filter_by(payment_received=False).count()
             no_review = Article.query.filter_by(has_review=False).count()
             not_edited = Article.query.filter_by(edited=False).count()
+            no_expertise = Article.query.filter_by(has_expertise_act=False).count()
             
             stats = {
                 'journals': Journal.query.count(),
@@ -559,6 +562,7 @@ def register_admin_routes(app):
                 'unpaid': unpaid,
                 'no_review': no_review,
                 'not_edited': not_edited,
+                'no_expertise': no_expertise,
             }
             recent_articles = (
                 Article.query
@@ -590,16 +594,18 @@ def register_admin_routes(app):
                 'no_review': no_review,
                 'edited': total_articles - not_edited,
                 'not_edited': not_edited,
+                'with_expertise': total_articles - no_expertise,
+                'no_expertise': no_expertise,
             }
             
             
         except Exception:
-            stats = {'journals': 0, 'issues': 0, 'articles': 0, 'unpaid': 0, 'no_review': 0, 'not_edited': 0}
+            stats = {'journals': 0, 'issues': 0, 'articles': 0, 'unpaid': 0, 'no_review': 0, 'not_edited': 0, 'no_expertise': 0}
             recent_articles = []
             recent_activity = []
             chart_data = []
             max_articles = 0
-            status_data = {'paid': 0, 'unpaid': 0, 'reviewed': 0, 'no_review': 0, 'edited': 0, 'not_edited': 0}
+            status_data = {'paid': 0, 'unpaid': 0, 'reviewed': 0, 'no_review': 0, 'edited': 0, 'not_edited': 0, 'with_expertise': 0, 'no_expertise': 0}
 
         return render_template('admin/dashboard.html', 
                                stats=stats, 
@@ -717,6 +723,8 @@ def register_admin_routes(app):
             query = query.filter(Article.has_review == False)
         elif status_filter == 'not_edited':
             query = query.filter(Article.edited == False)
+        elif status_filter == 'no_expertise':
+            query = query.filter(Article.has_expertise_act == False)
         
         if search:
             like_pattern = f'%{search}%'
@@ -884,14 +892,14 @@ def register_admin_routes(app):
         summary_font = Font(bold=True, size=11, color='0969DA')
 
         # --- Заголовок отчёта ---
-        ws.merge_cells('A1:I1')
+        ws.merge_cells('A1:J1')
         title_cell = ws['A1']
         title_cell.value = 'Экспорт статей'
         title_cell.font = title_font
         title_cell.alignment = Alignment(vertical='center')
         ws.row_dimensions[1].height = 28
 
-        ws.merge_cells('A2:I2')
+        ws.merge_cells('A2:J2')
         sub_cell = ws['A2']
         sub_cell.value = f'{filter_desc}  |  Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}'
         sub_cell.font = subtitle_font
@@ -902,7 +910,7 @@ def register_admin_routes(app):
         ws.row_dimensions[3].height = 6
 
         # --- Заголовки таблицы (строка 4) ---
-        headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.']
+        headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.', 'Акт эксп.']
         for col_idx, h in enumerate(headers, 1):
             cell = ws.cell(row=4, column=col_idx, value=h)
             cell.fill = header_fill
@@ -912,7 +920,7 @@ def register_admin_routes(app):
         ws.row_dimensions[4].height = 26
 
         # --- Данные ---
-        paid_count = reviewed_count = edited_count = 0
+        paid_count = reviewed_count = edited_count = expertise_count = 0
         for row_idx, article in enumerate(articles, 1):
             r = row_idx + 4  # строки данных начинаются с 5
 
@@ -926,6 +934,8 @@ def register_admin_routes(app):
                 reviewed_count += 1
             if article.edited:
                 edited_count += 1
+            if article.has_expertise_act:
+                expertise_count += 1
 
             row_data = [
                 row_idx,
@@ -937,6 +947,7 @@ def register_admin_routes(app):
                 'Да' if article.payment_received else 'Нет',
                 'Да' if article.has_review else 'Нет',
                 'Да' if article.edited else 'Нет',
+                'Да' if article.has_expertise_act else 'Нет',
             ]
 
             for col_idx, val in enumerate(row_data, 1):
@@ -949,7 +960,7 @@ def register_admin_routes(app):
                     cell.fill = row_even_fill
 
             # Условное форматирование статусов (колонки 7, 8, 9)
-            for col in (7, 8, 9):
+            for col in (7, 8, 9, 10):
                 cell = ws.cell(row=r, column=col)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 if cell.value == 'Да':
@@ -979,7 +990,7 @@ def register_admin_routes(app):
                 cell.fill = summary_fill
                 cell.border = thin_border
 
-            for col, count, label in [(7, paid_count, 'Оплата'), (8, reviewed_count, 'Рецензия'), (9, edited_count, 'Редакт.')]:
+            for col, count, label in [(7, paid_count, 'Оплата'), (8, reviewed_count, 'Рецензия'), (9, edited_count, 'Редакт.'), (10, expertise_count, 'Акт эксп.')]:
                 cell = ws.cell(row=sr, column=col, value=f'{count}/{total}')
                 cell.font = summary_font
                 cell.fill = summary_fill
@@ -987,7 +998,7 @@ def register_admin_routes(app):
                 cell.border = thin_border
 
         # --- Ширина колонок (auto-fit-like) ---
-        col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11}
+        col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11, 'J': 12}
         for col_letter, w in col_widths.items():
             ws.column_dimensions[col_letter].width = w
 
@@ -1027,7 +1038,7 @@ def register_admin_routes(app):
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.'])
+        writer.writerow(['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.', 'Акт эксп.'])
 
         for idx, article in enumerate(articles, 1):
             authors = ", ".join([a.full_name for a in article.article_authors]) if article.article_authors else (article.authors or "-")
@@ -1044,6 +1055,7 @@ def register_admin_routes(app):
                 "Да" if article.payment_received else "Нет",
                 "Да" if article.has_review else "Нет",
                 "Да" if article.edited else "Нет",
+                "Да" if article.has_expertise_act else "Нет",
             ])
 
         output.seek(0)

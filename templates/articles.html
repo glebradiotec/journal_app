@@ -42,6 +42,7 @@
     {% set paid_count = articles|selectattr('payment_received')|list|length %}
     {% set review_count = articles|selectattr('has_review')|list|length %}
     {% set edited_count = articles|selectattr('edited')|list|length %}
+    {% set expertise_count = articles|selectattr('has_expertise_act')|list|length %}
     
     <div class="stats-bar">
         <div class="stat-item">
@@ -74,6 +75,14 @@
             </svg>
             <span class="stat-value" id="stat-edited">{{ edited_count }}</span>
             <span class="stat-label">отредактировано</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item stat-item-purple">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8.75 1.75V5a.75.75 0 0 0 .75.75h3.25v7.5a.25.25 0 0 1-.25.25h-8.5a.25.25 0 0 1-.25-.25v-11.5a.25.25 0 0 1 .25-.25Zm2.5 3.5V2.507l2.243 2.243h-1.993a.25.25 0 0 1-.25-.25ZM3.75 0A1.75 1.75 0 0 0 2 1.75v12.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0 0 14 14.25V5.664a1.75 1.75 0 0 0-.513-1.237l-2.914-2.914A1.75 1.75 0 0 0 9.336 1H3.75Z"/>
+            </svg>
+            <span class="stat-value" id="stat-expertise">{{ expertise_count }}</span>
+            <span class="stat-label">с актом</span>
         </div>
     </div>
 
@@ -293,6 +302,8 @@
                         <option value="unreviewed">Без рецензии</option>
                         <option value="edited">Отредактировано</option>
                         <option value="unedited">Не отредактировано</option>
+                        <option value="with_expertise">С актом эксп.</option>
+                        <option value="no_expertise">Без акта эксп.</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -309,7 +320,7 @@
 
         <div class="articles-list">
             {% for article in articles %}
-            <div class="article-card" data-payment="{{ 'true' if article.payment_received else 'false' }}" data-review="{{ 'true' if article.has_review else 'false' }}" data-edited="{{ 'true' if article.edited else 'false' }}" data-date="{{ article.submission_date or '' }}">
+            <div class="article-card" data-payment="{{ 'true' if article.payment_received else 'false' }}" data-review="{{ 'true' if article.has_review else 'false' }}" data-edited="{{ 'true' if article.edited else 'false' }}" data-expertise="{{ 'true' if article.has_expertise_act else 'false' }}" data-date="{{ article.submission_date or '' }}">
                 <div class="article-card-main">
                     <div class="article-info">
                         <h3 class="article-title" onclick="quickView({{ article.id }}, null, event)" style="cursor:pointer">{{ article.title }}</h3>
@@ -1501,6 +1512,8 @@ function applyFilters() {
         if (activeFilter === 'unreviewed' && card.dataset.review !== 'false') show = false;
         if (activeFilter === 'edited' && card.dataset.edited !== 'true') show = false;
         if (activeFilter === 'unedited' && card.dataset.edited !== 'false') show = false;
+        if (activeFilter === 'with_expertise' && card.dataset.expertise !== 'true') show = false;
+        if (activeFilter === 'no_expertise' && card.dataset.expertise !== 'false') show = false;
 
         // Date filter
         if (dateFilter !== 'all' && card.dataset.date) {
@@ -1648,10 +1661,12 @@ function applyFilters() {
 .stat-item-green { color: #1a7f37; }
 .stat-item-blue { color: #5BA4B0; }
 .stat-item-orange { color: #9a6700; }
+.stat-item-purple { color: #8250df; }
 
 [data-theme="dark"] .stat-item-green { color: #3fb950; }
 [data-theme="dark"] .stat-item-blue { color: #7CC5D0; }
 [data-theme="dark"] .stat-item-orange { color: #d29922; }
+[data-theme="dark"] .stat-item-purple { color: #a371f7; }
 
 .stat-value {
     font-size: 16px;

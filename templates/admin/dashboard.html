@@ -138,6 +138,11 @@
                 <span class="adm-strip-num adm-strip-warn">{{ stats.not_edited }}</span>
                 <span class="adm-strip-label">не отред.</span>
             </div>
+            <div class="adm-strip-sep"></div>
+            <div class="adm-strip-item">
+                <span class="adm-strip-num adm-strip-warn">{{ stats.no_expertise }}</span>
+                <span class="adm-strip-label">без акта</span>
+            </div>
         </div>
 
         <!-- Charts Row: Bar + Doughnut -->
@@ -211,6 +216,7 @@
                     {% set paid_pct = ((stats.articles - stats.unpaid) / stats.articles * 100)|round(0)|int %}
                     {% set review_pct = ((stats.articles - stats.no_review) / stats.articles * 100)|round(0)|int %}
                     {% set edit_pct = ((stats.articles - stats.not_edited) / stats.articles * 100)|round(0)|int %}
+                    {% set expertise_pct = ((stats.articles - stats.no_expertise) / stats.articles * 100)|round(0)|int %}
                     <div class="adm-progress-list">
                         <div class="adm-progress-item">
                             <div class="adm-progress-head">
@@ -237,6 +243,15 @@
                             </div>
                             <div class="adm-progress-track">
                                 <div class="adm-progress-fill adm-fill-purple" style="width: {{ edit_pct }}%"></div>
+                            </div>
+                        </div>
+                        <div class="adm-progress-item">
+                            <div class="adm-progress-head">
+                                <span class="adm-progress-label">Акт экспертизы</span>
+                                <span class="adm-progress-val">{{ stats.articles - stats.no_expertise }} / {{ stats.articles }} <small>({{ expertise_pct }}%)</small></span>
+                            </div>
+                            <div class="adm-progress-track">
+                                <div class="adm-progress-fill adm-fill-violet" style="width: {{ expertise_pct }}%"></div>
                             </div>
                         </div>
                     </div>
@@ -318,6 +333,7 @@
                             <th>Оплата</th>
                             <th>Рецензия</th>
                             <th>Редакт.</th>
+                            <th>Акт эксп.</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -348,6 +364,13 @@
                             </td>
                             <td>
                                 {% if article.edited %}
+                                <span class="adm-check adm-check-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
+                                {% else %}
+                                <span class="adm-check adm-check-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if article.has_expertise_act %}
                                 <span class="adm-check adm-check-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
                                 {% else %}
                                 <span class="adm-check adm-check-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
@@ -726,10 +749,12 @@
 .adm-fill-green { background: linear-gradient(90deg, #1a7f37, #2ea043); }
 .adm-fill-teal { background: linear-gradient(90deg, #5BA4B0, #6fbec9); }
 .adm-fill-purple { background: linear-gradient(90deg, #8250df, #9a6ef5); }
+.adm-fill-violet { background: linear-gradient(90deg, #953ead, #bf5fd3); }
 
 [data-theme="dark"] .adm-fill-green { background: linear-gradient(90deg, #238636, #3fb950); }
 [data-theme="dark"] .adm-fill-teal { background: linear-gradient(90deg, #5BA4B0, #7CC5D0); }
 [data-theme="dark"] .adm-fill-purple { background: linear-gradient(90deg, #8250df, #a371f7); }
+[data-theme="dark"] .adm-fill-violet { background: linear-gradient(90deg, #953ead, #c97edb); }
 
 /* =============================================
    CARDS (generic)
@@ -1232,18 +1257,20 @@ document.addEventListener('DOMContentLoaded', function() {
     var doughnutCanvas = document.getElementById('statusDoughnutChart');
     if (doughnutCanvas && typeof Chart !== 'undefined') {
         var statusData = {{ status_data | tojson }};
-        var labels = ['Оплачено', 'Без оплаты', 'С рецензией', 'Без рецензии', 'Отредактировано', 'Не отредактировано'];
-        var values = [statusData.paid, statusData.unpaid, statusData.reviewed, statusData.no_review, statusData.edited, statusData.not_edited];
+        var labels = ['Оплачено', 'Без оплаты', 'С рецензией', 'Без рецензии', 'Отредактировано', 'Не отредактировано', 'С актом эксп.', 'Без акта эксп.'];
+        var values = [statusData.paid, statusData.unpaid, statusData.reviewed, statusData.no_review, statusData.edited, statusData.not_edited, statusData.with_expertise, statusData.no_expertise];
         var colors = [
             '#1a7f37', '#cf222e',
             '#5BA4B0', '#9a6700',
-            '#8250df', '#656d76'
+            '#8250df', '#656d76',
+            '#953ead', '#d1242f'
         ];
         if (isDark) {
             colors = [
                 '#3fb950', '#f85149',
                 '#7CC5D0', '#d29922',
-                '#a371f7', '#768390'
+                '#a371f7', '#768390',
+                '#c97edb', '#f47067'
             ];
         }
 

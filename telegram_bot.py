@@ -74,7 +74,7 @@ def generate_excel(filepath):
 
     rows = c.execute('''
         SELECT a.id, a.title, a.authors, a.submission_date,
-               a.payment_received, a.has_review, a.edited,
+               a.payment_received, a.has_review, a.edited, a.has_expertise_act,
                j.name as journal_name, i.number as issue_num, i.year as issue_year
         FROM article a
         JOIN issue i ON a.issue_id = i.id
@@ -117,7 +117,7 @@ def generate_excel(filepath):
     ws['A1'].alignment = Alignment(vertical='center')
     ws.row_dimensions[1].height = 28
 
-    ws.merge_cells('A2:I2')
+    ws.merge_cells('A2:J2')
     ws['A2'].value = f'Все статьи  |  Дата: {datetime.now().strftime("%d.%m.%Y %H:%M")}'
     ws['A2'].font = subtitle_font
     ws['A2'].alignment = Alignment(vertical='center')
@@ -125,7 +125,7 @@ def generate_excel(filepath):
     ws.row_dimensions[3].height = 6
 
     # Заголовки таблицы
-    headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.']
+    headers = ['№', 'Название', 'Авторы', 'Журнал', 'Выпуск', 'Дата поступления', 'Оплата', 'Рецензия', 'Редакт.', 'Акт эксп.']
     for col_idx, h in enumerate(headers, 1):
         cell = ws.cell(row=4, column=col_idx, value=h)
         cell.fill = header_fill
@@ -135,7 +135,7 @@ def generate_excel(filepath):
     ws.row_dimensions[4].height = 26
 
     # Данные
-    paid_count = reviewed_count = edited_count = 0
+    paid_count = reviewed_count = edited_count = expertise_count = 0
     for row_idx, article in enumerate(rows, 1):
         r = row_idx + 4
 
@@ -146,9 +146,11 @@ def generate_excel(filepath):
         is_paid = bool(article['payment_received'])
         is_reviewed = bool(article['has_review'])
         is_edited = bool(article['edited'])
+        has_expertise = bool(article['has_expertise_act'])
         if is_paid: paid_count += 1
         if is_reviewed: reviewed_count += 1
         if is_edited: edited_count += 1
+        if has_expertise: expertise_count += 1
 
         row_data = [
             row_idx, article['title'] or '-', authors, journal_name,
@@ -156,6 +158,7 @@ def generate_excel(filepath):
             'Да' if is_paid else 'Нет',
             'Да' if is_reviewed else 'Нет',
             'Да' if is_edited else 'Нет',
+            'Да' if has_expertise else 'Нет',
         ]
 
         for col_idx, val in enumerate(row_data, 1):
@@ -165,7 +168,7 @@ def generate_excel(filepath):
             if row_idx % 2 == 0:
                 cell.fill = row_even_fill
 
-        for col in (7, 8, 9):
+        for col in (7, 8, 9, 10):
             cell = ws.cell(row=r, column=col)
             cell.alignment = Alignment(horizontal='center', vertical='center')
             if cell.value == 'Да':
@@ -186,12 +189,12 @@ def generate_excel(filepath):
         for c in range(3, 7):
             cell = ws.cell(row=sr, column=c, value='')
             cell.fill = summary_fill; cell.border = thin_border
-        for col, count in [(7, paid_count), (8, reviewed_count), (9, edited_count)]:
+        for col, count in [(7, paid_count), (8, reviewed_count), (9, edited_count), (10, expertise_count)]:
             cell = ws.cell(row=sr, column=col, value=f'{count}/{total}')
             cell.font = summary_font; cell.fill = summary_fill
             cell.alignment = Alignment(horizontal='center', vertical='center'); cell.border = thin_border
 
-    col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11}
+    col_widths = {'A': 5, 'B': 42, 'C': 32, 'D': 22, 'E': 13, 'F': 17, 'G': 11, 'H': 11, 'I': 11, 'J': 12}
     for col_letter, w in col_widths.items():
         ws.column_dimensions[col_letter].width = w
     ws.freeze_panes = 'A5'
@@ -251,6 +254,7 @@ def handle_stats(chat_id):
         paid = c.execute('SELECT COUNT(*) FROM article WHERE payment_received = 1').fetchone()[0]
         reviewed = c.execute('SELECT COUNT(*) FROM article WHERE has_review = 1').fetchone()[0]
         edited = c.execute('SELECT COUNT(*) FROM article WHERE edited = 1').fetchone()[0]
+        with_expertise = c.execute('SELECT COUNT(*) FROM article WHERE has_expertise_act = 1').fetchone()[0]
         journals = c.execute('SELECT COUNT(*) FROM journal').fetchone()[0]
         issues = c.execute('SELECT COUNT(*) FROM issue').fetchone()[0]
         conn.close()
@@ -262,7 +266,8 @@ def handle_stats(chat_id):
             f'📄 Статей: <b>{total}</b>\n\n'
             f'💰 Оплачено: <b>{paid}</b> / {total}\n'
             f'📝 С рецензией: <b>{reviewed}</b> / {total}\n'
-            f'✏️ Отредактировано: <b>{edited}</b> / {total}'
+            f'✏️ Отредактировано: <b>{edited}</b> / {total}\n'
+            f'📋 С актом эксп.: <b>{with_expertise}</b> / {total}'
         )
     except Exception as e:
         send_message(chat_id, f'❌ Ошибка: {e}')
