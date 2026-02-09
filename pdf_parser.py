@@ -387,26 +387,51 @@ def parse_article_pdf(file_path):
     }
 
 
+def _extract_text_from_doc(file_path):
+    """Извлекает текст из .doc (старый Word 97-2003) через antiword."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ['antiword', '-w', '0', file_path],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+
+
 def parse_article_docx(file_path):
     """
-    Парсит Word-документ (.docx) научной статьи и извлекает метаданные.
+    Парсит Word-документ (.docx/.doc) научной статьи и извлекает метаданные.
     Сначала пробует AI (GigaChat), при неудаче — эвристический парсер.
 
     Returns:
         dict: {title, authors: [{name, email, organization}], raw_text, method}
     """
-    try:
-        from docx import Document as DocxDocument
-    except ImportError:
-        return {"error": "Модуль python-docx не установлен", "title": "", "authors": []}
+    is_old_doc = file_path.lower().endswith('.doc') and not file_path.lower().endswith('.docx')
 
-    try:
-        doc = DocxDocument(file_path)
-    except Exception as e:
-        return {"error": f"Не удалось открыть документ: {str(e)}", "title": "", "authors": []}
+    if is_old_doc:
+        # Старый формат .doc — извлекаем текст через antiword
+        text = _extract_text_from_doc(file_path)
+        if not text:
+            return {"error": "Не удалось прочитать .doc файл. Попробуйте сохранить как .docx", "title": "", "authors": []}
+        paragraphs = [line.strip() for line in text.split('\n') if line.strip()]
+    else:
+        # Формат .docx — через python-docx
+        try:
+            from docx import Document as DocxDocument
+        except ImportError:
+            return {"error": "Модуль python-docx не установлен", "title": "", "authors": []}
 
-    # Извлекаем текст из параграфов
-    paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        try:
+            doc = DocxDocument(file_path)
+        except Exception as e:
+            return {"error": f"Не удалось открыть документ: {str(e)}", "title": "", "authors": []}
+
+        paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+
     if not paragraphs:
         return {"error": "Документ пустой", "title": "", "authors": []}
 
