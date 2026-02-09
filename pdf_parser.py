@@ -485,7 +485,9 @@ def parse_article_docx(file_path):
             # Это уже зона авторов, заголовок — предыдущий
             if not title:
                 title = p  # fallback: если ничего лучше не нашли
-            title_end_idx = i
+                title_end_idx = i
+            # Не обновляем title_end_idx если заголовок уже найден —
+            # этот параграф должен войти в зону авторов
             break
         # Заголовок может быть многострочным — склеиваем подряд идущие
         if not title:
@@ -498,12 +500,11 @@ def parse_article_docx(file_path):
                 # Проверяем: если в следующем параграфе есть имена — стоп
                 next_has_names = any(pat.search(p) for pat in _RU_NAME_PATTERNS + _EN_NAME_PATTERNS)
                 if next_has_names:
-                    title_end_idx = i
+                    # Этот параграф — начало зоны авторов, не обновляем title_end_idx
                     break
                 title += " " + p
                 title_end_idx = i
             else:
-                title_end_idx = i
                 break
 
     # Убираем ведущие номера ("1. Название" -> "Название")
