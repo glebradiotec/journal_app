@@ -219,6 +219,25 @@
                             <input type="file" id="inputReview" name="review_file" accept=".doc,.docx,.pdf,.txt,.jpg,.png" style="display:none" onchange="showFileName(this,'nameReview')">
                         </div>
                         <div class="file-upload-item">
+                            <label>Акт экспертизы</label>
+                            <div class="file-drop-zone" id="dropExpertise"
+                                 onclick="document.getElementById('inputExpertise').click()"
+                                 ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                                 ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                                 ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                                 ondrop="event.preventDefault(); this.classList.remove('drop-active'); handleFileDrop(event, 'inputExpertise', 'nameExpertise')">
+                                <div class="file-drop-icon">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                                        <path d="M8.75 1.75V5a.75.75 0 0 0 .75.75h3.25v7.5a.25.25 0 0 1-.25.25h-8.5a.25.25 0 0 1-.25-.25v-11.5a.25.25 0 0 1 .25-.25Zm2.5 3.5V2.507l2.243 2.243h-1.993a.25.25 0 0 1-.25-.25ZM3.75 0A1.75 1.75 0 0 0 2 1.75v12.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0 0 14 14.25V5.664a1.75 1.75 0 0 0-.513-1.237l-2.914-2.914A1.75 1.75 0 0 0 9.336 1H3.75Z"/>
+                                    </svg>
+                                </div>
+                                <span class="file-drop-text">Перетащите или нажмите</span>
+                                <span class="file-drop-hint">.pdf, .jpg, .png, .doc</span>
+                                <span class="file-drop-name" id="nameExpertise"></span>
+                            </div>
+                            <input type="file" id="inputExpertise" name="expertise_act_file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="showFileName(this,'nameExpertise')">
+                        </div>
+                        <div class="file-upload-item">
                             <label>Изображения</label>
                             <div class="images-preview-list" id="addFormImagesPreview" style="display:none"></div>
                             <div id="addFormImagesContainer" style="display:none"></div>
@@ -2122,7 +2141,7 @@ function applyFilters() {
 /* Files Grid */
 .form-files-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
 }
 
@@ -2906,7 +2925,7 @@ function applyFilters() {
     .author-compact-details { flex-direction: column; }
     .form-compact-footer { flex-direction: column; }
     .form-compact-actions { width: 100%; justify-content: flex-end; }
-    .form-files-grid { grid-template-columns: 1fr; }
+    .form-files-grid { grid-template-columns: 1fr 1fr; }
 }
 
 /* History timeline */

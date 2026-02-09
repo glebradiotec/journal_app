@@ -158,7 +158,15 @@
                             </label>
                         </div>
                         {% endif %}
-                        <input type="file" name="manuscript_file" class="form-file" accept=".doc,.docx,.pdf">
+                        <div class="edit-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                             ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                             ondrop="event.preventDefault(); this.classList.remove('drop-active'); dropToFileInput(event, this)">
+                            <span class="edit-file-drop-text">Перетащите файл или нажмите</span>
+                            <span class="edit-file-drop-name"></span>
+                            <input type="file" name="manuscript_file" class="form-file" accept=".doc,.docx,.pdf" style="display:none" onchange="editDropShowName(this)">
+                        </div>
                     </div>
                     
                     <div class="file-item">
@@ -176,7 +184,15 @@
                             </label>
                         </div>
                         {% endif %}
-                        <input type="file" name="review_file" class="form-file" accept=".doc,.docx,.pdf,.txt,.jpg,.png">
+                        <div class="edit-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                             ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                             ondrop="event.preventDefault(); this.classList.remove('drop-active'); dropToFileInput(event, this)">
+                            <span class="edit-file-drop-text">Перетащите файл или нажмите</span>
+                            <span class="edit-file-drop-name"></span>
+                            <input type="file" name="review_file" class="form-file" accept=".doc,.docx,.pdf,.txt,.jpg,.png" style="display:none" onchange="editDropShowName(this)">
+                        </div>
                     </div>
                     
                     <div class="file-item file-item-images">
@@ -242,7 +258,15 @@
                             </label>
                         </div>
                         {% endif %}
-                        <input type="file" name="title_pdf" class="form-file" accept=".pdf">
+                        <div class="edit-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                             ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                             ondrop="event.preventDefault(); this.classList.remove('drop-active'); dropToFileInput(event, this)">
+                            <span class="edit-file-drop-text">Перетащите файл или нажмите</span>
+                            <span class="edit-file-drop-name"></span>
+                            <input type="file" name="title_pdf" class="form-file" accept=".pdf" style="display:none" onchange="editDropShowName(this)">
+                        </div>
                     </div>
 
                     <div class="file-item">
@@ -260,7 +284,15 @@
                             </label>
                         </div>
                         {% endif %}
-                        <input type="file" name="expertise_act_file" class="form-file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                        <div class="edit-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                             ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                             ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                             ondrop="event.preventDefault(); this.classList.remove('drop-active'); dropToFileInput(event, this)">
+                            <span class="edit-file-drop-text">Перетащите файл или нажмите</span>
+                            <span class="edit-file-drop-name"></span>
+                            <input type="file" name="expertise_act_file" class="form-file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="editDropShowName(this)">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -684,6 +716,54 @@
     color: var(--color-fg-muted);
 }
 
+/* Drop-зона для файлов в редактировании */
+.edit-file-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 12px;
+    border: 2px dashed var(--color-border-default);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--color-canvas-default);
+    min-height: 56px;
+    gap: 4px;
+}
+
+.edit-file-drop:hover {
+    border-color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.04);
+}
+
+.edit-file-drop.drop-active {
+    border-color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.1);
+    transform: scale(1.01);
+}
+
+.edit-file-drop.has-file {
+    border-color: var(--color-success-fg, #2da44e);
+    background: rgba(45, 164, 78, 0.05);
+    border-style: solid;
+}
+
+.edit-file-drop-text {
+    font-size: 13px;
+    color: var(--color-fg-muted);
+    opacity: 0.7;
+}
+
+.edit-file-drop-name {
+    display: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-default);
+    word-break: break-all;
+    text-align: center;
+}
+
 .file-hint {
     font-size: 12px;
     color: var(--color-fg-muted);
@@ -1076,6 +1156,32 @@ function handleEditImageDrop(e) {
     var files = e.dataTransfer.files;
     for (var i = 0; i < files.length; i++) {
         addImageFile(files[i]);
+    }
+}
+
+// Drag & drop для файловых полей (рукопись, рецензия, титульная, акт)
+function dropToFileInput(e, zone) {
+    var input = zone.querySelector('input[type=file]');
+    if (e.dataTransfer.files.length && input) {
+        input.files = e.dataTransfer.files;
+        editDropShowName(input);
+    }
+}
+
+function editDropShowName(input) {
+    var zone = input.closest('.edit-file-drop');
+    var nameEl = zone.querySelector('.edit-file-drop-name');
+    var textEl = zone.querySelector('.edit-file-drop-text');
+    if (input.files && input.files.length > 0) {
+        nameEl.textContent = input.files[0].name;
+        nameEl.style.display = 'block';
+        textEl.style.display = 'none';
+        zone.classList.add('has-file');
+    } else {
+        nameEl.textContent = '';
+        nameEl.style.display = 'none';
+        textEl.style.display = '';
+        zone.classList.remove('has-file');
     }
 }
 </script>
