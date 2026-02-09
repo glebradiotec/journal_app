@@ -30,6 +30,38 @@ def send_to_telegram(backup_file):
         print(f'Telegram send failed: {e}')
 
 
+def send_excel_to_telegram():
+    """Скачивает Excel-выгрузку с сервера и отправляет в Telegram."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    backups_dir = os.path.join(base_dir, 'backups')
+    os.makedirs(backups_dir, exist_ok=True)
+
+    try:
+        resp = requests.get('http://127.0.0.1:8001/admin/articles/bulk-export', timeout=30)
+        if resp.status_code == 200:
+            filename = f'articles_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+            filepath = os.path.join(backups_dir, filename)
+            with open(filepath, 'wb') as f:
+                f.write(resp.content)
+
+            url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
+            with open(filepath, 'rb') as f:
+                resp = requests.post(url, data={
+                    'chat_id': TELEGRAM_CHAT_ID,
+                    'caption': f'📊 Excel-выгрузка статей\n📅 {datetime.now().strftime("%d.%m.%Y %H:%M")}',
+                }, files={'document': (filename, f)}, timeout=30)
+
+            os.remove(filepath)
+            if resp.status_code == 200:
+                print('Excel export sent to Telegram')
+            else:
+                print(f'Telegram error (excel): {resp.status_code}')
+        else:
+            print(f'Excel export failed: HTTP {resp.status_code}')
+    except Exception as e:
+        print(f'Excel export send failed: {e}')
+
+
 def create_backup():
     # Файлы в папке instance
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,8 +80,11 @@ def create_backup():
     shutil.copy(db_file, backup_file)
     print(f'Backup created: {backup_file}')
     
-    # Отправляем в Telegram
+    # Отправляем .db в Telegram
     send_to_telegram(backup_file)
+
+    # Отправляем Excel-выгрузку
+    send_excel_to_telegram()
     
     # Удаляем старые (старше 7 дней)
     for f in os.listdir(backups_dir):
