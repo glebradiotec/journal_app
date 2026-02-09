@@ -2,6 +2,8 @@ import csv
 import io
 import json
 import os
+import re
+from collections import defaultdict
 from datetime import datetime, timezone
 from functools import wraps
 from io import BytesIO
@@ -1361,3 +1363,177 @@ def register_admin_routes(app):
                 'date': comment.created_at.strftime('%d.%m.%Y %H:%M')
             }
         })
+
+    # ─── Авторы ────────────────────────────────────────────────────────
+
+    def _normalize_author_name(name):
+        """
+        Нормализует имя автора для группировки.
+        'В.В. Беляев'  -> 'беляев_вв'
+        'Беляев В.В.'  -> 'беляев_вв'
+        'Владимир Владимирович Беляев' -> 'беляев_вв'
+        'Беляев Владимир Владимирович' -> 'беляев_вв'
+        """
+        if not name:
+            return ''
+        name = name.strip()
+        # Убираем цифры-индексы, скобки и лишние символы
+        name = re.sub(r'[\d*†‡§]+', '', name)
+        name = re.sub(r'[()«»""\']+', '', name)
+        name = name.strip(' ,;.')
+
+        # Разбиваем на части
+        parts = name.split()
+        if not parts:
+            return ''
+
+        # Определяем фамилию и инициалы
+        # Инициал — часть из 1-2 букв (возможно с точкой): "В.", "В.В.", "А"
+        initials = []
+        surname = ''
+        for p in parts:
+            clean = p.rstrip('.')
+            # Инициал: одна буква, или две слитные буквы (напр. "А.В" или "АВ")
+            if len(clean) <= 2 and clean.isalpha():
+                initials.append(clean[0].lower())
+            elif '.' in p and all(len(x) <= 1 for x in p.split('.') if x):
+                # "А.В." -> ['А', 'В']
+                for x in p.split('.'):
+                    if x and len(x) == 1:
+                        initials.append(x[0].lower())
+            elif len(clean) > 2:
+                # Полное слово — кандидат на фамилию или имя/отчество
+                if not surname:
+                    surname = clean
+                else:
+                    # Фамилия — обычно самое короткое из длинных слов (не всегда),
+                    # но надёжнее: если уже есть фамилия, это имя/отчество → берём первую букву
+                    initials.append(clean[0].lower())
+
+        # Если фамилия не определена (все части были инициалами)
+        if not surname and parts:
+            surname = parts[-1].rstrip('.')
+
+        key = surname.lower().rstrip('.')
+        if initials:
+            key += '_' + ''.join(sorted(initials))
+
+        return key
+
+    def _group_authors():
+        """
+        Загружает всех ArticleAuthor и группирует их.
+        Приоритет 1: по email (одинаковый email = один автор).
+        Приоритет 2: по нормализованному имени.
+        Возвращает список dict (отсортирован по фамилии):
+            {name, email, organization, articles: [{id, title, journal, issue}], name_variants}
+        """
+        all_authors = (
+            ArticleAuthor.query
+            .options(
+                joinedload(ArticleAuthor.article)
+                .joinedload(Article.issue)
+                .joinedload(Issue.journal)
+            )
+            .all()
+        )
+
+        # Шаг 1: группируем по email (если есть)
+        email_groups = defaultdict(list)     # email -> [ArticleAuthor]
+        no_email = []                        # авторы без email
+        for aa in all_authors:
+            email = (aa.email or '').strip().lower()
+            if email:
+                email_groups[email].append(aa)
+            else:
+                no_email.append(aa)
+
+        # Шаг 2: авторов без email группируем по нормализованному имени
+        name_groups = defaultdict(list)
+        for aa in no_email:
+            key = _normalize_author_name(aa.full_name)
+            if key:
+                name_groups[key].append(aa)
+            else:
+                name_groups[f'_unknown_{aa.id}'] = [aa]
+
+        # Шаг 3: объединяем email-группы в финальный результат
+        result = []
+
+        def _build_entry(members):
+            """Строит запись автора из группы ArticleAuthor."""
+            names = set()
+            emails = set()
+            orgs = set()
+            articles = []
+            seen_articles = set()
+
+            for aa in members:
+                if aa.full_name:
+                    names.add(aa.full_name.strip())
+                if aa.email and aa.email.strip():
+                    emails.add(aa.email.strip().lower())
+                if aa.organization and aa.organization.strip():
+                    orgs.add(aa.organization.strip())
+                if aa.article and aa.article_id not in seen_articles:
+                    seen_articles.add(aa.article_id)
+                    art = aa.article
+                    journal_name = ''
+                    issue_label = ''
+                    if art.issue:
+                        if art.issue.journal:
+                            journal_name = art.issue.journal.name
+                        issue_label = f'\u2116{art.issue.number}/{art.issue.year}'
+                    articles.append({
+                        'id': art.id,
+                        'title': art.title or '',
+                        'journal': journal_name,
+                        'issue': issue_label,
+                    })
+
+            # Основное имя — самое длинное
+            name_list = sorted(names, key=len, reverse=True)
+            main_name = name_list[0] if name_list else '—'
+            variants = [n for n in name_list[1:] if n != main_name]
+
+            return {
+                'name': main_name,
+                'name_variants': variants,
+                'email': ', '.join(sorted(emails)),
+                'organization': '; '.join(sorted(orgs, key=len, reverse=True)[:2]),
+                'article_count': len(articles),
+                'articles': sorted(articles, key=lambda x: x['id'], reverse=True),
+            }
+
+        for email, members in email_groups.items():
+            result.append(_build_entry(members))
+
+        for key, members in name_groups.items():
+            result.append(_build_entry(members))
+
+        # Сортируем по фамилии (первое слово)
+        result.sort(key=lambda x: x['name'].split()[-1].lower() if x['name'] else '')
+
+        return result
+
+    @app.route('/admin/authors')
+    @admin_required
+    def admin_authors():
+        """Страница со списком всех авторов."""
+        search = request.args.get('search', '').strip()
+        authors = _group_authors()
+
+        if search:
+            search_lower = search.lower()
+            authors = [
+                a for a in authors
+                if search_lower in a['name'].lower()
+                or search_lower in a['email'].lower()
+                or search_lower in a['organization'].lower()
+                or any(search_lower in v.lower() for v in a['name_variants'])
+            ]
+
+        return render_template('admin/authors.html',
+                               authors=authors,
+                               total=len(authors),
+                               search=search)
