@@ -1120,21 +1120,16 @@ function toggleStatus(btn) {
     });
 }
 
-// Toggle акта экспертизы — работает только если файл загружен
+// Акт экспертизы — полностью автоматический статус
 function toggleExpertise(btn) {
     const hasFile = btn.dataset.hasFile === 'true';
-    const wasActive = btn.dataset.active === 'true';
-
-    // Если файла нет и пытаемся включить — показываем уведомление
-    if (!hasFile && !wasActive) {
+    if (!hasFile) {
         showToast('Акт экспертизы не загружен. Загрузите файл в редактировании статьи.', 'error');
-        btn.classList.add('status-shake');
-        setTimeout(() => btn.classList.remove('status-shake'), 400);
-        return;
+    } else {
+        showToast('Статус акта управляется автоматически при загрузке/удалении файла.', 'info');
     }
-
-    // Если файл есть или выключаем — работает как обычный toggle
-    toggleStatus(btn);
+    btn.classList.add('status-shake');
+    setTimeout(() => btn.classList.remove('status-shake'), 400);
 }
 
 // Обновление счётчика статистики
@@ -1289,6 +1284,7 @@ function quickView(articleId, initialTab, originEvent) {
             html += '<span class="qv-status ' + (data.payment ? 'qv-status-on' : 'qv-status-off') + '">Оплата</span>';
             html += '<span class="qv-status ' + (data.review ? 'qv-status-on' : 'qv-status-off') + '">Рецензия</span>';
             html += '<span class="qv-status ' + (data.edited ? 'qv-status-on' : 'qv-status-off') + '">Редакт.</span>';
+            html += '<span class="qv-status ' + (data.expertise ? 'qv-status-on qv-status-purple' : 'qv-status-off') + '">Акт эксп.</span>';
             html += '</div>';
 
             // Authors
@@ -1312,7 +1308,7 @@ function quickView(articleId, initialTab, originEvent) {
             }
 
             // Files
-            var hasFiles = data.manuscript_file || data.review_file || data.title_pdf;
+            var hasFiles = data.manuscript_file || data.review_file || data.title_pdf || data.expertise_act_file;
             if (hasFiles) {
                 html += '<div class="qv-section"><div class="qv-section-title">Файлы</div><div class="qv-files">';
                 if (data.manuscript_file) {
@@ -1332,6 +1328,13 @@ function quickView(articleId, initialTab, originEvent) {
                 if (data.title_pdf) {
                     html += '<button class="qv-file-link" onclick="openFilePreview(\'/uploads/' + encodeURIComponent(data.title_pdf) + '\', \'Титульный лист\')">📑 Титульный — просмотр</button>';
                     html += '<a class="qv-file-link" href="/download/' + encodeURIComponent(data.title_pdf) + '">📑 Титульный — скачать</a>';
+                }
+                if (data.expertise_act_file) {
+                    var eExt = data.expertise_act_file.split('.').pop().toLowerCase();
+                    if (eExt === 'pdf' || eExt === 'jpg' || eExt === 'jpeg' || eExt === 'png') {
+                        html += '<button class="qv-file-link" onclick="openFilePreview(\'/uploads/' + encodeURIComponent(data.expertise_act_file) + '\', \'Акт экспертизы\')">📋 Акт эксп. — просмотр</button>';
+                    }
+                    html += '<a class="qv-file-link" href="/download/' + encodeURIComponent(data.expertise_act_file) + '">📋 Акт эксп. — скачать</a>';
                 }
                 html += '</div></div>';
             }
@@ -3081,6 +3084,16 @@ function applyFilters() {
     background: rgba(63, 185, 80, 0.15);
     color: #3fb950;
     border-color: #3fb950;
+}
+.qv-status-purple.qv-status-on {
+    background: rgba(130, 80, 223, 0.12);
+    color: #8250df;
+    border-color: #8250df;
+}
+[data-theme="dark"] .qv-status-purple.qv-status-on {
+    background: rgba(163, 113, 247, 0.15);
+    color: #a371f7;
+    border-color: #a371f7;
 }
 .qv-section {
     margin-bottom: 16px;
