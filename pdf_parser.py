@@ -452,31 +452,126 @@ def parse_article_docx(file_path):
     #     pass
 
     # === Эвристика по тексту ===
-    # Первый непустой параграф — предположительно название
-    title = paragraphs[0] if paragraphs else ""
-
-    # Ищем авторов и организации в оставшемся тексте
-    remaining = "\n".join(paragraphs[1:20])  # Берём первые ~20 параграфов
-    emails = _EMAIL_RE.findall(remaining)
-    all_names = []
-    for pat in _RU_NAME_PATTERNS + _EN_NAME_PATTERNS:
-        for m in pat.finditer(remaining):
-            name = m.group().strip().rstrip(',;.')
-            if name and name not in all_names:
-                all_names.append(name)
-
-    organizations = []
-    for p in paragraphs[1:20]:
-        p_lower = p.lower()
-        for kw in _ORG_KEYWORDS:
-            if kw in p_lower:
-                # Обрезаем после адреса
-                org = re.split(r',\s*(?:улица|ул\.|e-mail|email|тел|phone|spin|адрес|д\.\s*\d)',
-                               p, flags=re.IGNORECASE)[0].strip().rstrip(',;.')
-                if org and len(org) > 5 and org not in organizations:
-                    organizations.append(org)
+    # --- Шаг 1: найти заголовок (пропускаем УДК, DOI и т.д.) ---
+    title = ""
+    title_end_idx = 0
+    for i, p in enumerate(paragraphs):
+        p_lower = p.lower().strip()
+        # Пропускаем служебные строки
+        if any(p_lower.startswith(m) for m in _SKIP_MARKERS):
+            continue
+        # Пропускаем очень короткие строки (номера, пустышки)
+        if len(p.strip()) <= 3:
+            continue
+        # Стоп-маркер = заголовок не найден, берём что есть
+        if any(m in p_lower for m in _STOP_MARKERS):
+            break
+        # Первый содержательный параграф — кандидат на заголовок
+        # Проверяем, что это не строка с именами авторов
+        has_names = any(pat.search(p) for pat in _RU_NAME_PATTERNS + _EN_NAME_PATTERNS)
+        has_email = bool(_EMAIL_RE.search(p))
+        has_org = any(kw in p_lower for kw in _ORG_KEYWORDS)
+        if has_names or has_email or has_org:
+            # Это уже зона авторов, заголовок — предыдущий
+            if not title:
+                title = p  # fallback: если ничего лучше не нашли
+            title_end_idx = i
+            break
+        # Заголовок может быть многострочным — склеиваем подряд идущие
+        if not title:
+            title = p
+            title_end_idx = i
+        else:
+            # Следующий параграф — продолжение заголовка, только если
+            # он не похож на отдельный блок (короткий или начинается с заглавной после точки)
+            if len(p) > 5 and not any(m in p_lower for m in _STOP_MARKERS):
+                # Проверяем: если в следующем параграфе есть имена — стоп
+                next_has_names = any(pat.search(p) for pat in _RU_NAME_PATTERNS + _EN_NAME_PATTERNS)
+                if next_has_names:
+                    title_end_idx = i
+                    break
+                title += " " + p
+                title_end_idx = i
+            else:
+                title_end_idx = i
                 break
 
+    # Убираем ведущие номера ("1. Название" -> "Название")
+    title = re.sub(r'^\d+\.\s*', '', title).strip()
+
+    # --- Шаг 2: собираем строки между заголовком и аннотацией ---
+    author_zone = []
+    for i, p in enumerate(paragraphs[title_end_idx + 1:30]):
+        p_lower = p.lower().strip()
+        # Пропускаем служебные строки
+        if any(p_lower.startswith(m) for m in _SKIP_MARKERS):
+            continue
+        # Стоп — дошли до аннотации/введения
+        if any(m in p_lower for m in _STOP_MARKERS):
+            break
+        if len(p.strip()) <= 2:
+            continue
+        author_zone.append(p)
+
+    author_text = "\n".join(author_zone)
+
+    # --- Шаг 3: извлекаем email ---
+    emails = _EMAIL_RE.findall(author_text)
+
+    # --- Шаг 4: извлекаем имена ---
+    cleaned = _clean_superscripts(author_text)
+    raw_names = _find_names_in_text(cleaned)
+
+    # Фильтруем ложные имена (организации, "им. Баумана" и т.д.)
+    author_text_lower = author_text.lower()
+    all_names = []
+    for name in raw_names:
+        name_lower = name.lower()
+        # Фильтр: имя содержит ключевое слово организации
+        if any(kw in name_lower for kw in _ORG_KEYWORDS):
+            continue
+        # Фильтр: имя стоит после "им.", "имени", "named after"
+        idx = author_text_lower.find(name_lower)
+        if idx != -1:
+            before = author_text_lower[max(0, idx - 15):idx]
+            if any(m in before for m in ('им.', 'имени', 'named', 'name')):
+                continue
+        all_names.append(name)
+
+    # --- Шаг 5: извлекаем организации ---
+    organizations = []
+    for p in author_zone:
+        p_lower = p.lower()
+        has_org_kw = any(kw in p_lower for kw in _ORG_KEYWORDS)
+        if has_org_kw:
+            org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', p.strip()).rstrip(',;.')
+            # Ищем начало организации по ключевому слову
+            best_org = None
+            for kw in _ORG_KEYWORDS:
+                ki = org.lower().find(kw)
+                if ki != -1:
+                    start = org.rfind(',', 0, ki)
+                    start = start + 1 if start != -1 else 0
+                    org_part = org[start:]
+                    org_part = re.split(r',\s*(?:улица|ул\.|e-mail|email|тел|phone|spin|адрес|д\.\s*\d)',
+                                        org_part, flags=re.IGNORECASE)[0].strip().rstrip(',;.')
+                    if org_part and len(org_part) > 5:
+                        best_org = org_part
+                        break
+            if best_org and best_org not in organizations:
+                organizations.append(best_org)
+
+    # Фоллбэк: ищем авторов в строке копирайта ©
+    if not all_names:
+        for p in paragraphs:
+            if '©' in p:
+                copyright_text = p.split('©')[-1]
+                copyright_text = re.sub(r',?\s*\d{4}\s*$', '', copyright_text)
+                all_names = _find_names_in_text(copyright_text)
+                if all_names:
+                    break
+
+    # --- Шаг 6: собираем авторов ---
     authors = []
     for i, name in enumerate(all_names):
         author = {"name": name, "email": "", "organization": ""}
@@ -487,6 +582,11 @@ def parse_article_docx(file_path):
         elif organizations and i < len(organizations):
             author["organization"] = organizations[i]
         authors.append(author)
+
+    # Если нашли email, но не нашли авторов
+    if not authors and emails:
+        for email in emails:
+            authors.append({"name": "", "email": email, "organization": ""})
 
     return {
         "title": title,
