@@ -297,7 +297,11 @@
                         <div class="article-authors">
                             {% if article.article_authors %}
                                 {% for author in article.article_authors|sort(attribute='order') %}
-                                    <span class="author-name">{{ author.full_name }}</span>{% if not loop.last %}, {% endif %}
+                                    <span class="author-chip">
+                                        <span class="author-name">{{ author.full_name }}</span>
+                                        {%- if author.degree %}<span class="author-degree">{{ author.degree }}</span>{% endif -%}
+                                    </span>
+                                    {%- if not loop.last %}, {% endif %}
                                 {% endfor %}
                             {% else %}
                                 {{ article.authors or 'Автор не указан' }}
@@ -2411,7 +2415,21 @@ function applyFilters() {
     font-size: 14px;
     color: var(--color-fg-muted);
     margin-bottom: 8px;
+    line-height: 1.7;
 }
+.author-chip {
+    display: inline;
+}
+.author-degree {
+    display: inline;
+    font-size: 11px;
+    color: var(--color-fg-muted);
+    opacity: 0.7;
+    font-style: italic;
+    margin-left: 2px;
+}
+.author-degree::before { content: '('; }
+.author-degree::after { content: ')'; }
 
 .article-date {
     display: inline-flex;
