@@ -70,6 +70,16 @@ def _clean_superscripts(text):
     return text
 
 
+def _strip_leading_indices(text):
+    """
+    Убирает ведущие суперскрипт-индексы (1-2 цифры) из строки.
+    '1svispb@mail.ru' -> 'svispb@mail.ru'
+    '2Санкт-Петербургский' -> 'Санкт-Петербургский'
+    '1,2Иванов' -> 'Иванов'
+    """
+    return re.sub(r'^[\d,\-–−\s*]+(?=[A-Za-zА-ЯЁа-яё])', '', text)
+
+
 def _extract_text_blocks(page):
     """
     Извлекает текстовые блоки с информацией о шрифте.
@@ -511,12 +521,15 @@ def parse_article_docx(file_path):
             break
         if len(p.strip()) <= 2:
             continue
-        author_zone.append(p)
+        # Убираем ведущие суперскрипт-индексы ("1,2Санкт-..." -> "Санкт-...")
+        author_zone.append(_strip_leading_indices(p.strip()))
 
     author_text = "\n".join(author_zone)
 
     # --- Шаг 3: извлекаем email ---
-    emails = _EMAIL_RE.findall(author_text)
+    raw_emails = _EMAIL_RE.findall(author_text)
+    # Убираем ведущие цифры-индексы из email: "1svispb@yandex.ru" -> "svispb@yandex.ru"
+    emails = [_strip_leading_indices(e) for e in raw_emails]
 
     # --- Шаг 4: извлекаем имена ---
     cleaned = _clean_superscripts(author_text)
@@ -544,6 +557,7 @@ def parse_article_docx(file_path):
         p_lower = p.lower()
         has_org_kw = any(kw in p_lower for kw in _ORG_KEYWORDS)
         if has_org_kw:
+            # Ведущие индексы уже убраны в _strip_leading_indices при сборе author_zone
             org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', p.strip()).rstrip(',;.')
             # Ищем начало организации по ключевому слову
             best_org = None
