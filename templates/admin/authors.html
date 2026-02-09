@@ -196,7 +196,85 @@
 </div>
 
 <style>
-/* Authors page styles */
+/* =============================================
+   ADMIN LAYOUT (shared)
+   ============================================= */
+.adm-layout { display: flex; min-height: 100vh; }
+.adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 998; backdrop-filter: blur(2px); }
+.adm-overlay.active { display: block; }
+
+.adm-sidebar { width: 260px; min-height: 100vh; background: var(--color-canvas-subtle); border-right: 1px solid var(--color-border-default); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 999; }
+.adm-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 20px 20px; border-bottom: 1px solid var(--color-border-muted); }
+.adm-sidebar-close { display: none; background: none; border: none; color: var(--color-fg-muted); cursor: pointer; padding: 4px; border-radius: 6px; }
+.adm-sidebar-close:hover { background: var(--color-canvas-inset); }
+.adm-logo { display: flex; align-items: center; gap: 12px; }
+.adm-logo-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #5BA4B0, #4A8E99); color: #fff; display: flex; align-items: center; justify-content: center; }
+[data-theme="dark"] .adm-logo-icon { background: linear-gradient(135deg, #5BA4B0, #7CC5D0); }
+.adm-logo-text { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+
+.adm-nav { padding: 16px 12px; }
+.adm-nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-fg-muted); padding: 0 12px; margin-bottom: 8px; }
+.adm-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 14px; font-weight: 500; color: var(--color-fg-muted); text-decoration: none; border-radius: 8px; margin-bottom: 2px; transition: background 0.15s, color 0.15s; }
+.adm-nav-item:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+.adm-nav-active { background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.06)); color: #5BA4B0; font-weight: 600; }
+[data-theme="dark"] .adm-nav-active { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.06)); }
+.adm-nav-active:hover { background: linear-gradient(135deg, rgba(91,164,176,0.18), rgba(91,164,176,0.1)); }
+
+.adm-sidebar-footer { padding: 8px 12px 20px; border-top: 1px solid var(--color-border-muted); margin-top: 8px; }
+.adm-user-block { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.adm-user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--color-canvas-inset); border: 2px solid var(--color-border-default); display: flex; align-items: center; justify-content: center; color: var(--color-fg-muted); flex-shrink: 0; }
+.adm-user-info { display: flex; flex-direction: column; min-width: 0; }
+.adm-user-name { font-size: 13px; font-weight: 600; color: var(--color-fg-default); }
+.adm-user-role { font-size: 12px; color: var(--color-fg-muted); }
+
+.adm-main { flex: 1; min-width: 0; padding: 32px 36px 48px; background: var(--color-canvas-default); position: relative; }
+
+.adm-toolbar { position: absolute; top: 20px; right: 24px; display: flex; gap: 6px; z-index: 10; }
+.adm-toolbar-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.adm-toolbar-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); border-color: var(--color-border-muted); }
+.adm-toolbar-exit:hover { color: #cf222e; border-color: rgba(207,34,46,0.3); background: rgba(207,34,46,0.06); }
+[data-theme="dark"] .adm-toolbar-exit:hover { color: #f85149; border-color: rgba(248,81,73,0.3); background: rgba(248,81,73,0.08); }
+
+.adm-mobile-header { display: none; align-items: center; gap: 12px; margin-bottom: 24px; }
+.adm-hamburger { background: none; border: 1px solid var(--color-border-default); border-radius: 8px; padding: 8px; color: var(--color-fg-default); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.adm-hamburger:hover { background: var(--color-canvas-subtle); }
+.adm-mobile-title { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+.adm-welcome { margin-bottom: 24px; }
+.adm-welcome-title { font-size: 26px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 4px 0; }
+.adm-welcome-sub { font-size: 15px; color: var(--color-fg-muted); margin: 0; }
+
+/* =============================================
+   ARTICLES TABLE SHARED
+   ============================================= */
+.art-card { background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 20px; }
+.art-table-card { overflow: hidden; }
+.art-table-wrap { overflow-x: auto; }
+.art-table { width: 100%; border-collapse: collapse; }
+.art-table thead th { padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-fg-muted); background: var(--color-canvas-subtle); border-bottom: 1px solid var(--color-border-default); white-space: nowrap; }
+.art-table td { padding: 11px 14px; font-size: 13px; color: var(--color-fg-default); border-bottom: 1px solid var(--color-border-muted); vertical-align: middle; }
+.art-table tr:last-child td { border-bottom: none; }
+.art-search-wrap { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 8px; transition: border-color 0.15s, box-shadow 0.15s; }
+.art-search-wrap:focus-within { border-color: var(--color-accent-emphasis); box-shadow: 0 0 0 3px rgba(91,164,176,0.2); }
+.art-search-icon { color: var(--color-fg-muted); flex-shrink: 0; }
+.art-search { border: none; background: transparent; color: var(--color-fg-default); font-size: 13px; outline: none; width: 100%; }
+.art-search::placeholder { color: var(--color-fg-muted); }
+.art-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; border: 1px solid transparent; border-radius: 8px; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s, box-shadow 0.15s; }
+.art-btn-reset { background: var(--color-canvas-subtle); color: var(--color-fg-muted); border-color: var(--color-border-default); }
+.art-btn-reset:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+
+@media (max-width: 768px) {
+    .adm-sidebar { position: fixed; left: -280px; top: 0; height: 100vh; width: 270px; transition: left 0.25s ease; box-shadow: none; }
+    .adm-sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.15); }
+    .adm-sidebar-close { display: flex; }
+    .adm-mobile-header { display: flex; }
+    .adm-toolbar { display: none; }
+    .adm-main { padding: 20px 16px 36px; }
+    .adm-welcome-title { font-size: 22px; }
+}
+
+/* =============================================
+   AUTHORS PAGE
+   ============================================= */
 .aut-name {
     font-weight: 600;
     font-size: 13.5px;
@@ -286,6 +364,25 @@
 </style>
 
 <script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+}
+
+function toggleAdmTheme() {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = next === 'dark' ? '☀️' : '🌙'; });
+    var hi = document.getElementById('theme-icon');
+    if (hi) hi.textContent = next === 'dark' ? '☀️' : '🌙';
+}
+(function() {
+    var t = localStorage.getItem('theme') || 'light';
+    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
+})();
+
 function toggleArticles(row) {
     var articlesRow = row.nextElementSibling;
     if (!articlesRow || !articlesRow.classList.contains('aut-articles-row')) return;
