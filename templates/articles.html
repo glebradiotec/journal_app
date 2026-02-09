@@ -1194,6 +1194,7 @@ function updateStatCounter(field, delta) {
 var MODAL_EASING = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
 var MODAL_DURATION = '0.32s';
 var _activeCard = null;
+var _openModals = 0;
 
 // Capture click origin info immediately (before async operations)
 function captureOrigin(e) {
@@ -1243,6 +1244,10 @@ function openModalFrom(modalEl, origin) {
         _activeCard = origin.card;
     }
     
+    // Block page scroll while modal is open
+    _openModals++;
+    document.body.style.overflow = 'hidden';
+    
     requestAnimationFrame(function() {
         modalEl.classList.add('modal-visible');  // overlay bg + blur
         content.style.opacity = '1';             // content fade in
@@ -1269,6 +1274,10 @@ function closeModal(modalEl) {
     
     setTimeout(function() {
         modalEl.style.display = 'none';
+        
+        // Restore page scroll when all modals are closed
+        _openModals = Math.max(0, _openModals - 1);
+        if (_openModals === 0) document.body.style.overflow = '';
         
         // Now overlay is gone — check if cursor is still on the card
         if (card) {
@@ -3347,6 +3356,8 @@ function updateArticleCard(article) {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    overflow: hidden;
+    overscroll-behavior: contain;
     transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
 }
 
@@ -3395,6 +3406,7 @@ function updateArticleCard(article) {
 
 .modal-body {
     padding: 28px;
+    overscroll-behavior: contain;
 }
 
 .form-group {
@@ -3698,6 +3710,7 @@ function updateArticleCard(article) {
    ======================================== */
 .qv-comments-list {
     padding: 16px;
+    overscroll-behavior: contain;
 }
 .qv-comment {
     margin-bottom: 12px;
@@ -3847,6 +3860,7 @@ function updateArticleCard(article) {
     flex: 1;
     overflow-y: auto;
     padding: 20px 24px;
+    overscroll-behavior: contain;
 }
 
 .sp-footer {
