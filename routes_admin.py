@@ -427,6 +427,7 @@ def register_admin_routes(app):
                         'expertise_act_file': article.expertise_act_file or '',
                         'manuscript_file': article.manuscript_file or '',
                         'review_file': article.review_file or '',
+                        'title_pdf': article.title_pdf or '',
                         'notes': article.notes or '',
                     }
                 })
