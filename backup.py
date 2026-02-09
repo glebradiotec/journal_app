@@ -31,33 +31,29 @@ def send_to_telegram(backup_file):
 
 
 def send_excel_to_telegram():
-    """Скачивает Excel-выгрузку с сервера и отправляет в Telegram."""
+    """Генерирует Excel-выгрузку из SQLite и отправляет в Telegram."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     backups_dir = os.path.join(base_dir, 'backups')
     os.makedirs(backups_dir, exist_ok=True)
 
     try:
-        resp = requests.get('http://127.0.0.1:8001/admin/articles/bulk-export', timeout=30)
+        from telegram_bot import generate_excel
+        filename = f'articles_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        filepath = os.path.join(backups_dir, filename)
+        total = generate_excel(filepath)
+
+        url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
+        with open(filepath, 'rb') as f:
+            resp = requests.post(url, data={
+                'chat_id': TELEGRAM_CHAT_ID,
+                'caption': f'📊 Excel-выгрузка статей ({total} шт.)\n📅 {datetime.now().strftime("%d.%m.%Y %H:%M")}',
+            }, files={'document': (filename, f)}, timeout=30)
+
+        os.remove(filepath)
         if resp.status_code == 200:
-            filename = f'articles_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-            filepath = os.path.join(backups_dir, filename)
-            with open(filepath, 'wb') as f:
-                f.write(resp.content)
-
-            url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
-            with open(filepath, 'rb') as f:
-                resp = requests.post(url, data={
-                    'chat_id': TELEGRAM_CHAT_ID,
-                    'caption': f'📊 Excel-выгрузка статей\n📅 {datetime.now().strftime("%d.%m.%Y %H:%M")}',
-                }, files={'document': (filename, f)}, timeout=30)
-
-            os.remove(filepath)
-            if resp.status_code == 200:
-                print('Excel export sent to Telegram')
-            else:
-                print(f'Telegram error (excel): {resp.status_code}')
+            print('Excel export sent to Telegram')
         else:
-            print(f'Excel export failed: HTTP {resp.status_code}')
+            print(f'Telegram error (excel): {resp.status_code}')
     except Exception as e:
         print(f'Excel export send failed: {e}')
 
