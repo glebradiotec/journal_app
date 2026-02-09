@@ -511,32 +511,47 @@ def parse_article_docx(file_path):
     title = re.sub(r'^\d+\.\s*', '', title).strip()
 
     # --- Шаг 2: собираем строки между заголовком и аннотацией ---
+    # Разбиваем многострочные параграфы на отдельные строки
+    # (иногда email и орг попадают в один параграф через \n)
+    all_lines = []
+    for p in paragraphs[title_end_idx + 1:30]:
+        for line in p.split('\n'):
+            line = line.strip()
+            if line:
+                all_lines.append(line)
+
     author_zone_raw = []   # сырые строки (с индексами — для привязки)
     author_zone = []       # очищенные (без ведущих индексов)
-    for i, p in enumerate(paragraphs[title_end_idx + 1:30]):
-        p_lower = p.lower().strip()
-        if any(p_lower.startswith(m) for m in _SKIP_MARKERS):
+    for line in all_lines:
+        line_lower = line.lower()
+        if any(line_lower.startswith(m) for m in _SKIP_MARKERS):
             continue
-        if any(m in p_lower for m in _STOP_MARKERS):
+        if any(m in line_lower for m in _STOP_MARKERS):
             break
-        if len(p.strip()) <= 2:
+        if len(line) <= 2:
             continue
-        author_zone_raw.append(p.strip())
-        author_zone.append(_strip_leading_indices(p.strip()))
+        author_zone_raw.append(line)
+        author_zone.append(_strip_leading_indices(line))
 
     author_text = "\n".join(author_zone)
     author_text_raw = "\n".join(author_zone_raw)
 
     # --- Шаг 3: извлекаем email с привязкой к индексам аффилиаций ---
-    raw_emails = _EMAIL_RE.findall(author_text_raw)
     email_by_index = {}   # {"1": ["email1", "email2"], "2": ["email3"], ...}
     last_email_idx = None
     emails_flat = []      # плоский список (фоллбэк если индексов нет)
-    for raw_email in raw_emails:
-        # Проверяем ведущие цифры-индексы: "1vic@mail.ru" → индекс "1"
+    for m in _EMAIL_RE.finditer(author_text_raw):
+        raw_email = m.group()
+        # Вариант 1: индекс приклеен к email: "1vic@mail.ru" → индекс "1"
         idx_m = re.match(r'^(\d{1,2})(?=[a-zA-Z])', raw_email)
         if idx_m:
             last_email_idx = idx_m.group(1)
+        else:
+            # Вариант 2: индекс через пробел перед email: "1 tujh98@mail.ru"
+            before = author_text_raw[max(0, m.start() - 5):m.start()]
+            before_idx = re.search(r'(\d{1,2})\s*$', before)
+            if before_idx:
+                last_email_idx = before_idx.group(1)
         clean = _strip_leading_indices(raw_email)
         emails_flat.append(clean)
         if last_email_idx is not None:
