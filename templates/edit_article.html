@@ -86,6 +86,10 @@
                             <input type="checkbox" name="edited" {% if article.edited %}checked{% endif %}>
                             <span class="checkbox-text checkbox-orange">Редактировано</span>
                         </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="has_expertise_act" {% if article.has_expertise_act %}checked{% endif %}>
+                            <span class="checkbox-text checkbox-purple">Акт эксп.</span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -239,6 +243,24 @@
                         </div>
                         {% endif %}
                         <input type="file" name="title_pdf" class="form-file" accept=".pdf">
+                    </div>
+
+                    <div class="file-item">
+                        <div class="file-item-header">
+                            <svg class="file-icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8.75 1.75V5a.75.75 0 0 0 .75.75h3.25v7.5a.25.25 0 0 1-.25.25h-8.5a.25.25 0 0 1-.25-.25v-11.5a.25.25 0 0 1 .25-.25Zm2.5 3.5V2.507l2.243 2.243h-1.993a.25.25 0 0 1-.25-.25ZM3.75 0A1.75 1.75 0 0 0 2 1.75v12.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0 0 14 14.25V5.664a1.75 1.75 0 0 0-.513-1.237l-2.914-2.914A1.75 1.75 0 0 0 9.336 1H3.75Z"/>
+                            </svg>
+                            <span>Акт экспертизы</span>
+                        </div>
+                        {% if article.expertise_act_file %}
+                        <div class="file-current">
+                            <a href="/uploads/{{ article.expertise_act_file }}" target="_blank">{{ article.expertise_act_file }}</a>
+                            <label class="delete-file-label">
+                                <input type="checkbox" name="delete_expertise_act"> Удалить
+                            </label>
+                        </div>
+                        {% endif %}
+                        <input type="file" name="expertise_act_file" class="form-file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
                     </div>
                 </div>
             </div>
@@ -444,16 +466,12 @@
 .checkbox-green { color: #1a7f37; }
 .checkbox-blue { color: #5BA4B0; }
 .checkbox-orange { color: #9a6700; }
+.checkbox-purple { color: #8250df; }
 
-.checkbox-label:has(input:checked) .checkbox-green {
-    color: #1a7f37;
-}
-.checkbox-label:has(input:checked) .checkbox-blue {
-    color: #5BA4B0;
-}
-.checkbox-label:has(input:checked) .checkbox-orange {
-    color: #9a6700;
-}
+.checkbox-label:has(input:checked) .checkbox-green { color: #1a7f37; }
+.checkbox-label:has(input:checked) .checkbox-blue { color: #5BA4B0; }
+.checkbox-label:has(input:checked) .checkbox-orange { color: #9a6700; }
+.checkbox-label:has(input:checked) .checkbox-purple { color: #8250df; }
 
 /* Highlight checked checkbox labels */
 .checkbox-label:has(.checkbox-green):has(input:checked) {
@@ -468,10 +486,15 @@
     background: linear-gradient(135deg, rgba(154, 103, 0, 0.12) 0%, rgba(154, 103, 0, 0.05) 100%);
     border-color: rgba(154, 103, 0, 0.4);
 }
+.checkbox-label:has(.checkbox-purple):has(input:checked) {
+    background: linear-gradient(135deg, rgba(130, 80, 223, 0.12) 0%, rgba(130, 80, 223, 0.05) 100%);
+    border-color: rgba(130, 80, 223, 0.4);
+}
 
 [data-theme="dark"] .checkbox-green { color: #3fb950; }
 [data-theme="dark"] .checkbox-blue { color: #7CC5D0; }
 [data-theme="dark"] .checkbox-orange { color: #d29922; }
+[data-theme="dark"] .checkbox-purple { color: #a371f7; }
 
 [data-theme="dark"] .checkbox-label:has(.checkbox-green):has(input:checked) {
     background: linear-gradient(135deg, rgba(63, 185, 80, 0.18) 0%, rgba(63, 185, 80, 0.08) 100%);
@@ -484,6 +507,10 @@
 [data-theme="dark"] .checkbox-label:has(.checkbox-orange):has(input:checked) {
     background: linear-gradient(135deg, rgba(210, 153, 34, 0.18) 0%, rgba(210, 153, 34, 0.08) 100%);
     border-color: rgba(210, 153, 34, 0.4);
+}
+[data-theme="dark"] .checkbox-label:has(.checkbox-purple):has(input:checked) {
+    background: linear-gradient(135deg, rgba(163, 113, 247, 0.18) 0%, rgba(163, 113, 247, 0.08) 100%);
+    border-color: rgba(163, 113, 247, 0.4);
 }
 
 /* Authors */

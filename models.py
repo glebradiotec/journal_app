@@ -59,6 +59,9 @@ class Article(db.Model):
     notes = db.Column(db.Text)
     issue_id = db.Column(db.Integer, db.ForeignKey('issue.id'), nullable=False, index=True)
 
+    has_expertise_act = db.Column(db.Boolean, default=False)
+    expertise_act_file = db.Column(db.String(500))
+
     # Дополнительные поля
     submission_date = db.Column(db.String(50))
     manuscript_file = db.Column(db.String(500))

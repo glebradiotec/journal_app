@@ -84,12 +84,15 @@ def _save_uploaded_file(file, upload_folder):
 
 
 def _process_file_uploads(article, upload_folder):
-    """Обрабатывает загрузку файлов (рукопись, рецензия, титульная) для статьи."""
-    for field_name in ('manuscript_file', 'review_file', 'title_pdf'):
+    """Обрабатывает загрузку файлов (рукопись, рецензия, титульная, акт экспертизы) для статьи."""
+    for field_name in ('manuscript_file', 'review_file', 'title_pdf', 'expertise_act_file'):
         file = request.files.get(field_name)
         saved = _save_uploaded_file(file, upload_folder)
         if saved:
             setattr(article, field_name, saved)
+            # Автоматически включаем статус акта при загрузке файла
+            if field_name == 'expertise_act_file':
+                article.has_expertise_act = True
 
 
 def _process_article_images(article, upload_folder, start_order=0):
@@ -263,8 +266,11 @@ def register_admin_routes(app):
         elif field == 'review':
             article.has_review = not article.has_review
             new_value = article.has_review
+        elif field == 'expertise':
+            article.has_expertise_act = not article.has_expertise_act
+            new_value = article.has_expertise_act
 
-        field_labels = {'payment': 'Оплата', 'edited': 'Редакт.', 'review': 'Рецензия'}
+        field_labels = {'payment': 'Оплата', 'edited': 'Редакт.', 'review': 'Рецензия', 'expertise': 'Акт эксп.'}
         status_text = 'вкл' if new_value else 'выкл'
         log_activity('toggled', 'article', article.id, article.title, f'{field_labels.get(field, field)}: {status_text}')
         log_article_history(article.id, 'status', [{'field': field_labels.get(field, field), 'old': 'выкл' if new_value else 'вкл', 'new': status_text}])
@@ -350,6 +356,7 @@ def register_admin_routes(app):
                 'payment_received': ('payment_received' in request.form, 'Оплата'),
                 'has_review': ('has_review' in request.form, 'Рецензия'),
                 'edited': ('edited' in request.form, 'Редактирование'),
+                'has_expertise_act': ('has_expertise_act' in request.form, 'Акт эксп.'),
             }
             for field, (new_val, label) in new_statuses.items():
                 old_val = getattr(article, field)
@@ -362,9 +369,12 @@ def register_admin_routes(app):
             _process_file_uploads(article, upload_folder)
             
             # Удаление файлов
-            for field_name, form_key in [('manuscript_file', 'delete_manuscript'), ('review_file', 'delete_review'), ('title_pdf', 'delete_title_pdf')]:
+            for field_name, form_key in [('manuscript_file', 'delete_manuscript'), ('review_file', 'delete_review'), ('title_pdf', 'delete_title_pdf'), ('expertise_act_file', 'delete_expertise_act')]:
                 if request.form.get(form_key):
                     setattr(article, field_name, None)
+                    # Сбрасываем статус акта при удалении файла
+                    if field_name == 'expertise_act_file':
+                        article.has_expertise_act = False
             
             # Удаление выбранных изображений
             delete_image_ids = request.form.getlist('delete_image[]')
@@ -766,6 +776,8 @@ def register_admin_routes(app):
                 'payment': a.payment_received,
                 'review': a.has_review,
                 'edited': a.edited,
+                'expertise': a.has_expertise_act,
+                'expertise_act_file': a.expertise_act_file or '',
             })
 
         return jsonify({'articles': result, 'total': len(result)})
@@ -812,11 +824,13 @@ def register_admin_routes(app):
                     article.has_review = value
                 elif field == 'edited':
                     article.edited = value
+                elif field == 'expertise':
+                    article.has_expertise_act = value
                 updated_count += 1
         
         db.session.commit()
         
-        field_names = {'payment': 'оплата', 'review': 'рецензия', 'edited': 'редактирование'}
+        field_names = {'payment': 'оплата', 'review': 'рецензия', 'edited': 'редактирование', 'expertise': 'акт экспертизы'}
         status = 'установлен' if value else 'снят'
         return jsonify({'success': True, 'message': f'{field_names.get(field, field)}: {status} для {updated_count} статей'})
 
@@ -1323,6 +1337,8 @@ def register_admin_routes(app):
             'payment': article.payment_received,
             'review': article.has_review,
             'edited': article.edited,
+            'expertise': article.has_expertise_act,
+            'expertise_act_file': article.expertise_act_file or '',
             'notes': article.notes or '',
             'manuscript_file': article.manuscript_file or '',
             'review_file': article.review_file or '',
