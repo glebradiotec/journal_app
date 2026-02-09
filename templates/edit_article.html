@@ -37,6 +37,7 @@
             Редактирование
         </div>
         <form method="POST" enctype="multipart/form-data" class="edit-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <!-- Title -->
             <div class="form-section">
                 <label class="form-label">Название статьи *</label>

@@ -242,8 +242,8 @@
             var csrfToken = token ? token.getAttribute('content') : '';
 
             // 1. Авто-вставка hidden-поля во все HTML-формы с method=POST
-            document.addEventListener('DOMContentLoaded', function() {
-                document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
+            function injectCsrfIntoForms(container) {
+                (container || document).querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(form) {
                     if (!form.querySelector('input[name="csrf_token"]')) {
                         var input = document.createElement('input');
                         input.type = 'hidden';
@@ -252,7 +252,10 @@
                         form.prepend(input);
                     }
                 });
-            });
+            }
+            document.addEventListener('DOMContentLoaded', function() { injectCsrfIntoForms(); });
+            // Экспортируем для вызова после SPA-навигации
+            window._injectCsrfIntoForms = injectCsrfIntoForms;
 
             // 2. Перехват fetch — автоматически добавляем заголовок X-CSRFToken
             var originalFetch = window.fetch;
@@ -583,6 +586,9 @@
                     window.scrollTo(0, 0);
                     return executeScripts(mainEl);
                 }).then(function() {
+                    // Инъекция CSRF-токенов в новые формы после SPA-навигации
+                    if (window._injectCsrfIntoForms) window._injectCsrfIntoForms(mainEl);
+                    
                     if (admToAdm) {
                         // Sidebar остаётся видимым, fade-in только .adm-main
                         mainEl.style.opacity = '1';
