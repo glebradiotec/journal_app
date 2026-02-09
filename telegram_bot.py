@@ -1,5 +1,5 @@
 """
-Telegram-бот для Journal App.
+Telegram-бот для Radiotec Journal App.
 Слушает команды и отправляет бэкапы / Excel-выгрузки.
 Запускается как systemd-сервис (journal-bot.service).
 """
@@ -51,7 +51,7 @@ def get_main_keyboard():
 def handle_start(chat_id):
     """Обработка /start."""
     send_message(chat_id,
-        '👋 <b>Journal App Backup Bot</b>\n\n'
+        '👋 <b>Radiotec Journal App</b>\n\n'
         '📦 Каждый день в 3:00 сюда приходит бэкап БД и Excel-выгрузка.\n\n'
         'Доступные действия:',
         reply_markup=get_main_keyboard()
@@ -119,7 +119,7 @@ def handle_stats(chat_id):
         conn.close()
 
         send_message(chat_id,
-            f'📈 <b>Статистика Journal App</b>\n\n'
+            f'📈 <b>Статистика Radiotec Journal App</b>\n\n'
             f'📚 Журналов: <b>{journals}</b>\n'
             f'📖 Выпусков: <b>{issues}</b>\n'
             f'📄 Статей: <b>{total}</b>\n\n'

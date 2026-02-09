@@ -12,7 +12,7 @@ def send_to_telegram(backup_file):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
     size_mb = os.path.getsize(backup_file) / 1024 / 1024
     caption = (
-        f"📦 Бэкап БД journal_app\n"
+        f"📦 Бэкап БД Radiotec Journal App\n"
         f"📅 {datetime.now().strftime('%d.%m.%Y %H:%M')}\n"
         f"💾 {size_mb:.1f} МБ"
     )
