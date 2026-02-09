@@ -15,11 +15,15 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 TELEGRAM_BOT_TOKEN = '8568162243:AAFIJGHdgjb4swYCUuBU2pzMHggp9pRGMhA'
 TELEGRAM_CHAT_ID = '134711555'
+BOT_PASSWORD = 'radiotec2026'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_APP_URL = 'http://127.0.0.1:8001'
 
 API = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}'
 POLL_INTERVAL = 2  # секунды
+
+# Авторизованные пользователи (chat_id -> True). Владелец всегда авторизован.
+_authorized_users = {TELEGRAM_CHAT_ID: True}
 
 
 def send_message(chat_id, text, reply_markup=None):
@@ -264,6 +268,11 @@ def handle_stats(chat_id):
         send_message(chat_id, f'❌ Ошибка: {e}')
 
 
+def is_authorized(chat_id):
+    """Проверяет, авторизован ли пользователь."""
+    return str(chat_id) in _authorized_users
+
+
 def process_update(update):
     """Обработать одно обновление от Telegram."""
     msg = update.get('message')
@@ -273,14 +282,36 @@ def process_update(update):
     chat_id = msg['chat']['id']
     text = msg.get('text', '').strip()
 
-    # Проверяем, что это наш чат
-    if str(chat_id) != TELEGRAM_CHAT_ID:
-        send_message(chat_id, '⛔ Доступ запрещён.')
+    # /start доступен всем
+    if text == '/start':
+        if is_authorized(chat_id):
+            handle_start(chat_id)
+        else:
+            send_message(chat_id,
+                '🔒 <b>Radiotec Journal App</b>\n\n'
+                'Для доступа введите пароль:'
+            )
         return
 
-    if text == '/start':
-        handle_start(chat_id)
-    elif text in ('/export', '📊 Excel-выгрузка'):
+    # Если не авторизован — проверяем пароль
+    if not is_authorized(chat_id):
+        if text == BOT_PASSWORD:
+            _authorized_users[str(chat_id)] = True
+            user_name = msg.get('from', {}).get('first_name', 'Пользователь')
+            # Уведомляем владельца
+            send_message(TELEGRAM_CHAT_ID,
+                f'🔓 Новый пользователь получил доступ к боту:\n'
+                f'👤 {user_name} (ID: {chat_id})')
+            send_message(chat_id,
+                '✅ Доступ разрешён! Добро пожаловать.',
+                reply_markup=get_main_keyboard()
+            )
+        else:
+            send_message(chat_id, '❌ Неверный пароль. Попробуйте ещё раз.')
+        return
+
+    # Авторизованные команды
+    if text in ('/export', '📊 Excel-выгрузка'):
         handle_export(chat_id)
     elif text in ('/backup', '💾 Бэкап БД'):
         handle_backup(chat_id)
