@@ -715,8 +715,8 @@ function parsePdfAndFill(input) {
                             </svg>
                         </button>
                     </div>
-                    <div class="author-compact-details" id="author-details-${num}" style="display: none;">
-                        <input type="text" name="author_degree[]" placeholder="Ученая степень">
+                    <div class="author-compact-details" id="author-details-${num}" style="${author.degree ? 'display: flex;' : 'display: none;'}">
+                        <input type="text" name="author_degree[]" placeholder="Ученая степень" value="${escapeHtml(author.degree || '')}">
                         <input type="text" name="author_position[]" placeholder="Должность">
                         <input type="tel" name="author_phone[]" placeholder="Телефон">
                     </div>
