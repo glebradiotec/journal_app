@@ -511,26 +511,36 @@ def parse_article_docx(file_path):
     title = re.sub(r'^\d+\.\s*', '', title).strip()
 
     # --- Шаг 2: собираем строки между заголовком и аннотацией ---
-    author_zone = []
+    author_zone_raw = []   # сырые строки (с индексами — для привязки)
+    author_zone = []       # очищенные (без ведущих индексов)
     for i, p in enumerate(paragraphs[title_end_idx + 1:30]):
         p_lower = p.lower().strip()
-        # Пропускаем служебные строки
         if any(p_lower.startswith(m) for m in _SKIP_MARKERS):
             continue
-        # Стоп — дошли до аннотации/введения
         if any(m in p_lower for m in _STOP_MARKERS):
             break
         if len(p.strip()) <= 2:
             continue
-        # Убираем ведущие суперскрипт-индексы ("1,2Санкт-..." -> "Санкт-...")
+        author_zone_raw.append(p.strip())
         author_zone.append(_strip_leading_indices(p.strip()))
 
     author_text = "\n".join(author_zone)
+    author_text_raw = "\n".join(author_zone_raw)
 
-    # --- Шаг 3: извлекаем email ---
-    raw_emails = _EMAIL_RE.findall(author_text)
-    # Убираем ведущие цифры-индексы из email: "1svispb@yandex.ru" -> "svispb@yandex.ru"
-    emails = [_strip_leading_indices(e) for e in raw_emails]
+    # --- Шаг 3: извлекаем email с привязкой к индексам аффилиаций ---
+    raw_emails = _EMAIL_RE.findall(author_text_raw)
+    email_by_index = {}   # {"1": ["email1", "email2"], "2": ["email3"], ...}
+    last_email_idx = None
+    emails_flat = []      # плоский список (фоллбэк если индексов нет)
+    for raw_email in raw_emails:
+        # Проверяем ведущие цифры-индексы: "1vic@mail.ru" → индекс "1"
+        idx_m = re.match(r'^(\d{1,2})(?=[a-zA-Z])', raw_email)
+        if idx_m:
+            last_email_idx = idx_m.group(1)
+        clean = _strip_leading_indices(raw_email)
+        emails_flat.append(clean)
+        if last_email_idx is not None:
+            email_by_index.setdefault(last_email_idx, []).append(clean)
 
     # --- Шаг 4: извлекаем имена ---
     cleaned = _clean_superscripts(author_text)
@@ -541,10 +551,8 @@ def parse_article_docx(file_path):
     all_names = []
     for name in raw_names:
         name_lower = name.lower()
-        # Фильтр: имя содержит ключевое слово организации
         if any(kw in name_lower for kw in _ORG_KEYWORDS):
             continue
-        # Фильтр: имя стоит после "им.", "имени", "named after"
         idx = author_text_lower.find(name_lower)
         if idx != -1:
             before = author_text_lower[max(0, idx - 15):idx]
@@ -552,29 +560,46 @@ def parse_article_docx(file_path):
                 continue
         all_names.append(name)
 
-    # --- Шаг 5: извлекаем организации ---
+    # Извлекаем индексы авторов — цифра сразу после имени в сыром тексте
+    # "В. В. Беляев1," → индекс "1"
+    name_to_index = {}
+    for name in all_names:
+        pos = author_text_raw.find(name)
+        if pos != -1:
+            after = author_text_raw[pos + len(name):pos + len(name) + 3]
+            trail_m = re.match(r'(\d{1,2})', after)
+            if trail_m:
+                name_to_index[name] = trail_m.group(1)
+
+    # --- Шаг 5: извлекаем организации с привязкой к индексам ---
     organizations = []
-    for p in author_zone:
-        p_lower = p.lower()
-        has_org_kw = any(kw in p_lower for kw in _ORG_KEYWORDS)
-        if has_org_kw:
-            # Ведущие индексы уже убраны в _strip_leading_indices при сборе author_zone
-            org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', p.strip()).rstrip(',;.')
-            # Ищем начало организации по ключевому слову
-            best_org = None
-            for kw in _ORG_KEYWORDS:
-                ki = org.lower().find(kw)
-                if ki != -1:
-                    start = org.rfind(',', 0, ki)
-                    start = start + 1 if start != -1 else 0
-                    org_part = org[start:]
-                    org_part = re.split(r',\s*(?:улица|ул\.|e-mail|email|тел|phone|spin|адрес|д\.\s*\d)',
-                                        org_part, flags=re.IGNORECASE)[0].strip().rstrip(',;.')
-                    if org_part and len(org_part) > 5:
-                        best_org = org_part
-                        break
-            if best_org and best_org not in organizations:
+    org_by_index = {}  # {"1": ["org1"], "3": ["org1", "org2"], ...}
+    for p_raw, p_clean in zip(author_zone_raw, author_zone):
+        p_lower = p_clean.lower()
+        if not any(kw in p_lower for kw in _ORG_KEYWORDS):
+            continue
+        org = re.sub(r'^\s*[\d,\-–−\s]+\s+', '', p_clean.strip()).rstrip(',;.')
+        best_org = None
+        for kw in _ORG_KEYWORDS:
+            ki = org.lower().find(kw)
+            if ki != -1:
+                start = org.rfind(',', 0, ki)
+                start = start + 1 if start != -1 else 0
+                org_part = org[start:]
+                org_part = re.split(r',\s*(?:улица|ул\.|e-mail|email|тел|phone|spin|адрес|д\.\s*\d)',
+                                    org_part, flags=re.IGNORECASE)[0].strip().rstrip(',;.')
+                if org_part and len(org_part) > 5:
+                    best_org = org_part
+                    break
+        if best_org:
+            if best_org not in organizations:
                 organizations.append(best_org)
+            # Извлекаем индексы из сырой строки: "1,3Российский..." → ["1", "3"]
+            idx_m = re.match(r'^([\d,\-–−\s]+)', p_raw)
+            if idx_m:
+                indices = re.findall(r'\d+', idx_m.group(1))
+                for idx in indices:
+                    org_by_index.setdefault(idx, []).append(best_org)
 
     # Фоллбэк: ищем авторов в строке копирайта ©
     if not all_names:
@@ -587,20 +612,32 @@ def parse_article_docx(file_path):
                     break
 
     # --- Шаг 6: собираем авторов ---
+    has_indices = bool(name_to_index)
     authors = []
     for i, name in enumerate(all_names):
         author = {"name": name, "email": "", "organization": ""}
-        if i < len(emails):
-            author["email"] = emails[i]
-        if len(organizations) == 1:
-            author["organization"] = organizations[0]
-        elif organizations and i < len(organizations):
-            author["organization"] = organizations[i]
+
+        if has_indices and name in name_to_index:
+            # Привязка по индексам аффилиаций
+            idx = name_to_index[name]
+            if idx in email_by_index:
+                author["email"] = ", ".join(email_by_index[idx])
+            if idx in org_by_index:
+                author["organization"] = "; ".join(org_by_index[idx])
+        else:
+            # Фоллбэк: по порядку
+            if i < len(emails_flat):
+                author["email"] = emails_flat[i]
+            if len(organizations) == 1:
+                author["organization"] = organizations[0]
+            elif organizations and i < len(organizations):
+                author["organization"] = organizations[i]
+
         authors.append(author)
 
     # Если нашли email, но не нашли авторов
-    if not authors and emails:
-        for email in emails:
+    if not authors and emails_flat:
+        for email in emails_flat:
             authors.append({"name": "", "email": email, "organization": ""})
 
     return {
