@@ -15,7 +15,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 TELEGRAM_BOT_TOKEN = '8568162243:AAFIJGHdgjb4swYCUuBU2pzMHggp9pRGMhA'
 TELEGRAM_CHAT_ID = '134711555'
-BOT_PASSWORD = 'radiotec2026'
+BOT_PASSWORD = '1845'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_APP_URL = 'http://127.0.0.1:8001'
 
