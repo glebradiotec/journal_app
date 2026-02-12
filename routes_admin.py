@@ -1522,6 +1522,7 @@ def register_admin_routes(app):
             )
             .filter(ArticleAuthor.full_name.isnot(None))
             .filter(ArticleAuthor.full_name != '')
+            .filter(~ArticleAuthor.full_name.like('(%'))  # исключаем мусор (организации/города)
         )
 
         if search:
