@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}{{ author.name }} — Автор{% endblock %}
+
+{% block content %}
+<div class="author-page">
+    <!-- Breadcrumbs -->
+    <ul class="breadcrumbs">
+        <li><a href="/">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z"/></svg>
+            Главная
+        </a></li>
+        <li><span class="breadcrumb-current">{{ author.name }}</span></li>
+    </ul>
+
+    <!-- Author Card -->
+    <div class="ap-card">
+        <div class="ap-avatar">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.432-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/>
+            </svg>
+        </div>
+        <div class="ap-info">
+            <h1 class="ap-name">{{ author.name }}</h1>
+            <div class="ap-details">
+                {% if author.degree %}
+                <span class="ap-detail">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25Zm-.025 5.475-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 0 1 2.83 2.83Z"/></svg>
+                    {{ author.degree }}
+                </span>
+                {% endif %}
+                {% if author.position %}
+                <span class="ap-detail">{{ author.position }}</span>
+                {% endif %}
+                {% if author.organization %}
+                <span class="ap-detail">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1.75 16A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0h8.5C11.216 0 12 .784 12 1.75v12.5c0 .085-.006.168-.018.25h2.268a.25.25 0 0 0 .25-.25V8.285a.25.25 0 0 0-.111-.208l-1.055-.703a.749.749 0 1 1 .832-1.248l1.055.703c.487.325.777.871.777 1.456v5.965A1.75 1.75 0 0 1 14.25 16h-3.5a.766.766 0 0 1-.197-.026c-.099.017-.2.026-.303.026h-3a.75.75 0 0 1-.75-.75V14h-1v1.25a.75.75 0 0 1-.75.75Zm-.25-1.75c0 .138.112.25.25.25H4v-1.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 .75.75v1.25h2.25a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25ZM3.75 6h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 3.75A.75.75 0 0 1 3.75 3h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 3.75Zm4 3A.75.75 0 0 1 7.75 6h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 7 6.75ZM7.75 3h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5ZM3 9.75A.75.75 0 0 1 3.75 9h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 3 9.75ZM7.75 9h.5a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5Z"/></svg>
+                    {{ author.organization }}
+                </span>
+                {% endif %}
+                {% if author.email %}
+                <span class="ap-detail">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2ZM1.5 12.251c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V5.809L8.38 9.397a.75.75 0 0 1-.76 0L1.5 5.809v6.442Zm13-8.181v-.32a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25v.32L8 7.88Z"/></svg>
+                    {{ author.email }}
+                </span>
+                {% endif %}
+                {% if author.phone %}
+                <span class="ap-detail">{{ author.phone }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Articles -->
+    <div class="ap-articles-header">
+        <h2 class="ap-articles-title">
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25ZM1.75 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Z"/>
+            </svg>
+            Публикации
+        </h2>
+        <span class="ap-articles-count">{{ articles|length }}</span>
+    </div>
+
+    {% if articles %}
+    <div class="ap-articles-list">
+        {% for article in articles %}
+        <div class="ap-article" style="--card-index: {{ loop.index0 }}">
+            <div class="ap-article-main">
+                <h3 class="ap-article-title">
+                    <a href="/issue/{{ article.issue_id }}">{{ article.title }}</a>
+                </h3>
+                <div class="ap-article-meta">
+                    {% if article.issue and article.issue.journal %}
+                    <span class="ap-meta-badge ap-meta-journal">{{ article.issue.journal.name }}</span>
+                    {% endif %}
+                    {% if article.issue %}
+                    <span class="ap-meta-badge">&numero;{{ article.issue.number }} / {{ article.issue.year }}</span>
+                    {% endif %}
+                </div>
+                {% if article.article_authors|length > 1 %}
+                <div class="ap-coauthors">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 3.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4.001 4.001 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5Zm8 .5a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-1.5 1a2.5 2.5 0 0 1 4.637-1.292.75.75 0 0 1-1.274.79A1 1 0 0 0 10 6a.75.75 0 0 1 0-1.5Zm3.491 3.27a.75.75 0 0 1 .893-.576 5.002 5.002 0 0 1 3.088 3.139.75.75 0 0 1-1.412.506 3.502 3.502 0 0 0-2.16-2.197.75.75 0 0 1-.409-.873Z"/></svg>
+                    <span>Соавторы:
+                    {% for a in article.article_authors|sort(attribute='order') %}
+                        {% if a.full_name.lower() != author.name.lower() %}
+                            <a href="/author/{{ a.full_name|urlencode }}" class="ap-coauthor-link">{{ a.full_name }}</a>{% if not loop.last %}, {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="ap-article-statuses">
+                {% if article.payment_received %}
+                <span class="ap-status ap-status-green" title="Оплачено">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>
+                </span>
+                {% endif %}
+                {% if article.has_review %}
+                <span class="ap-status ap-status-blue" title="Рецензия">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z"/></svg>
+                </span>
+                {% endif %}
+                {% if article.edited %}
+                <span class="ap-status ap-status-orange" title="Отредактировано">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="ap-empty">
+        <p>Статьи не найдены</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.author-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 32px;
+}
+
+/* Author Card */
+.ap-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 28px;
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    margin-bottom: 32px;
+}
+
+.ap-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #5BA4B0, #4A8E99);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+[data-theme="dark"] .ap-avatar {
+    background: linear-gradient(135deg, #5BA4B0, #7CC5D0);
+}
+
+.ap-info { min-width: 0; flex: 1; }
+
+.ap-name {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0 0 10px 0;
+    line-height: 1.3;
+}
+
+.ap-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.ap-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--color-fg-muted);
+}
+
+.ap-detail svg { opacity: 0.6; flex-shrink: 0; }
+
+/* Articles Header */
+.ap-articles-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.ap-articles-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
+.ap-articles-title svg { color: var(--color-fg-muted); }
+
+.ap-articles-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    color: var(--color-fg-muted);
+}
+
+/* Articles List */
+.ap-articles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ap-article {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-muted);
+    border-radius: 12px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: apCardAppear 0.25s ease forwards;
+    animation-delay: calc(var(--card-index, 0) * 0.03s);
+}
+
+@keyframes apCardAppear {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ap-article:hover {
+    border-color: var(--color-border-default);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.ap-article-main { min-width: 0; flex: 1; }
+
+.ap-article-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+}
+
+.ap-article-title a {
+    color: var(--color-fg-default);
+    text-decoration: none;
+}
+
+.ap-article-title a:hover {
+    color: var(--color-accent-fg);
+}
+
+.ap-article-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.ap-meta-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    background: var(--color-canvas-subtle);
+    color: var(--color-fg-muted);
+    border: 1px solid var(--color-border-default);
+}
+
+.ap-meta-journal {
+    background: linear-gradient(135deg, rgba(91,164,176,0.1), rgba(91,164,176,0.05));
+    color: #5BA4B0;
+    border-color: rgba(91,164,176,0.3);
+}
+
+[data-theme="dark"] .ap-meta-journal {
+    color: #7CC5D0;
+    border-color: rgba(124,197,208,0.3);
+}
+
+.ap-coauthors {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    margin-top: 4px;
+}
+
+.ap-coauthors svg { flex-shrink: 0; opacity: 0.5; position: relative; top: 2px; }
+
+.ap-coauthor-link {
+    color: var(--color-accent-fg);
+    text-decoration: none;
+}
+
+.ap-coauthor-link:hover {
+    text-decoration: underline;
+}
+
+.ap-article-statuses {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    padding-top: 2px;
+}
+
+.ap-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+}
+
+.ap-status-green { color: #1a7f37; background: rgba(31,136,61,0.1); }
+.ap-status-blue { color: #5BA4B0; background: rgba(91,164,176,0.1); }
+.ap-status-orange { color: #9a6700; background: rgba(154,103,0,0.1); }
+
+[data-theme="dark"] .ap-status-green { color: #3fb950; background: rgba(63,185,80,0.15); }
+[data-theme="dark"] .ap-status-blue { color: #7CC5D0; background: rgba(124,197,208,0.15); }
+[data-theme="dark"] .ap-status-orange { color: #d29922; background: rgba(210,153,34,0.15); }
+
+.ap-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--color-fg-muted);
+    font-size: 15px;
+}
+
+@media (max-width: 768px) {
+    .author-page { padding: 20px 16px; }
+    .ap-card { flex-direction: column; align-items: center; text-align: center; }
+    .ap-details { justify-content: center; }
+    .ap-article { flex-direction: column; }
+    .ap-article-statuses { align-self: flex-start; }
+}
+</style>
+{% endblock %}

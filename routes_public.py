@@ -199,6 +199,56 @@ def register_public_routes(app):
         
         return render_template('articles.html', issue=issue, journal=journal, articles=articles, search=search)
 
+    @app.route('/author/<path:author_name>')
+    @login_required
+    def author_page(author_name):
+        """Страница автора со списком всех его статей."""
+        # Находим все записи автора (по имени, регистронезависимо)
+        author_records = (
+            ArticleAuthor.query
+            .filter(db.func.lower(ArticleAuthor.full_name) == author_name.lower())
+            .all()
+        )
+        if not author_records:
+            from flask import abort
+            abort(404)
+
+        # Берём данные автора из первой записи с максимумом информации
+        author_info = {
+            'name': author_records[0].full_name,
+            'email': None,
+            'organization': None,
+            'degree': None,
+            'position': None,
+            'phone': None,
+        }
+        for rec in author_records:
+            if rec.email and not author_info['email']:
+                author_info['email'] = rec.email
+            if rec.organization and not author_info['organization']:
+                author_info['organization'] = rec.organization
+            if rec.degree and not author_info['degree']:
+                author_info['degree'] = rec.degree
+            if rec.position and not author_info['position']:
+                author_info['position'] = rec.position
+            if rec.phone and not author_info['phone']:
+                author_info['phone'] = rec.phone
+
+        # Получаем все статьи автора
+        article_ids = [r.article_id for r in author_records]
+        articles = (
+            Article.query
+            .filter(Article.id.in_(article_ids))
+            .options(
+                joinedload(Article.issue).joinedload(Issue.journal),
+                subqueryload(Article.article_authors)
+            )
+            .order_by(Article.id.desc())
+            .all()
+        )
+
+        return render_template('author.html', author=author_info, articles=articles)
+
     @app.route('/api/journals-and-issues')
     @login_required
     def get_journals_and_issues():
