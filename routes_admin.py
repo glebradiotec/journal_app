@@ -1495,21 +1495,109 @@ def register_admin_routes(app):
     @app.route('/admin/authors')
     @admin_required
     def admin_authors():
-        """Страница со списком всех авторов."""
+        """Страница со списком всех авторов — данные через AJAX."""
         search = request.args.get('search', '').strip()
-        authors = _group_authors()
+        total_authors = db.session.query(db.func.count(db.distinct(ArticleAuthor.full_name))).scalar()
+        return render_template('admin/authors.html',
+                               total=total_authors,
+                               search=search)
+
+    @app.route('/admin/authors/api')
+    @admin_required
+    def admin_authors_api():
+        """JSON API для пагинированного списка авторов (группировка на уровне SQL)."""
+        search = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 200)
+
+        # SQL-группировка авторов по LOWER(full_name)
+        base_q = (
+            db.session.query(
+                ArticleAuthor.full_name,
+                db.func.min(ArticleAuthor.email).label('email'),
+                db.func.min(ArticleAuthor.organization).label('organization'),
+                db.func.count(db.distinct(ArticleAuthor.article_id)).label('article_count'),
+            )
+            .filter(ArticleAuthor.full_name.isnot(None))
+            .filter(ArticleAuthor.full_name != '')
+        )
 
         if search:
-            search_lower = search.lower()
-            authors = [
-                a for a in authors
-                if search_lower in a['name'].lower()
-                or search_lower in a['email'].lower()
-                or search_lower in a['organization'].lower()
-                or any(search_lower in v.lower() for v in a['name_variants'])
-            ]
+            like = f'%{search}%'
+            base_q = base_q.filter(
+                db.or_(
+                    ArticleAuthor.full_name.ilike(like),
+                    ArticleAuthor.email.ilike(like),
+                    ArticleAuthor.organization.ilike(like),
+                )
+            )
 
-        return render_template('admin/authors.html',
-                               authors=authors,
-                               total=len(authors),
-                               search=search)
+        base_q = base_q.group_by(db.func.lower(ArticleAuthor.full_name))
+
+        total = base_q.count()
+        rows = (
+            base_q
+            .order_by(ArticleAuthor.full_name)
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+        result = []
+        for row in rows:
+            result.append({
+                'name': row.full_name or '',
+                'email': (row.email or '').strip(),
+                'organization': (row.organization or '').strip(),
+                'article_count': row.article_count,
+            })
+
+        total_pages = (total + per_page - 1) // per_page
+        return jsonify({
+            'authors': result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+        })
+
+    @app.route('/admin/authors/articles')
+    @admin_required
+    def admin_author_articles():
+        """JSON API — статьи конкретного автора (по имени)."""
+        name = request.args.get('name', '').strip()
+        if not name:
+            return jsonify({'articles': []})
+
+        authors = (
+            ArticleAuthor.query
+            .filter(db.func.lower(ArticleAuthor.full_name) == name.lower())
+            .options(
+                joinedload(ArticleAuthor.article)
+                .joinedload(Article.issue)
+                .joinedload(Issue.journal)
+            )
+            .all()
+        )
+
+        seen = set()
+        articles = []
+        for aa in authors:
+            if aa.article and aa.article_id not in seen:
+                seen.add(aa.article_id)
+                art = aa.article
+                journal_name = ''
+                issue_label = ''
+                if art.issue:
+                    if art.issue.journal:
+                        journal_name = art.issue.journal.name
+                    issue_label = f'\u2116{art.issue.number}/{art.issue.year}'
+                articles.append({
+                    'id': art.id,
+                    'title': art.title or '',
+                    'journal': journal_name,
+                    'issue': issue_label,
+                })
+
+        articles.sort(key=lambda x: x['id'], reverse=True)
+        return jsonify({'articles': articles})

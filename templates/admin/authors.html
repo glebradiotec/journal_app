@@ -115,20 +115,28 @@
 
         <!-- Search -->
         <div class="art-card" style="padding: 16px 20px; margin-bottom: 20px;">
-            <form method="get" action="{{ url_for('admin_authors') }}" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <div class="art-search-wrap" style="flex: 1; min-width: 220px;">
                     <svg class="art-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.5 7a4.499 4.499 0 1 1-8.998 0A4.499 4.499 0 0 1 11.5 7Zm-.82 4.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215Z"/></svg>
-                    <input type="text" name="search" class="art-search" placeholder="Поиск по имени, email, организации..." value="{{ search }}">
+                    <input type="text" id="authorSearch" class="art-search" placeholder="Поиск по имени, email, организации..." value="{{ search }}">
                 </div>
-                <button type="submit" class="art-btn" style="padding: 8px 20px; background: var(--color-accent-emphasis); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 13px;">Найти</button>
-                {% if search %}
-                <a href="{{ url_for('admin_authors') }}" class="art-btn art-btn-reset" style="padding: 8px 16px; font-size: 13px; text-decoration: none;">Сбросить</a>
-                {% endif %}
-            </form>
+                <button type="button" id="authorSearchReset" class="art-btn art-btn-reset" style="padding: 8px 16px; font-size: 13px; display: none;">Сбросить</button>
+            </div>
+        </div>
+
+        <!-- Pagination Top -->
+        <div class="aut-pagination" id="paginationTop" style="display:none">
+            <button class="aut-page-btn" onclick="goPage(-1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06Z"/></svg>
+            </button>
+            <span class="aut-page-info" id="pageInfoTop">1 / 1</span>
+            <button class="aut-page-btn" onclick="goPage(1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
         </div>
 
         <!-- Authors Table -->
-        <div class="art-card art-table-card">
+        <div class="art-card art-table-card" id="tableCard">
             <div class="art-table-wrap">
                 <table class="art-table" id="authorsTable">
                     <thead>
@@ -140,56 +148,30 @@
                             <th style="width: 80px; text-align: center;">Статей</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for author in authors %}
-                        <tr class="aut-row" onclick="toggleArticles(this)" style="cursor: pointer;">
-                            <td style="text-align: center; color: var(--color-fg-muted); font-size: 12px;">{{ loop.index }}</td>
-                            <td>
-                                <div class="aut-name">{{ author.name }}</div>
-                                {% if author.name_variants %}
-                                <div class="aut-variants">{{ author.name_variants|join(', ') }}</div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if author.email %}
-                                <span class="aut-email">{{ author.email }}</span>
-                                {% else %}
-                                <span style="color: var(--color-fg-subtle);">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="aut-org">{{ author.organization|truncate(60, True, '...') if author.organization else '—' }}</div>
-                            </td>
-                            <td style="text-align: center;">
-                                <span class="aut-count">{{ author.article_count }}</span>
-                            </td>
-                        </tr>
-                        <tr class="aut-articles-row" style="display: none;">
-                            <td colspan="5" style="padding: 0;">
-                                <div class="aut-articles-list">
-                                    {% for art in author.articles %}
-                                    <a href="{{ url_for('admin_articles', search=art.title[:30]) }}" class="aut-article-item">
-                                        <span class="aut-article-title">{{ art.title|truncate(80, True, '...') }}</span>
-                                        <span class="aut-article-meta">{{ art.journal }} {{ art.issue }}</span>
-                                    </a>
-                                    {% endfor %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                    <tbody id="authorsBody">
+                        <!-- AJAX -->
                     </tbody>
                 </table>
 
-                {% if not authors %}
-                <div class="art-empty" style="padding: 48px 20px; text-align: center; color: var(--color-fg-muted);">
-                    {% if search %}
-                    Авторы не найдены по запросу "{{ search }}"
-                    {% else %}
-                    Авторы пока не добавлены
-                    {% endif %}
+                <div class="art-empty" id="emptyState" style="display:none; padding: 48px 20px; text-align: center; color: var(--color-fg-muted);">
+                    Авторы не найдены
                 </div>
-                {% endif %}
+                <div class="aut-loading" id="loadingState">
+                    <div class="aut-spinner"></div>
+                    <p>Загрузка...</p>
+                </div>
             </div>
+        </div>
+
+        <!-- Pagination Bottom -->
+        <div class="aut-pagination" id="paginationBottom" style="display:none">
+            <button class="aut-page-btn" onclick="goPage(-1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06Z"/></svg>
+            </button>
+            <span class="aut-page-info" id="pageInfoBottom">1 / 1</span>
+            <button class="aut-page-btn" onclick="goPage(1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
         </div>
 
     </div>
@@ -280,12 +262,6 @@
     font-size: 13.5px;
     color: var(--color-fg-default);
 }
-.aut-variants {
-    font-size: 11.5px;
-    color: var(--color-fg-muted);
-    margin-top: 2px;
-    font-style: italic;
-}
 .aut-email {
     font-size: 13px;
     color: var(--color-accent-fg);
@@ -319,6 +295,13 @@
 }
 .aut-articles-list {
     padding: 8px 16px 12px 48px;
+    background: var(--color-canvas-inset);
+    border-bottom: 1px solid var(--color-border-muted);
+}
+.aut-articles-loading {
+    padding: 16px 48px;
+    font-size: 13px;
+    color: var(--color-fg-muted);
     background: var(--color-canvas-inset);
     border-bottom: 1px solid var(--color-border-muted);
 }
@@ -361,6 +344,19 @@
 .aut-row.aut-expanded td:first-child::before {
     transform: rotate(90deg);
 }
+
+/* Pagination */
+.aut-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
+.aut-page-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--color-border-default); border-radius: 8px; background: var(--color-canvas-default); color: var(--color-fg-default); cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.aut-page-btn:hover:not(:disabled) { background: var(--color-canvas-subtle); border-color: var(--color-accent-emphasis); }
+.aut-page-btn:disabled { opacity: 0.35; cursor: default; }
+.aut-page-info { font-size: 14px; font-weight: 600; color: var(--color-fg-muted); min-width: 80px; text-align: center; }
+
+/* Loading */
+.aut-loading { text-align: center; padding: 48px 16px; color: var(--color-fg-muted); }
+.aut-loading p { margin: 12px 0 0; font-size: 14px; }
+.aut-spinner { width: 28px; height: 28px; border: 3px solid var(--color-border-default); border-top-color: var(--color-accent-emphasis); border-radius: 50%; animation: autSpin 0.6s linear infinite; margin: 0 auto; }
+@keyframes autSpin { to { transform: rotate(360deg); } }
 </style>
 
 <script>
@@ -383,13 +379,174 @@ function toggleAdmTheme() {
     document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
 })();
 
+/* ===== Authors AJAX ===== */
+var _autPage = 1;
+var _autTotalPages = 1;
+var _autController = null;
+var _autTimer = null;
+
+function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function truncate(s, max) { return s && s.length > max ? s.substring(0, max) + '...' : (s || ''); }
+
+function loadAuthors(resetPage) {
+    if (resetPage !== false) _autPage = 1;
+
+    var search = document.getElementById('authorSearch').value.trim();
+    var resetBtn = document.getElementById('authorSearchReset');
+    resetBtn.style.display = search ? '' : 'none';
+
+    if (_autController) _autController.abort();
+    _autController = new AbortController();
+
+    var sub = document.querySelector('.adm-welcome-sub');
+    if (sub) sub.textContent = 'Загрузка...';
+    document.getElementById('loadingState').style.display = '';
+    document.getElementById('authorsBody').innerHTML = '';
+    document.getElementById('emptyState').style.display = 'none';
+
+    var params = new URLSearchParams();
+    if (search) params.set('search', search);
+    params.set('page', _autPage);
+    params.set('per_page', 50);
+
+    fetch('/admin/authors/api?' + params.toString(), { signal: _autController.signal })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('loadingState').style.display = 'none';
+            _autTotalPages = data.total_pages || 1;
+            if (sub) sub.textContent = 'Найдено: ' + data.total;
+            renderAuthors(data);
+            updatePagination(data);
+        })
+        .catch(function(e) {
+            if (e.name !== 'AbortError') {
+                document.getElementById('loadingState').style.display = 'none';
+                if (sub) sub.textContent = 'Ошибка загрузки';
+            }
+        });
+}
+
+function renderAuthors(data) {
+    var tbody = document.getElementById('authorsBody');
+    var empty = document.getElementById('emptyState');
+    var authors = data.authors || [];
+    var offset = ((data.page || 1) - 1) * (data.per_page || 50);
+
+    if (!authors.length) {
+        tbody.innerHTML = '';
+        empty.style.display = '';
+        return;
+    }
+    empty.style.display = 'none';
+
+    var html = '';
+    for (var i = 0; i < authors.length; i++) {
+        var a = authors[i];
+        var num = offset + i + 1;
+        var nameEsc = escapeHtml(a.name);
+        html += '<tr class="aut-row" data-name="' + nameEsc.replace(/"/g, '&quot;') + '" onclick="toggleArticles(this)" style="cursor:pointer;">' +
+            '<td style="text-align:center;color:var(--color-fg-muted);font-size:12px;">' + num + '</td>' +
+            '<td><div class="aut-name">' + nameEsc + '</div></td>' +
+            '<td>' + (a.email ? '<span class="aut-email">' + escapeHtml(a.email) + '</span>' : '<span style="color:var(--color-fg-subtle);">\u2014</span>') + '</td>' +
+            '<td><div class="aut-org">' + escapeHtml(truncate(a.organization, 60) || '\u2014') + '</div></td>' +
+            '<td style="text-align:center;"><span class="aut-count">' + a.article_count + '</span></td>' +
+        '</tr>' +
+        '<tr class="aut-articles-row" style="display:none;">' +
+            '<td colspan="5" style="padding:0;">' +
+                '<div class="aut-articles-loading">Загрузка статей...</div>' +
+            '</td>' +
+        '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+function updatePagination(data) {
+    var pags = [document.getElementById('paginationTop'), document.getElementById('paginationBottom')];
+    if (data.total <= 0 || data.total_pages <= 1) {
+        pags.forEach(function(p) { p.style.display = 'none'; });
+        return;
+    }
+    pags.forEach(function(p) { p.style.display = 'flex'; });
+    document.getElementById('pageInfoTop').textContent = data.page + ' / ' + data.total_pages;
+    document.getElementById('pageInfoBottom').textContent = data.page + ' / ' + data.total_pages;
+    /* Enable/disable buttons */
+    var prevBtns = document.querySelectorAll('.aut-pagination .aut-page-btn:first-child');
+    var nextBtns = document.querySelectorAll('.aut-pagination .aut-page-btn:last-child');
+    prevBtns.forEach(function(b) { b.disabled = data.page <= 1; });
+    nextBtns.forEach(function(b) { b.disabled = data.page >= data.total_pages; });
+}
+
+function goPage(delta) {
+    _autPage += delta;
+    if (_autPage < 1) _autPage = 1;
+    if (_autPage > _autTotalPages) _autPage = _autTotalPages;
+    loadAuthors(false);
+    document.getElementById('tableCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function toggleArticles(row) {
     var articlesRow = row.nextElementSibling;
     if (!articlesRow || !articlesRow.classList.contains('aut-articles-row')) return;
 
     var isOpen = articlesRow.style.display !== 'none';
-    articlesRow.style.display = isOpen ? 'none' : 'table-row';
-    row.classList.toggle('aut-expanded', !isOpen);
+    if (isOpen) {
+        articlesRow.style.display = 'none';
+        row.classList.remove('aut-expanded');
+        return;
+    }
+
+    articlesRow.style.display = 'table-row';
+    row.classList.add('aut-expanded');
+
+    /* Load articles on demand */
+    var name = row.getAttribute('data-name');
+    var cell = articlesRow.querySelector('td');
+    cell.innerHTML = '<div class="aut-articles-loading">Загрузка статей...</div>';
+
+    fetch('/admin/authors/articles?name=' + encodeURIComponent(name))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var arts = data.articles || [];
+            if (!arts.length) {
+                cell.innerHTML = '<div class="aut-articles-loading">Статьи не найдены</div>';
+                return;
+            }
+            var html = '<div class="aut-articles-list">';
+            for (var i = 0; i < arts.length; i++) {
+                var a = arts[i];
+                html += '<a href="/admin/articles?search=' + encodeURIComponent(a.title.substring(0, 30)) + '" class="aut-article-item">' +
+                    '<span class="aut-article-title">' + escapeHtml(truncate(a.title, 80)) + '</span>' +
+                    '<span class="aut-article-meta">' + escapeHtml(a.journal) + ' ' + escapeHtml(a.issue) + '</span>' +
+                '</a>';
+            }
+            html += '</div>';
+            cell.innerHTML = html;
+        })
+        .catch(function() {
+            cell.innerHTML = '<div class="aut-articles-loading">Ошибка загрузки</div>';
+        });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('authorSearch');
+    searchInput.addEventListener('input', function() {
+        clearTimeout(_autTimer);
+        _autTimer = setTimeout(function() { loadAuthors(); }, 300);
+    });
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_autTimer); loadAuthors(); }
+    });
+    document.getElementById('authorSearchReset').addEventListener('click', function() {
+        searchInput.value = '';
+        loadAuthors();
+    });
+    /* Auto-load */
+    loadAuthors();
+});
 </script>
 {% endblock %}
