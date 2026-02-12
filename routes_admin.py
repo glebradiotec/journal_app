@@ -1509,14 +1509,16 @@ def register_admin_routes(app):
         search = request.args.get('search', '').strip()
         page = request.args.get('page', 1, type=int)
         per_page = min(request.args.get('per_page', 50, type=int), 200)
+        sort = request.args.get('sort', 'name_asc')  # name_asc, name_desc, articles_desc, articles_asc, email
 
         # SQL-группировка авторов по LOWER(full_name)
+        article_count_col = db.func.count(db.distinct(ArticleAuthor.article_id)).label('article_count')
         base_q = (
             db.session.query(
                 ArticleAuthor.full_name,
                 db.func.min(ArticleAuthor.email).label('email'),
                 db.func.min(ArticleAuthor.organization).label('organization'),
-                db.func.count(db.distinct(ArticleAuthor.article_id)).label('article_count'),
+                article_count_col,
             )
             .filter(ArticleAuthor.full_name.isnot(None))
             .filter(ArticleAuthor.full_name != '')
@@ -1534,10 +1536,20 @@ def register_admin_routes(app):
 
         base_q = base_q.group_by(db.func.lower(ArticleAuthor.full_name))
 
+        # Сортировка
+        sort_map = {
+            'name_asc': ArticleAuthor.full_name.asc(),
+            'name_desc': ArticleAuthor.full_name.desc(),
+            'articles_desc': db.desc('article_count'),
+            'articles_asc': db.asc('article_count'),
+            'email': db.func.min(ArticleAuthor.email).asc(),
+        }
+        order = sort_map.get(sort, ArticleAuthor.full_name.asc())
+
         total = base_q.count()
         rows = (
             base_q
-            .order_by(ArticleAuthor.full_name)
+            .order_by(order)
             .offset((page - 1) * per_page)
             .limit(per_page)
             .all()

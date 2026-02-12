@@ -113,13 +113,20 @@
             <p class="adm-welcome-sub">Всего {{ total }} {{ total|pluralize_ru('автор', 'автора', 'авторов') }}</p>
         </div>
 
-        <!-- Search -->
+        <!-- Search & Sort -->
         <div class="art-card" style="padding: 16px 20px; margin-bottom: 20px;">
             <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <div class="art-search-wrap" style="flex: 1; min-width: 220px;">
                     <svg class="art-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.5 7a4.499 4.499 0 1 1-8.998 0A4.499 4.499 0 0 1 11.5 7Zm-.82 4.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215Z"/></svg>
                     <input type="text" id="authorSearch" class="art-search" placeholder="Поиск по имени, email, организации..." value="{{ search }}">
                 </div>
+                <select id="authorSort" class="aut-sort-select">
+                    <option value="articles_desc">Больше статей</option>
+                    <option value="articles_asc">Меньше статей</option>
+                    <option value="name_asc" selected>Имя А → Я</option>
+                    <option value="name_desc">Имя Я → А</option>
+                    <option value="email">По email</option>
+                </select>
                 <button type="button" id="authorSearchReset" class="art-btn art-btn-reset" style="padding: 8px 16px; font-size: 13px; display: none;">Сбросить</button>
             </div>
         </div>
@@ -240,6 +247,8 @@
 .art-search-icon { color: var(--color-fg-muted); flex-shrink: 0; }
 .art-search { border: none; background: transparent; color: var(--color-fg-default); font-size: 13px; outline: none; width: 100%; }
 .art-search::placeholder { color: var(--color-fg-muted); }
+.aut-sort-select { padding: 8px 12px; font-size: 13px; color: var(--color-fg-default); background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 8px; outline: none; cursor: pointer; transition: border-color 0.15s; }
+.aut-sort-select:focus { border-color: var(--color-accent-emphasis); box-shadow: 0 0 0 3px rgba(91,164,176,0.2); }
 .art-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; border: 1px solid transparent; border-radius: 8px; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s, box-shadow 0.15s; }
 .art-btn-reset { background: var(--color-canvas-subtle); color: var(--color-fg-muted); border-color: var(--color-border-default); }
 .art-btn-reset:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
@@ -409,8 +418,11 @@ function loadAuthors(resetPage) {
     document.getElementById('authorsBody').innerHTML = '';
     document.getElementById('emptyState').style.display = 'none';
 
+    var sort = document.getElementById('authorSort').value;
+
     var params = new URLSearchParams();
     if (search) params.set('search', search);
+    params.set('sort', sort);
     params.set('page', _autPage);
     params.set('per_page', 50);
 
@@ -543,6 +555,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('authorSearchReset').addEventListener('click', function() {
         searchInput.value = '';
+        loadAuthors();
+    });
+    document.getElementById('authorSort').addEventListener('change', function() {
         loadAuthors();
     });
     /* Auto-load */
