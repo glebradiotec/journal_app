@@ -124,11 +124,11 @@
     <div class="home-stats">
         <div class="home-stat">
             <span class="home-stat-number">{{ total_articles|default(0) }}</span>
-            <span class="home-stat-label">статей</span>
+            <span class="home-stat-label">{{ total_articles|default(0)|pluralize_ru('статья', 'статьи', 'статей') }}</span>
         </div>
         <div class="home-stat">
             <span class="home-stat-number">{{ total_authors|default(0) }}</span>
-            <span class="home-stat-label">авторов</span>
+            <span class="home-stat-label">{{ total_authors|default(0)|pluralize_ru('автор', 'автора', 'авторов') }}</span>
         </div>
     </div>
 
