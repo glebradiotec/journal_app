@@ -51,8 +51,8 @@ class Issue(db.Model):
 
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    authors = db.Column(db.String(200))  # Строковое поле для ФИО авторов
+    title = db.Column(db.Text, nullable=False)
+    authors = db.Column(db.Text)  # Строковое поле для ФИО авторов
     payment_received = db.Column(db.Boolean, default=False)
     edited = db.Column(db.Boolean, default=False)
     has_review = db.Column(db.Boolean, default=False)
