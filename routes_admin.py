@@ -729,66 +729,35 @@ def register_admin_routes(app):
     @app.route('/admin/articles')
     @admin_required
     def admin_articles():
-        """Страница управления всеми статьями"""
-        # Фильтры
+        """Страница управления всеми статьями — начальная загрузка без статей, всё через AJAX"""
         journal_id = request.args.get('journal_id', type=int)
-        issue_id = request.args.get('issue_id', type=int)
-        status_filter = request.args.get('status', '')  # unpaid, no_review, not_edited
+        status_filter = request.args.get('status', '')
         search = request.args.get('search', '').strip()
         
-        query = (
-            Article.query
-            .join(Issue).join(Journal)
-            .options(
-                joinedload(Article.issue).joinedload(Issue.journal),
-                joinedload(Article.article_authors)
-            )
-        )
-        
-        if journal_id:
-            query = query.filter(Issue.journal_id == journal_id)
-        if issue_id:
-            query = query.filter(Article.issue_id == issue_id)
-        if status_filter == 'unpaid':
-            query = query.filter(Article.payment_received == False)
-        elif status_filter == 'no_review':
-            query = query.filter(Article.has_review == False)
-        elif status_filter == 'not_edited':
-            query = query.filter(Article.edited == False)
-        elif status_filter == 'no_expertise':
-            query = query.filter(Article.has_expertise_act == False)
-        
-        if search:
-            like_pattern = f'%{search}%'
-            query = query.filter(
-                db.or_(
-                    Article.title.ilike(like_pattern),
-                    Article.authors.ilike(like_pattern)
-                )
-            )
-        articles = query.order_by(Article.id.desc()).all()
-        
         journals = Journal.query.all()
-        issues = Issue.query.all()
+        total_articles = Article.query.count()
         
         return render_template('admin/articles.html', 
-                               articles=articles, 
                                journals=journals,
-                               issues=issues,
+                               total_articles=total_articles,
                                current_journal=journal_id,
-                               current_issue=issue_id,
                                current_status=status_filter,
                                search=search)
 
     @app.route('/admin/articles/api')
     @admin_required
     def admin_articles_api():
-        """JSON API для AJAX-фильтрации статей"""
+        """JSON API для AJAX-фильтрации статей с пагинацией"""
         journal_id = request.args.get('journal_id', type=int)
         status_filter = request.args.get('status', '')
         search = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 200)
 
-        articles = _filtered_articles_query(journal_id, status_filter, search).all()
+        query = _filtered_articles_query(journal_id, status_filter, search)
+        total = query.count()
+        articles = query.offset((page - 1) * per_page).limit(per_page).all()
+
         result = []
         for a in articles:
             authors_str = ''
@@ -820,7 +789,14 @@ def register_admin_routes(app):
                 'expertise_act_file': a.expertise_act_file or '',
             })
 
-        return jsonify({'articles': result, 'total': len(result)})
+        total_pages = (total + per_page - 1) // per_page
+        return jsonify({
+            'articles': result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': total_pages,
+        })
 
     @app.route('/admin/articles/bulk-delete', methods=['POST'])
     @admin_required

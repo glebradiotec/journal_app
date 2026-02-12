@@ -94,7 +94,7 @@
         <!-- Welcome -->
         <div class="adm-welcome">
             <h1 class="adm-welcome-title">Все статьи</h1>
-            <p class="adm-welcome-sub">Найдено: {{ articles|length }}</p>
+            <p class="adm-welcome-sub">Всего: {{ total_articles }}</p>
         </div>
 
         <!-- Filters -->
@@ -183,72 +183,36 @@
                         </tr>
                     </thead>
                     <tbody id="articlesBody">
-                        {% for article in articles %}
-                        <tr>
-                            <td><input type="checkbox" class="art-checkbox article-cb" value="{{ article.id }}" onchange="updateBulk()"></td>
-                            <td class="art-td-id">#{{ article.id }}</td>
-                            <td class="art-td-title">
-                                <a href="{{ url_for('edit_article', article_id=article.id) }}">{{ article.title[:55] }}{% if article.title|length > 55 %}...{% endif %}</a>
-                            </td>
-                            <td class="art-td-authors">
-                                {% if article.article_authors %}
-                                    {{ article.article_authors|map(attribute='full_name')|join(', ')|truncate(35, True, '...') }}
-                                {% else %}
-                                    {{ (article.authors or '-')|truncate(35, True, '...') }}
-                                {% endif %}
-                            </td>
-                            <td class="art-td-meta">
-                                {% if article.issue %}
-                                <span class="art-meta-journal">{{ article.issue.journal.name[:22] }}{% if article.issue.journal.name|length > 22 %}...{% endif %}</span>
-                                <span class="art-meta-badge">№{{ article.issue.number }}/{{ article.issue.year }}</span>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td class="art-th-center">
-                                {% if article.payment_received %}
-                                <span class="art-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
-                                {% else %}
-                                <span class="art-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
-                                {% endif %}
-                            </td>
-                            <td class="art-th-center">
-                                {% if article.has_review %}
-                                <span class="art-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
-                                {% else %}
-                                <span class="art-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
-                                {% endif %}
-                            </td>
-                            <td class="art-th-center">
-                                {% if article.edited %}
-                                <span class="art-ok"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg></span>
-                                {% else %}
-                                <span class="art-no"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/></svg></span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div class="art-row-actions">
-                                    <a href="{{ url_for('edit_article', article_id=article.id) }}" class="art-action-btn" title="Редактировать">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>
-                                    </a>
-                                    <a href="/issue/{{ article.issue_id }}" class="art-action-btn" title="К выпуску">
-                                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Z"/></svg>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                        <!-- Заполняется через AJAX -->
                     </tbody>
                 </table>
             </div>
-            <div class="art-empty" id="emptyState" style="{% if articles %}display:none{% endif %}">
+            <div class="art-empty" id="emptyState" style="display:none">
                 <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor" style="opacity:0.2">
                     <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Z"/>
                 </svg>
                 <p>Статьи не найдены</p>
             </div>
+            <!-- Loading -->
+            <div class="art-loading" id="loadingState">
+                <div class="art-spinner"></div>
+                <p>Загрузка...</p>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="art-pagination" id="pagination" style="display:none">
+            <button class="art-page-btn" id="prevPage" onclick="goPage(-1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06Z"/></svg>
+            </button>
+            <span class="art-page-info" id="pageInfo">1 / 1</span>
+            <button class="art-page-btn" id="nextPage" onclick="goPage(1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
         </div>
 
         <!-- Export all -->
-        <div class="art-export-row" id="exportRow" style="{% if not articles %}display:none{% endif %}">
+        <div class="art-export-row" id="exportRow" style="display:none">
             <a href="{{ url_for('admin_export') }}" class="art-btn art-btn-export-all">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg>
                 Экспортировать в Excel / CSV
@@ -373,6 +337,18 @@
 .art-action-btn:hover { color: var(--color-accent-fg); border-color: var(--color-accent-emphasis); background: rgba(91,164,176,0.08); }
 .art-empty { text-align: center; padding: 48px 16px; color: var(--color-fg-muted); }
 .art-empty p { margin: 12px 0 0; font-size: 14px; }
+/* Pagination */
+.art-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 20px; }
+.art-page-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--color-border-default); border-radius: 8px; background: var(--color-canvas-default); color: var(--color-fg-default); cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.art-page-btn:hover:not(:disabled) { background: var(--color-canvas-subtle); border-color: var(--color-accent-emphasis); }
+.art-page-btn:disabled { opacity: 0.35; cursor: default; }
+.art-page-info { font-size: 14px; font-weight: 600; color: var(--color-fg-muted); min-width: 80px; text-align: center; }
+/* Loading */
+.art-loading { text-align: center; padding: 48px 16px; color: var(--color-fg-muted); }
+.art-loading p { margin: 12px 0 0; font-size: 14px; }
+.art-spinner { width: 28px; height: 28px; border: 3px solid var(--color-border-default); border-top-color: var(--color-accent-emphasis); border-radius: 50%; animation: artSpin 0.6s linear infinite; margin: 0 auto; }
+@keyframes artSpin { to { transform: rotate(360deg); } }
+
 .art-export-row { text-align: right; }
 .art-btn-export-all { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; font-size: 13px; font-weight: 600; color: #fff; background: #1a7f37; border: none; border-radius: 10px; text-decoration: none; transition: background 0.15s; }
 .art-btn-export-all:hover { background: #178132; color: #fff; }
@@ -467,11 +443,15 @@ function renderArticles(articles) {
     updateBulk();
 }
 
-/* ===== AJAX фильтрация ===== */
+/* ===== AJAX фильтрация с пагинацией ===== */
 var _filterTimer = null;
 var _filterController = null;
+var _currentPage = 1;
+var _totalPages = 1;
 
-function applyFilters() {
+function applyFilters(resetPage) {
+    if (resetPage !== false) _currentPage = 1;
+
     var journal = document.getElementById('filterJournal').value;
     var status = document.getElementById('filterStatus').value;
     var search = document.getElementById('filterSearch').value.trim();
@@ -489,6 +469,7 @@ function applyFilters() {
     if (journal) params.set('journal_id', journal);
     if (status) params.set('status', status);
     if (search) params.set('search', search);
+    if (_currentPage > 1) params.set('page', _currentPage);
     var qs = params.toString();
     var newUrl = '/admin/articles' + (qs ? '?' + qs : '');
     history.replaceState(null, '', newUrl);
@@ -497,32 +478,73 @@ function applyFilters() {
     if (_filterController) _filterController.abort();
     _filterController = new AbortController();
 
-    /* Обновляем подпись «Найдено: ...» */
+    /* Обновляем подпись */
     var sub = document.querySelector('.adm-welcome-sub');
     if (sub) sub.textContent = 'Загрузка...';
+    document.getElementById('loadingState').style.display = '';
+    document.getElementById('articlesBody').innerHTML = '';
 
-    fetch('/admin/articles/api?' + (qs || ''), { signal: _filterController.signal })
+    var apiParams = new URLSearchParams();
+    if (journal) apiParams.set('journal_id', journal);
+    if (status) apiParams.set('status', status);
+    if (search) apiParams.set('search', search);
+    apiParams.set('page', _currentPage);
+    apiParams.set('per_page', 50);
+
+    fetch('/admin/articles/api?' + apiParams.toString(), { signal: _filterController.signal })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            document.getElementById('loadingState').style.display = 'none';
             renderArticles(data.articles);
+            _totalPages = data.total_pages || 1;
             if (sub) sub.textContent = 'Найдено: ' + data.total;
+            updatePagination(data);
         })
         .catch(function(e) {
             if (e.name !== 'AbortError') {
+                document.getElementById('loadingState').style.display = 'none';
                 console.error('Filter error:', e);
                 if (sub) sub.textContent = 'Ошибка загрузки';
             }
         });
 }
 
+function updatePagination(data) {
+    var pag = document.getElementById('pagination');
+    var exportRow = document.getElementById('exportRow');
+    if (data.total <= 0) {
+        pag.style.display = 'none';
+        if (exportRow) exportRow.style.display = 'none';
+        return;
+    }
+    if (exportRow) exportRow.style.display = '';
+    if (data.total_pages <= 1) {
+        pag.style.display = 'none';
+        return;
+    }
+    pag.style.display = 'flex';
+    document.getElementById('pageInfo').textContent = data.page + ' / ' + data.total_pages;
+    document.getElementById('prevPage').disabled = data.page <= 1;
+    document.getElementById('nextPage').disabled = data.page >= data.total_pages;
+}
+
+function goPage(delta) {
+    _currentPage += delta;
+    if (_currentPage < 1) _currentPage = 1;
+    if (_currentPage > _totalPages) _currentPage = _totalPages;
+    applyFilters(false);
+    /* Scroll to top of table */
+    document.getElementById('tableCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function applyFiltersDebounced() {
     clearTimeout(_filterTimer);
-    _filterTimer = setTimeout(applyFilters, 300);
+    _filterTimer = setTimeout(function() { applyFilters(); }, 300);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('filterJournal').addEventListener('change', applyFilters);
-    document.getElementById('filterStatus').addEventListener('change', applyFilters);
+    document.getElementById('filterJournal').addEventListener('change', function() { applyFilters(); });
+    document.getElementById('filterStatus').addEventListener('change', function() { applyFilters(); });
     document.getElementById('filterSearch').addEventListener('input', applyFiltersDebounced);
     document.getElementById('filterSearch').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_filterTimer); applyFilters(); }
@@ -533,6 +555,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filterSearch').value = '';
         applyFilters();
     });
+
+    /* Автозагрузка первой страницы */
+    applyFilters();
 });
 
 /* ===== Bulk actions (без изменений) ===== */
