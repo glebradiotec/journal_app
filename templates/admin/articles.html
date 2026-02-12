@@ -165,6 +165,17 @@
             </div>
         </div>
 
+        <!-- Pagination Top -->
+        <div class="art-pagination" id="paginationTop" style="display:none">
+            <button class="art-page-btn" id="prevPageTop" onclick="goPage(-1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06Z"/></svg>
+            </button>
+            <span class="art-page-info" id="pageInfoTop">1 / 1</span>
+            <button class="art-page-btn" id="nextPageTop" onclick="goPage(1)">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+            </button>
+        </div>
+
         <!-- Articles Table -->
         <div class="art-card art-table-card" id="tableCard">
             <div class="art-table-wrap">
@@ -510,22 +521,25 @@ function applyFilters(resetPage) {
 }
 
 function updatePagination(data) {
-    var pag = document.getElementById('pagination');
+    var pags = [document.getElementById('pagination'), document.getElementById('paginationTop')];
     var exportRow = document.getElementById('exportRow');
     if (data.total <= 0) {
-        pag.style.display = 'none';
+        pags.forEach(function(p) { p.style.display = 'none'; });
         if (exportRow) exportRow.style.display = 'none';
         return;
     }
     if (exportRow) exportRow.style.display = '';
     if (data.total_pages <= 1) {
-        pag.style.display = 'none';
+        pags.forEach(function(p) { p.style.display = 'none'; });
         return;
     }
-    pag.style.display = 'flex';
+    pags.forEach(function(p) { p.style.display = 'flex'; });
     document.getElementById('pageInfo').textContent = data.page + ' / ' + data.total_pages;
+    document.getElementById('pageInfoTop').textContent = data.page + ' / ' + data.total_pages;
     document.getElementById('prevPage').disabled = data.page <= 1;
     document.getElementById('nextPage').disabled = data.page >= data.total_pages;
+    document.getElementById('prevPageTop').disabled = data.page <= 1;
+    document.getElementById('nextPageTop').disabled = data.page >= data.total_pages;
 }
 
 function goPage(delta) {
