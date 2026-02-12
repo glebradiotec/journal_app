@@ -38,9 +38,7 @@
         {% set total_articles = namespace(count=0) %}
         {% for journal in journals %}
             {% set total_issues.count = total_issues.count + (journal.issues|length if journal.issues else 0) %}
-            {% for issue in journal.issues %}
-                {% set total_articles.count = total_articles.count + (issue.articles|length if issue.articles else 0) %}
-            {% endfor %}
+            {% set total_articles.count = total_articles.count + (article_counts.get(journal.id, 0) if article_counts else 0) %}
         {% endfor %}
         <div class="journals-stat-item journals-stat-green">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -64,10 +62,7 @@
     <div class="journals-grid">
         {% for journal in journals %}
         {% set issues_count = journal.issues|length if journal.issues else 0 %}
-        {% set articles_count = namespace(count=0) %}
-        {% for issue in journal.issues %}
-            {% set articles_count.count = articles_count.count + (issue.articles|length if issue.articles else 0) %}
-        {% endfor %}
+        {% set articles_count = namespace(count=article_counts.get(journal.id, 0) if article_counts else 0) %}
         <a href="/journal/{{ journal.id }}" class="journal-card{% if 'Антенны' in journal.name %} journal-card-antennas{% endif %}{% if 'Биомедицинская' in journal.name %} journal-card-biomed{% endif %}{% if 'Динамика сложных' in journal.name %} journal-card-dynamics{% endif %}{% if journal.name == 'Радиотехника' %} journal-card-radio{% endif %}{% if 'Нанотехнологии' in journal.name %} journal-card-nano{% endif %}{% if 'Информационно-измерительные' in journal.name %} journal-card-info-sys{% endif %}{% if 'Наукоемкие' in journal.name %} journal-card-scitech{% endif %}{% if 'Нелинейный мир' in journal.name %} journal-card-nonlinear{% endif %}{% if 'Успехи' in journal.name %} journal-card-uspekhi{% endif %}{% if 'Электромагнитные' in journal.name %} journal-card-emwaves{% endif %}{% if 'Технологии живых' in journal.name %} journal-card-living{% endif %}{% if 'Системы высокой' in journal.name %} journal-card-highavail{% endif %}{% if 'Нейрокомпьютеры' in journal.name %} journal-card-neuro{% endif %}{% if 'Спутниковые' in journal.name %} journal-card-satellite{% endif %}">
             {% if 'Антенны' in journal.name %}
             <div class="journal-card-bg" style="background-image: url('/static/journal_antennas.png'); opacity: 0;"></div>

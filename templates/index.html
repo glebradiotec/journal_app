@@ -120,6 +120,18 @@
         </div>
     </div>
 
+    <!-- Stats -->
+    <div class="home-stats">
+        <div class="home-stat">
+            <span class="home-stat-number">{{ total_articles|default(0) }}</span>
+            <span class="home-stat-label">статей</span>
+        </div>
+        <div class="home-stat">
+            <span class="home-stat-number">{{ total_authors|default(0) }}</span>
+            <span class="home-stat-label">авторов</span>
+        </div>
+    </div>
+
     <!-- Search Section -->
     <div class="home-search-section">
         <div class="home-search-wrapper">
@@ -129,6 +141,7 @@
             <input type="text" id="searchInput" class="home-search-input" 
                    placeholder="Поиск по статьям, авторам, журналам..." 
                    autocomplete="off">
+            <div id="searchSpinner" class="home-spinner" style="display:none;"></div>
             <button type="button" id="clearSearch" class="home-clear-btn" style="display: none;">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"/>
@@ -140,82 +153,20 @@
             <span id="resultsCount" class="home-results-count">0</span> 
             <span id="resultsLabel">результатов</span> по запросу 
             «<strong id="searchQuery"></strong>»
+            <span id="searchMore" style="display:none;"> (показаны первые 50)</span>
         </div>
     </div>
 
-    <!-- Results -->
-    <div class="home-results" id="searchResults">
-        {% for article in articles %}
-        <div class="home-article-card" 
-             data-title="{{ article.title|lower }}"
-             data-authors="{% if article.article_authors %}{% for a in article.article_authors %}{{ a.full_name|lower }} {% endfor %}{% else %}{{ (article.authors or '')|lower }}{% endif %}"
-             data-journal="{{ article.issue.journal.name|lower if article.issue and article.issue.journal else '' }}">
-            <div class="home-article-header">
-                <h3 class="home-article-title">
-                    <a href="/issue/{{ article.issue.id if article.issue else '#' }}">{{ article.title }}</a>
-                </h3>
-                <div class="home-article-meta">
-                    {% if article.issue and article.issue.journal %}
-                    <span class="home-label home-label-blue">{{ article.issue.journal.name }}</span>
-                    {% endif %}
-                    {% if article.issue %}
-                    <span class="home-label">№{{ article.issue.number }} / {{ article.issue.year }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            
-            <div class="home-article-authors">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.432-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/>
-                </svg>
-                <span>
-                    {% if article.article_authors %}
-                        {% for author in article.article_authors|sort(attribute='order') %}
-                            {{ author.full_name }}{% if not loop.last %}, {% endif %}
-                        {% endfor %}
-                    {% else %}
-                        {{ article.authors or 'Автор не указан' }}
-                    {% endif %}
-                </span>
-            </div>
-            
-            <div class="home-article-footer">
-                <div class="home-article-status">
-                    {% if article.payment_received %}
-                    <span class="home-status home-status-success">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>
-                        </svg>
-                        Оплачено
-                    </span>
-                    {% endif %}
-                    {% if article.has_review %}
-                    <span class="home-status home-status-info">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z"/>
-                        </svg>
-                        Рецензия
-                    </span>
-                    {% endif %}
-                    {% if article.edited %}
-                    <span class="home-status home-status-warning">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/>
-                        </svg>
-                        Редакт.
-                    </span>
-                    {% endif %}
-                </div>
-                <a href="/issue/{{ article.issue.id if article.issue else '#' }}" class="home-link">
-                    Перейти к выпуску
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/>
-                    </svg>
-                </a>
-            </div>
-        </div>
-        {% endfor %}
+    <!-- Hint: type to search -->
+    <div id="searchHint" class="home-search-hint">
+        <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor" opacity="0.2">
+            <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
+        </svg>
+        <p>Начните вводить запрос для поиска по базе данных</p>
     </div>
+
+    <!-- Results (populated by JS) -->
+    <div class="home-results" id="searchResults"></div>
     
     <!-- Empty State -->
     <div id="emptyState" class="home-empty-state" style="display: none;">
@@ -248,7 +199,7 @@ function playBatAnimation() {
     }, 10000);
 }
 
-// Клиентский поиск
+// AJAX-поиск по серверу
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('searchInput');
     const clearBtn = document.getElementById('clearSearch');
@@ -256,15 +207,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsCount = document.getElementById('resultsCount');
     const resultsLabel = document.getElementById('resultsLabel');
     const searchQuery = document.getElementById('searchQuery');
+    const searchMore = document.getElementById('searchMore');
+    const searchHint = document.getElementById('searchHint');
     const emptyState = document.getElementById('emptyState');
-    const cards = document.querySelectorAll('.home-article-card');
+    const resultsContainer = document.getElementById('searchResults');
+    const spinner = document.getElementById('searchSpinner');
     
-    // Нормализация текста
-    function normalize(text) {
-        return (text || '').toLowerCase().replace(/ё/g, 'е');
-    }
+    let currentRequest = null;
     
-    // Склонение слов
     function pluralize(n, one, few, many) {
         const mod10 = n % 10;
         const mod100 = n % 100;
@@ -273,72 +223,111 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mod10 >= 2 && mod10 <= 4) return few;
         return many;
     }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
     
-    // Фильтрация
-    function filterCards() {
-        const query = normalize(searchInput.value.trim());
-        let visibleCount = 0;
-        let visibleIndex = 0;
+    function renderCard(art, index) {
+        const authors = art.authors.join(', ') || 'Автор не указан';
+        let statuses = '';
+        if (art.payment_received) {
+            statuses += '<span class="home-status home-status-success"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/></svg>Оплачено</span>';
+        }
+        if (art.has_review) {
+            statuses += '<span class="home-status home-status-info"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v9.5A1.75 1.75 0 0 1 14.25 13H8.06l-2.573 2.573A1.458 1.458 0 0 1 3 14.543V13H1.75A1.75 1.75 0 0 1 0 11.25Zm1.75-.25a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h2a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h6.5a.25.25 0 0 0 .25-.25v-9.5a.25.25 0 0 0-.25-.25Z"/></svg>Рецензия</span>';
+        }
+        if (art.edited) {
+            statuses += '<span class="home-status home-status-warning"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>Редакт.</span>';
+        }
+        const issueUrl = art.issue_id ? '/issue/' + art.issue_id : '#';
+        const issueMeta = art.issue_number != null ? '\u2116' + art.issue_number + ' / ' + art.issue_year : '';
+
+        return '<div class="home-article-card card-visible" style="--card-index:' + index + '">' +
+            '<div class="home-article-header">' +
+                '<h3 class="home-article-title"><a href="' + issueUrl + '">' + escapeHtml(art.title) + '</a></h3>' +
+                '<div class="home-article-meta">' +
+                    (art.journal ? '<span class="home-label home-label-blue">' + escapeHtml(art.journal) + '</span>' : '') +
+                    (issueMeta ? '<span class="home-label">' + issueMeta + '</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div class="home-article-authors">' +
+                '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M10.561 8.073a6.005 6.005 0 0 1 3.432 5.142.75.75 0 1 1-1.498.07 4.5 4.5 0 0 0-8.99 0 .75.75 0 0 1-1.498-.07 6.004 6.004 0 0 1 3.432-5.142 3.999 3.999 0 1 1 5.123 0ZM10.5 5a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"/></svg>' +
+                '<span>' + escapeHtml(authors) + '</span>' +
+            '</div>' +
+            '<div class="home-article-footer">' +
+                '<div class="home-article-status">' + statuses + '</div>' +
+                '<a href="' + issueUrl + '" class="home-link">Перейти к выпуску <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg></a>' +
+            '</div>' +
+        '</div>';
+    }
+    
+    function doSearch() {
+        const query = searchInput.value.trim();
         
-        // Если запрос пустой — скрыть все карточки
-        if (!query) {
-            cards.forEach((card) => {
-                card.classList.remove('card-visible');
-            });
-            clearBtn.style.display = 'none';
+        if (!query || query.length < 2) {
+            resultsContainer.innerHTML = '';
+            clearBtn.style.display = query ? 'flex' : 'none';
             searchInfo.style.display = 'none';
             emptyState.style.display = 'none';
+            searchHint.style.display = query.length < 2 ? 'block' : 'none';
+            spinner.style.display = 'none';
             return;
         }
         
-        cards.forEach((card) => {
-            const title = normalize(card.dataset.title);
-            const authors = normalize(card.dataset.authors);
-            const journal = normalize(card.dataset.journal);
+        searchHint.style.display = 'none';
+        clearBtn.style.display = 'flex';
+        spinner.style.display = 'block';
+        
+        if (currentRequest) currentRequest.abort();
+        
+        const controller = new AbortController();
+        currentRequest = controller;
+        
+        fetch('/api/search?q=' + encodeURIComponent(query) + '&limit=50', {
+            signal: controller.signal
+        })
+        .then(r => r.json())
+        .then(data => {
+            spinner.style.display = 'none';
+            const results = data.results || [];
+            const total = data.total || 0;
             
-            const matches = title.includes(query) || 
-                authors.includes(query) || 
-                journal.includes(query);
+            searchInfo.style.display = 'block';
+            resultsCount.textContent = total;
+            resultsLabel.textContent = pluralize(total, 'результат', 'результата', 'результатов');
+            searchQuery.textContent = query;
+            searchMore.style.display = total > 50 ? 'inline' : 'none';
             
-            if (matches) {
-                card.style.setProperty('--card-index', visibleIndex);
-                card.classList.add('card-visible');
-                visibleCount++;
-                visibleIndex++;
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '';
+                emptyState.style.display = 'block';
             } else {
-                card.classList.remove('card-visible');
+                emptyState.style.display = 'none';
+                resultsContainer.innerHTML = results.map((art, i) => renderCard(art, i)).join('');
+            }
+        })
+        .catch(err => {
+            if (err.name !== 'AbortError') {
+                spinner.style.display = 'none';
+                console.error('Search error:', err);
             }
         });
-        
-        // Показать информацию о поиске
-        clearBtn.style.display = 'flex';
-        searchInfo.style.display = 'block';
-        resultsCount.textContent = visibleCount;
-        resultsLabel.textContent = pluralize(visibleCount, 'результат', 'результата', 'результатов');
-        searchQuery.textContent = searchInput.value.trim();
-        
-        if (visibleCount === 0) {
-            emptyState.style.display = 'block';
-        } else {
-            emptyState.style.display = 'none';
-        }
     }
     
-    // Дебаунс для производительности
     let debounceTimer;
     searchInput.addEventListener('input', function() {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(filterCards, 150);
+        debounceTimer = setTimeout(doSearch, 300);
     });
     
-    // Очистка поиска
     clearBtn.addEventListener('click', function() {
         searchInput.value = '';
-        filterCards();
+        doSearch();
         searchInput.focus();
     });
-    
-    // Карточки уже скрыты через CSS (max-height: 0)
 });
 </script>
 
@@ -418,6 +407,56 @@ document.addEventListener('DOMContentLoaded', function() {
 .home-btn-primary:hover {
     box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45);
 }
+
+/* Stats */
+.home-stats {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 32px;
+}
+
+.home-stat {
+    text-align: center;
+}
+
+.home-stat-number {
+    display: block;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--color-accent-fg);
+    line-height: 1.2;
+}
+
+.home-stat-label {
+    font-size: 14px;
+    color: var(--color-fg-muted);
+}
+
+/* Search hint */
+.home-search-hint {
+    text-align: center;
+    padding: 48px 32px;
+    color: var(--color-fg-muted);
+}
+
+.home-search-hint p {
+    font-size: 15px;
+    margin: 12px 0 0 0;
+}
+
+/* Spinner */
+.home-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-border-default);
+    border-top-color: var(--color-accent-emphasis);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Search */
 .home-search-section {
@@ -505,27 +544,19 @@ document.addEventListener('DOMContentLoaded', function() {
     border: 1px solid var(--color-border-default);
     border-radius: 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.02);
-    /* Плавное сворачивание */
-    overflow: hidden;
-    max-height: 0;
-    padding: 0 24px;
-    margin-bottom: 0;
-    opacity: 0;
-    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                margin-bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.25s ease;
-    transition-delay: calc(var(--card-index, 0) * 0.05s);
-}
-
-.home-article-card.card-visible {
-    max-height: 400px;
     padding: 24px;
     margin-bottom: 16px;
-    opacity: 1;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: cardAppear 0.3s ease forwards;
+    animation-delay: calc(var(--card-index, 0) * 0.03s);
 }
 
-.home-article-card.card-visible:hover {
+@keyframes cardAppear {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.home-article-card:hover {
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
 }
 
