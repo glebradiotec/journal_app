@@ -1569,6 +1569,7 @@ def register_admin_routes(app):
         if not name:
             return jsonify({'articles': []})
 
+        # SQLite lower() переопределён через Python для поддержки кириллицы
         authors = (
             ArticleAuthor.query
             .filter(db.func.lower(ArticleAuthor.full_name) == name.lower())

@@ -86,6 +86,16 @@ def make_session_permanent():
 # Инициализация БД и регистрация маршрутов
 db.init_app(app)
 migrate = Migrate(app, db)  # Миграции БД (flask db init/migrate/upgrade)
+
+
+# === SQLite: Unicode-aware LOWER() для кириллицы ===
+# Стандартный SQLite LOWER() обрабатывает только ASCII.
+# Регистрируем Python-функцию для корректного LOWER() с кириллицей.
+from sqlalchemy import event
+
+@event.listens_for(db.engine, "connect")
+def _sqlite_unicode_lower(dbapi_connection, connection_record):
+    dbapi_connection.create_function("lower", 1, lambda s: s.lower() if s else s)
 register_public_routes(app)
 register_admin_routes(app)
 
