@@ -1522,7 +1522,11 @@ def register_admin_routes(app):
             )
             .filter(ArticleAuthor.full_name.isnot(None))
             .filter(ArticleAuthor.full_name != '')
-            .filter(~ArticleAuthor.full_name.like('(%'))  # исключаем мусор (организации/города)
+            .filter(~ArticleAuthor.full_name.like('(%'))   # организации/города
+            .filter(~ArticleAuthor.full_name.like('-%'))   # фрагменты текста
+            .filter(~ArticleAuthor.full_name.like('<%'))   # HTML-теги
+            .filter(~ArticleAuthor.full_name.like('%<%'))   # HTML внутри имени
+            .filter(db.func.length(ArticleAuthor.full_name) > 2)  # слишком короткие
         )
 
         if search:
