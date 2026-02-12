@@ -37,6 +37,7 @@ class Journal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     issn = db.Column(db.String(20))
+    is_hidden = db.Column(db.Boolean, default=False)
 
 
 class Issue(db.Model):

@@ -163,10 +163,11 @@
             </div>
             <div class="jrn-list" id="journalList">
                 {% for j in journals %}
-                <div class="jrn-item" data-id="{{ j.id }}" id="journal-{{ j.id }}">
+                <div class="jrn-item{% if j.is_hidden %} jrn-item-hidden{% endif %}" data-id="{{ j.id }}" id="journal-{{ j.id }}">
                     <div class="jrn-item-view">
                         <div class="jrn-item-info">
                             <a href="/journal/{{ j.id }}" class="jrn-item-name">{{ j.name }}</a>
+                            {% if j.is_hidden %}<span class="jrn-hidden-badge">скрыт</span>{% endif %}
                             {% if j.issn %}<span class="jrn-item-issn">ISSN: {{ j.issn }}</span>{% endif %}
                             <div class="jrn-item-stats">
                                 <span class="jrn-item-stat">{{ j.issues }} выпуск{{ j.issues|pluralize_ru('', 'а', 'ов') }}</span>
@@ -175,6 +176,13 @@
                             </div>
                         </div>
                         <div class="jrn-item-actions">
+                            <button class="jrn-action-btn jrn-action-vis{% if j.is_hidden %} jrn-vis-hidden{% endif %}" onclick="toggleVisibility({{ j.id }})" title="{{ 'Показать на странице журналов' if j.is_hidden else 'Скрыть со страницы журналов' }}">
+                                {% if j.is_hidden %}
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.143 2.31a.75.75 0 0 1 1.047-.167l14.5 10.5a.75.75 0 1 1-.88 1.214l-2.248-1.628C11.346 12.076 10.2 12.378 9 12.378c-3.573 0-6.559-2.22-8.143-5.378a.75.75 0 0 1 0-.578c.618-1.232 1.464-2.31 2.5-3.186L.31 1.357a.75.75 0 0 1-.167-1.047ZM4.18 4.394C3.32 5.084 2.597 5.952 2.056 6.95c1.39 2.67 3.88 4.428 6.944 4.428.93 0 1.817-.167 2.637-.478L10.32 9.968A2.75 2.75 0 0 1 6.5 6.544L4.18 4.394ZM9 3.378c-.13 0-.26.003-.39.01a.75.75 0 0 1-.08-1.498A7.049 7.049 0 0 1 9 1.878c3.573 0 6.559 2.22 8.143 5.072a.75.75 0 0 1 0 .678 11.653 11.653 0 0 1-1.46 2.206.75.75 0 0 1-1.132-.984c.427-.49.804-1.02 1.122-1.594C14.32 4.6 11.82 2.878 9 3.378Z"/></svg>
+                                {% else %}
+                                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2c-3.573 0-6.559 2.22-8 5.5C1.441 10.78 4.427 13 8 13s6.559-2.22 8-5.5C14.559 4.22 11.573 2 8 2Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>
+                                {% endif %}
+                            </button>
                             <button class="jrn-action-btn jrn-action-edit" onclick="startEdit({{ j.id }})" title="Редактировать">
                                 <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/></svg>
                             </button>
@@ -595,6 +603,62 @@
     transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
+/* Visibility button */
+.jrn-action-vis {
+    color: #1a7f37;
+}
+.jrn-action-vis:hover {
+    color: #1a7f37;
+    border-color: rgba(26,127,55,0.4);
+    background: rgba(26,127,55,0.08);
+}
+[data-theme="dark"] .jrn-action-vis {
+    color: #3fb950;
+}
+[data-theme="dark"] .jrn-action-vis:hover {
+    color: #3fb950;
+    border-color: rgba(63,185,80,0.4);
+    background: rgba(63,185,80,0.08);
+}
+.jrn-action-vis.jrn-vis-hidden {
+    color: var(--color-fg-muted);
+    opacity: 0.6;
+}
+.jrn-action-vis.jrn-vis-hidden:hover {
+    color: #1a7f37;
+    opacity: 1;
+    border-color: rgba(26,127,55,0.4);
+    background: rgba(26,127,55,0.08);
+}
+[data-theme="dark"] .jrn-action-vis.jrn-vis-hidden:hover {
+    color: #3fb950;
+    border-color: rgba(63,185,80,0.4);
+}
+
+/* Hidden journal item */
+.jrn-item-hidden {
+    opacity: 0.55;
+}
+.jrn-item-hidden:hover {
+    opacity: 0.85;
+}
+
+/* Hidden badge */
+.jrn-hidden-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    padding: 1px 8px;
+    margin-left: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
 .jrn-action-edit {
     color: var(--color-fg-muted);
 }
@@ -737,6 +801,45 @@
 
 <script>
 let deleteId = null;
+
+function toggleVisibility(id) {
+    fetch('/admin/journals/' + id + '/toggle-visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const item = document.getElementById('journal-' + id);
+            const btn = item.querySelector('.jrn-action-vis');
+            const badge = item.querySelector('.jrn-hidden-badge');
+            if (data.is_hidden) {
+                item.classList.add('jrn-item-hidden');
+                btn.classList.add('jrn-vis-hidden');
+                btn.title = 'Показать на странице журналов';
+                btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M.143 2.31a.75.75 0 0 1 1.047-.167l14.5 10.5a.75.75 0 1 1-.88 1.214l-2.248-1.628C11.346 12.076 10.2 12.378 9 12.378c-3.573 0-6.559-2.22-8.143-5.378a.75.75 0 0 1 0-.578c.618-1.232 1.464-2.31 2.5-3.186L.31 1.357a.75.75 0 0 1-.167-1.047ZM4.18 4.394C3.32 5.084 2.597 5.952 2.056 6.95c1.39 2.67 3.88 4.428 6.944 4.428.93 0 1.817-.167 2.637-.478L10.32 9.968A2.75 2.75 0 0 1 6.5 6.544L4.18 4.394ZM9 3.378c-.13 0-.26.003-.39.01a.75.75 0 0 1-.08-1.498A7.049 7.049 0 0 1 9 1.878c3.573 0 6.559 2.22 8.143 5.072a.75.75 0 0 1 0 .678 11.653 11.653 0 0 1-1.46 2.206.75.75 0 0 1-1.132-.984c.427-.49.804-1.02 1.122-1.594C14.32 4.6 11.82 2.878 9 3.378Z"/></svg>';
+                if (!badge) {
+                    const nameEl = item.querySelector('.jrn-item-name');
+                    const span = document.createElement('span');
+                    span.className = 'jrn-hidden-badge';
+                    span.textContent = 'скрыт';
+                    nameEl.after(span);
+                }
+                showToast('Журнал скрыт со страницы', 'success');
+            } else {
+                item.classList.remove('jrn-item-hidden');
+                btn.classList.remove('jrn-vis-hidden');
+                btn.title = 'Скрыть со страницы журналов';
+                btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2c-3.573 0-6.559 2.22-8 5.5C1.441 10.78 4.427 13 8 13s6.559-2.22 8-5.5C14.559 4.22 11.573 2 8 2Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0-5.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>';
+                if (badge) badge.remove();
+                showToast('Журнал показан на странице', 'success');
+            }
+        } else {
+            showToast('Ошибка', 'error');
+        }
+    })
+    .catch(() => showToast('Ошибка сети', 'error'));
+}
 
 function toggleAddForm() {
     document.getElementById('addCard').classList.toggle('form-open');

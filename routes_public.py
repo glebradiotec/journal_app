@@ -132,7 +132,7 @@ def register_public_routes(app):
     def journals():
         journals = Journal.query.options(
             subqueryload(Journal.issues)
-        ).all()
+        ).filter(db.or_(Journal.is_hidden == False, Journal.is_hidden.is_(None))).all()
         # Подсчитываем статьи через запрос, а не загрузку всех объектов
         article_counts = dict(
             db.session.query(Issue.journal_id, db.func.count(Article.id))

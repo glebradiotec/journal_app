@@ -668,6 +668,7 @@ def register_admin_routes(app):
         for j, issue_count, article_count in journals_with_counts:
             journals_data.append({
                 'id': j.id,
+                'is_hidden': j.is_hidden or False,
                 'name': j.name,
                 'issn': j.issn or '',
                 'issues': issue_count,
@@ -708,6 +709,17 @@ def register_admin_routes(app):
         log_activity('updated', 'journal', journal.id, journal.name, f'Было: {old_name}')
         db.session.commit()
         return jsonify({'success': True, 'name': journal.name, 'issn': journal.issn or ''})
+
+    @app.route('/admin/journals/<int:journal_id>/toggle-visibility', methods=['POST'])
+    @admin_required
+    def admin_journal_toggle_visibility(journal_id):
+        """Скрыть/показать журнал на публичной странице"""
+        journal = Journal.query.get_or_404(journal_id)
+        journal.is_hidden = not journal.is_hidden
+        log_activity('updated', 'journal', journal.id, journal.name,
+                      'Скрыт' if journal.is_hidden else 'Показан')
+        db.session.commit()
+        return jsonify({'success': True, 'is_hidden': journal.is_hidden})
 
     @app.route('/admin/journals/<int:journal_id>/delete', methods=['POST'])
     @admin_required
