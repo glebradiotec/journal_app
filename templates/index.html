@@ -104,7 +104,7 @@
 </script>
 
 <div class="home-page">
-    <!-- Hero Section -->
+    <!-- Hero + Stats в одном блоке -->
     <div class="home-hero">
         <div class="home-hero-content">
             <h1 class="home-hero-title">Научные журналы</h1>
@@ -117,18 +117,16 @@
                     Все журналы
                 </a>
             </div>
-        </div>
-    </div>
-
-    <!-- Stats (каскадная анимация как карточки) -->
-    <div class="home-stats">
-        <div class="home-stat" style="--stat-index: 0">
-            <span class="home-stat-number">{{ total_articles|default(0) }}</span>
-            <span class="home-stat-label">{{ total_articles|default(0)|pluralize_ru('статья', 'статьи', 'статей') }}</span>
-        </div>
-        <div class="home-stat" style="--stat-index: 1">
-            <span class="home-stat-number">{{ total_authors|default(0) }}</span>
-            <span class="home-stat-label">{{ total_authors|default(0)|pluralize_ru('автор', 'автора', 'авторов') }}</span>
+            <div class="home-stats">
+                <div class="home-stat" style="--stat-index: 0">
+                    <span class="home-stat-number">{{ total_articles|default(0) }}</span>
+                    <span class="home-stat-label">{{ total_articles|default(0)|pluralize_ru('статья', 'статьи', 'статей') }}</span>
+                </div>
+                <div class="home-stat" style="--stat-index: 1">
+                    <span class="home-stat-number">{{ total_authors|default(0) }}</span>
+                    <span class="home-stat-label">{{ total_authors|default(0)|pluralize_ru('автор', 'автора', 'авторов') }}</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -155,13 +153,6 @@
             <span id="resultsLabel">результатов</span> по запросу 
             «<strong id="searchQuery"></strong>»
             <span id="searchMore" style="display:none;"> (показаны первые 50)</span>
-        </div>
-        <!-- Hint: рядом со строкой поиска -->
-        <div id="searchHint" class="home-search-hint">
-            <svg class="home-search-hint-icon" width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/>
-            </svg>
-            <p>Начните вводить запрос для поиска по базе данных</p>
         </div>
         </div>
     </div>
@@ -209,7 +200,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsLabel = document.getElementById('resultsLabel');
     const searchQuery = document.getElementById('searchQuery');
     const searchMore = document.getElementById('searchMore');
-    const searchHint = document.getElementById('searchHint');
     const emptyState = document.getElementById('emptyState');
     const resultsContainer = document.getElementById('searchResults');
     const spinner = document.getElementById('searchSpinner');
@@ -277,12 +267,10 @@ document.addEventListener('DOMContentLoaded', function() {
             clearBtn.style.display = query ? 'flex' : 'none';
             searchInfo.style.display = 'none';
             emptyState.style.display = 'none';
-            searchHint.style.display = query.length < 2 ? 'block' : 'none';
             spinner.style.display = 'none';
             return;
         }
         
-        searchHint.style.display = 'none';
         clearBtn.style.display = 'flex';
         spinner.style.display = 'block';
         
@@ -340,14 +328,14 @@ document.addEventListener('DOMContentLoaded', function() {
 .home-page {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 40px 32px;
+    padding: 32px 24px;
 }
 
-/* Hero — анимированный градиент */
+/* Hero + Stats в одном блоке */
 .home-hero {
     text-align: center;
-    padding: 48px 24px;
-    margin-bottom: 40px;
+    padding: 36px 24px 32px;
+    margin-bottom: 24px;
     background: linear-gradient(135deg,
         rgba(255, 255, 255, 1) 0%,
         rgba(224, 247, 250, 0.6) 35%,
@@ -381,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .home-hero-subtitle {
     font-size: 18px;
     color: var(--color-fg-muted);
-    margin: 0 0 28px 0;
+    margin: 0 0 20px 0;
 }
 
 .home-hero-actions {
@@ -413,12 +401,15 @@ document.addEventListener('DOMContentLoaded', function() {
     box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45);
 }
 
-/* Stats — каскадная анимация «как игровой автомат» */
-.home-stats {
+/* Stats внутри hero */
+.home-hero .home-stats {
     display: flex;
     justify-content: center;
     gap: 40px;
-    margin-bottom: 32px;
+    margin-top: 24px;
+    margin-bottom: 0;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border-default);
 }
 
 .home-stat {
@@ -446,37 +437,18 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--color-fg-muted);
 }
 
-/* Search row: строка поиска + подсказка рядом */
 .home-search-row {
     display: flex;
     flex-direction: column;
     gap: 0;
 }
 
+.home-search-section {
+    margin-bottom: 20px;
+}
+
 .home-search-section .home-search-wrapper {
-    margin-bottom: 12px;
-}
-
-/* Подсказка поиска — ближе к строке, в одну линию с иконкой */
-.home-search-hint {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px 12px 20px;
-    color: var(--color-fg-muted);
-    background: var(--color-canvas-subtle);
-    border-radius: 12px;
-    border: 1px solid var(--color-border-default);
-}
-
-.home-search-hint-icon {
-    flex-shrink: 0;
-    opacity: 0.35;
-}
-
-.home-search-hint p {
-    font-size: 14px;
-    margin: 0;
+    margin-bottom: 8px;
 }
 
 /* Spinner */
@@ -492,27 +464,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Search */
-.home-search-section {
-    margin-bottom: 32px;
-}
-
+/* Поиск — акцентный блок */
 .home-search-wrapper {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 16px 8px 20px;
+    gap: 14px;
+    padding: 14px 20px 14px 22px;
     background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
     border: 2px solid var(--color-border-default);
     border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(91, 164, 176, 0.08);
     transition: all 0.2s;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
 }
 
 .home-search-wrapper:focus-within {
     border-color: var(--color-accent-emphasis);
-    box-shadow: 0 4px 16px rgba(91, 164, 176, 0.15);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08), 0 10px 40px rgba(91, 164, 176, 0.18);
 }
 
 .home-search-icon {
@@ -522,8 +490,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .home-search-input {
     flex: 1;
-    padding: 12px 0;
-    font-size: 16px;
+    padding: 14px 0;
+    font-size: 17px;
     color: var(--color-fg-default);
     background: transparent;
     border: none;
