@@ -202,8 +202,10 @@
                         <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/>
                     </svg>
                 </button>
-                <div class="year-section-body" hidden>
-                    <div class="issues-list issues-list-lazy" id="issues-list-year-{{ y }}" data-year="{{ y }}"></div>
+                <div class="year-section-body" id="year-body-{{ y }}">
+                    <div class="year-section-body-inner">
+                        <div class="issues-list issues-list-lazy" id="issues-list-year-{{ y }}" data-year="{{ y }}"></div>
+                    </div>
                 </div>
             </div>
             {% endif %}
@@ -261,14 +263,13 @@ function toggleYearSection(year) {
     var btn = section.querySelector('.year-section-header');
     var body = section.querySelector('.year-section-body');
     var listEl = document.getElementById('issues-list-year-' + year);
-    var isExpanded = body.getAttribute('hidden') === null;
+    var isExpanded = body.classList.contains('year-section-body-open');
     if (isExpanded) {
-        body.setAttribute('hidden', '');
+        body.classList.remove('year-section-body-open');
         btn.setAttribute('aria-expanded', 'false');
         section.classList.remove('year-section-expanded');
         section.classList.add('year-section-collapsed');
     } else {
-        body.removeAttribute('hidden');
         btn.setAttribute('aria-expanded', 'true');
         section.classList.add('year-section-expanded');
         section.classList.remove('year-section-collapsed');
@@ -282,7 +283,10 @@ function toggleYearSection(year) {
                     } else if (listEl) {
                         listEl.innerHTML = '<p class="year-section-empty">Нет выпусков за этот год.</p>';
                     }
+                    body.classList.add('year-section-body-open');
                 });
+        } else {
+            body.classList.add('year-section-body-open');
         }
     }
 }
@@ -664,7 +668,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .year-section-chevron {
     margin-left: auto;
     flex-shrink: 0;
-    transition: transform 0.2s;
+    transition: transform 0.3s ease;
 }
 
 .year-section-expanded .year-section-chevron {
@@ -672,7 +676,31 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .year-section-body {
+    margin-top: 0;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    visibility: hidden;
+    transition:
+        max-height 0.35s ease,
+        opacity 0.25s ease,
+        margin-top 0.3s ease,
+        visibility 0s 0.35s;
+}
+
+.year-section-body.year-section-body-open {
+    max-height: 2200px;
+    opacity: 1;
     margin-top: 12px;
+    visibility: visible;
+    transition:
+        max-height 0.4s ease,
+        opacity 0.3s ease,
+        margin-top 0.3s ease,
+        visibility 0s 0s;
+}
+
+.year-section-body-inner {
     padding-left: 4px;
 }
 
