@@ -10,6 +10,7 @@ from flask import (
     send_from_directory,
 )
 from flask_login import login_user, logout_user, login_required, current_user
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload, subqueryload
 from models import db, User, Journal, Issue, Article, ArticleAuthor
 
@@ -145,15 +146,72 @@ def register_public_routes(app):
     @app.route("/journal/<int:journal_id>")
     @login_required
     def journal_page(journal_id):
+        from datetime import datetime
         journal = Journal.query.get_or_404(journal_id)
-        issues = (
-            Issue.query
+        default_year = datetime.now().year
+        years = [
+            row[0] for row in
+            db.session.query(Issue.year)
             .filter_by(journal_id=journal_id)
-            .options(joinedload(Issue.articles))
+            .distinct()
+            .order_by(Issue.year.desc())
+            .all()
+        ]
+        rows = (
+            db.session.query(Issue, func.count(Article.id).label('article_count'))
+            .outerjoin(Article, Article.issue_id == Issue.id)
+            .filter(Issue.journal_id == journal_id, Issue.year == default_year)
+            .group_by(Issue.id)
             .order_by(Issue.position.asc(), Issue.id.desc())
             .all()
         )
-        return render_template('journal.html', journal=journal, issues=issues)
+        issues_default = [{'issue': issue, 'article_count': count} for issue, count in rows]
+        total_issues = Issue.query.filter_by(journal_id=journal_id).count()
+        total_articles = Article.query.join(Issue).filter(Issue.journal_id == journal_id).count()
+        last_issue = (
+            Issue.query.filter_by(journal_id=journal_id)
+            .order_by(Issue.position.asc(), Issue.id.desc())
+            .first()
+        )
+        issue_count_by_year = dict(
+            db.session.query(Issue.year, func.count(Issue.id))
+            .filter_by(journal_id=journal_id)
+            .group_by(Issue.year)
+            .all()
+        )
+        return render_template(
+            'journal.html',
+            journal=journal,
+            years=years,
+            default_year=default_year,
+            issues_default=issues_default,
+            total_issues=total_issues,
+            total_articles=total_articles,
+            last_issue=last_issue,
+            issue_count_by_year=issue_count_by_year,
+        )
+
+    @app.route("/api/journal/<int:journal_id>/issues")
+    @login_required
+    def api_journal_issues(journal_id):
+        """Возвращает выпуски журнала за указанный год (для ленивой подгрузки по годам)."""
+        year = request.args.get('year', type=int)
+        if year is None:
+            return jsonify({'error': 'year required'}), 400
+        Journal.query.get_or_404(journal_id)
+        rows = (
+            db.session.query(Issue, func.count(Article.id).label('article_count'))
+            .outerjoin(Article, Article.issue_id == Issue.id)
+            .filter(Issue.journal_id == journal_id, Issue.year == year)
+            .group_by(Issue.id)
+            .order_by(Issue.position.asc(), Issue.id.desc())
+            .all()
+        )
+        issues = [
+            {'id': issue.id, 'number': issue.number, 'year': issue.year, 'article_count': count}
+            for issue, count in rows
+        ]
+        return jsonify({'issues': issues})
 
     @app.route("/issue/<int:issue_id>")
     @login_required
