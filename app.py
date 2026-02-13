@@ -100,7 +100,7 @@ def _sqlite_unicode_lower(dbapi_connection, connection_record):
 register_public_routes(app)
 register_admin_routes(app)
 
-# Создаём таблицы (если новые модели добавились)
+# Создаём таблицы (если новых модели добавились)
 with app.app_context():
     db.create_all()
 
@@ -209,8 +209,16 @@ def init_users():
 
 if __name__ == "__main__":
     print("Starting app...")
-    create_backup()
-    init_journals()
-    init_users()
-    print("Сервер стартует...")
-    app.run(debug=True)
+    # Бэкап только если настроен Telegram (на сервере), иначе не блокируем старт
+    if os.environ.get('TELEGRAM_BOT_TOKEN'):
+        try:
+            create_backup()
+        except Exception as e:
+            print(f"Backup skip: {e}")
+    try:
+        init_journals()
+        init_users()
+    except Exception as e:
+        print(f"Init skip: {e}")
+    print("Сервер стартует на http://127.0.0.1:5000 ...")
+    app.run(host='127.0.0.1', port=5000, debug=True)
