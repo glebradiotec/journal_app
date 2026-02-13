@@ -177,18 +177,23 @@
                     <div class="file-item file-item-images">
                         <div class="file-item-header">
                             <svg class="file-icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h.19l5.613-5.613a1.75 1.75 0 0 1 2.474 0L14.75 12.53V2.75a.25.25 0 0 0-.25-.25Zm12.5 11a.25.25 0 0 0 .25-.25v-.32L10.28 8.71a.25.25 0 0 0-.354 0L5.22 13.416c.035.01.073.016.112.016h8.918ZM4.5 6.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/>
+                                <path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/>
                             </svg>
-                            <span>Изображения</span>
+                            <span>Разное</span>
                         </div>
                         
-                        <!-- Существующие изображения -->
+                        <!-- Существующие файлы -->
                         {% if article.images %}
                         <div class="images-list" id="existingImages">
                             {% for img in article.images %}
+                            {% set ext = img.filename.rsplit('.', 1)[-1].lower() %}
                             <div class="image-item">
                                 <div class="image-preview-wrap">
+                                    {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'] %}
                                     <img src="/uploads/{{ img.filename }}" class="image-thumb" alt="">
+                                    {% else %}
+                                    <svg class="image-thumb" width="40" height="40" viewBox="0 0 16 16" fill="var(--color-fg-muted)" style="object-fit:contain;padding:8px;background:var(--color-canvas-subtle);border-radius:6px"><path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/></svg>
+                                    {% endif %}
                                     <a href="/uploads/{{ img.filename }}" target="_blank" class="image-link">{{ img.filename }}</a>
                                 </div>
                                 <label class="delete-file-label">
@@ -199,7 +204,7 @@
                         </div>
                         {% endif %}
                         
-                        <!-- Новые изображения (превью) -->
+                        <!-- Новые файлы (превью) -->
                         <div class="images-list" id="newImagesPreview"></div>
                         
                         <!-- Скрытый контейнер для файлов -->
@@ -216,9 +221,9 @@
                                 <path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/>
                                 <path d="M11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/>
                             </svg>
-                            <span>Перетащите изображения сюда или нажмите для выбора</span>
+                            <span>Перетащите файлы сюда или нажмите для выбора</span>
                         </div>
-                        <input type="file" id="imageSelectInput" accept=".jpg,.jpeg,.png,.gif,.bmp,.webp" style="display:none" onchange="handleImageSelect(this)">
+                        <input type="file" id="imageSelectInput" multiple style="display:none" onchange="handleImageSelect(this)">
                     </div>
                     
                     <div class="file-item">
@@ -962,7 +967,7 @@ function toggleAuthorDetails(btn) {
     }
 }
 
-// === Работа с изображениями ===
+// === Работа с файлами (раздел "Разное") ===
 let imageCounter = 0;
 
 function triggerImageSelect() {
@@ -982,9 +987,6 @@ function handleImageSelect(input) {
 }
 
 function addImageFile(file) {
-    // Проверяем, что это изображение
-    if (!file.type.startsWith('image/')) return;
-    
     const preview = document.getElementById('newImagesPreview');
     const container = document.getElementById('imageFilesContainer');
     
@@ -1008,12 +1010,12 @@ function addImageFile(file) {
     
     const currentInputId = fileInput.id;
     const currentPreviewId = previewItem.id;
+    const isImage = file.type.startsWith('image/');
     
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        previewItem.innerHTML = `
+    function buildItemHTML(thumbHtml) {
+        return `
             <div class="image-preview-wrap">
-                <img src="${e.target.result}" class="image-thumb" alt="">
+                ${thumbHtml}
                 <span class="image-link">${file.name}</span>
                 <span class="image-new-badge">новое</span>
             </div>
@@ -1023,8 +1025,17 @@ function addImageFile(file) {
                 </svg>
             </button>
         `;
-    };
-    reader.readAsDataURL(file);
+    }
+    
+    if (isImage) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewItem.innerHTML = buildItemHTML(`<img src="${e.target.result}" class="image-thumb" alt="">`);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        previewItem.innerHTML = buildItemHTML(`<svg class="image-thumb" width="40" height="40" viewBox="0 0 16 16" fill="var(--color-fg-muted)" style="object-fit:contain;padding:8px;background:var(--color-canvas-subtle);border-radius:6px;flex-shrink:0"><path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/></svg>`);
+    }
     
     preview.appendChild(previewItem);
     imageCounter++;

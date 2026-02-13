@@ -28,7 +28,18 @@ from werkzeug.utils import secure_filename
 from models import db, User, Journal, Issue, Article, ArticleAuthor, ArticleImage, ActivityLog, ArticleHistory, ArticleComment
 
 
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'gif', 'bmp'}
+ALLOWED_EXTENSIONS = {
+    # Документы
+    'txt', 'pdf', 'doc', 'docx', 'odt', 'rtf', 'xls', 'xlsx', 'csv', 'ppt', 'pptx',
+    # Изображения
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'tiff', 'tif', 'ico',
+    # Архивы
+    'zip', 'rar', '7z', 'tar', 'gz',
+    # Аудио/видео
+    'mp3', 'wav', 'mp4', 'avi', 'mov', 'mkv',
+    # Прочее
+    'html', 'htm', 'xml', 'json', 'yaml', 'yml', 'md', 'tex', 'djvu', 'epub', 'fb2',
+}
 
 
 def allowed_file(filename: str) -> bool:
@@ -98,7 +109,7 @@ def _process_file_uploads(article, upload_folder):
 
 
 def _process_article_images(article, upload_folder, start_order=0):
-    """Загружает изображения статьи. Возвращает количество добавленных."""
+    """Загружает файлы раздела 'Разное' для статьи. Возвращает количество добавленных."""
     images = request.files.getlist('article_images')
     added = 0
     for i, img in enumerate(images):
