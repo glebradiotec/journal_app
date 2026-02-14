@@ -24,42 +24,6 @@ def normalize_text(text):
     return text
 
 
-def journal_icon(name):
-    """Иконка-эмодзи по названию журнала (по ключевым словам)."""
-    if not name:
-        return "📚"
-    n = name.lower()
-    if "антенн" in n:
-        return "📡"
-    if "биомедицин" in n:
-        return "🧬"
-    if "динамика сложн" in n:
-        return "📐"
-    if "информационно-измерительн" in n:
-        return "📊"
-    if "нанотехнолог" in n:
-        return "⚛️"
-    if "наукоемк" in n:
-        return "🔬"
-    if "нелинейный мир" in n:
-        return "∞"
-    if "нейрокомпьютер" in n:
-        return "🧠"
-    if "радиотехник" in n and "успехи" not in n:
-        return "📻"
-    if "системы высокой" in n:
-        return "🛡️"
-    if "спутников" in n:
-        return "🛰️"
-    if "технологии живых" in n:
-        return "🌱"
-    if "успехи" in n:
-        return "✨"
-    if "электромагнитн" in n:
-        return "⚡"
-    return "📚"
-
-
 def register_public_routes(app):
     # ==================== AUTH ====================
     @app.route('/login', methods=['GET', 'POST'])
@@ -97,19 +61,7 @@ def register_public_routes(app):
         # Статьи загружаются через AJAX-поиск, а не при открытии страницы
         total_articles = Article.query.count()
         total_authors = db.session.query(db.func.count(db.distinct(ArticleAuthor.full_name))).scalar()
-        journals = (
-            Journal.query
-            .filter(db.or_(Journal.is_hidden == False, Journal.is_hidden.is_(None)))
-            .order_by(Journal.name)
-            .all()
-        )
-        journals_with_icons = [(j, journal_icon(j.name)) for j in journals]
-        return render_template(
-            'index.html',
-            total_articles=total_articles,
-            total_authors=total_authors,
-            journals_with_icons=journals_with_icons,
-        )
+        return render_template('index.html', total_articles=total_articles, total_authors=total_authors)
 
     @app.route('/api/search')
     @login_required
