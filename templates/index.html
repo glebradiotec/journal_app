@@ -178,6 +178,21 @@
         </div>
     </div>
 
+    <!-- Быстрый выбор журнала -->
+    {% if journals_with_icons %}
+    <div class="home-journals-quick">
+        <h2 class="home-journals-quick-title">Быстрый выбор журнала</h2>
+        <div class="home-journals-quick-grid">
+            {% for journal, icon in journals_with_icons %}
+            <a href="/journal/{{ journal.id }}" class="home-journal-chip" title="{{ journal.name }}">
+                <span class="home-journal-chip-icon" aria-hidden="true">{{ icon }}</span>
+                <span class="home-journal-chip-name">{{ journal.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Search Section -->
     <div class="home-search-section">
         <div class="home-search-row">
@@ -552,6 +567,58 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--color-fg-muted);
 }
 
+/* Быстрый выбор журнала */
+.home-journals-quick {
+    margin-bottom: 28px;
+}
+
+.home-journals-quick-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    margin: 0 0 14px 0;
+}
+
+.home-journals-quick-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.home-journal-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--color-fg-default);
+    font-size: 14px;
+    font-weight: 500;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+    max-width: 100%;
+}
+
+.home-journal-chip:hover {
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 4px 12px rgba(91, 164, 176, 0.15);
+    color: var(--color-accent-fg);
+}
+
+.home-journal-chip-icon {
+    font-size: 1.25em;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.home-journal-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .home-search-row {
     display: flex;
     flex-direction: column;
@@ -851,6 +918,9 @@ document.addEventListener('DOMContentLoaded', function() {
     .home-hero-title { font-size: 28px; }
     .home-hero-actions { flex-direction: column; }
     .home-btn { justify-content: center; }
+    .home-journals-quick-grid { gap: 8px; }
+    .home-journal-chip { padding: 8px 12px; font-size: 13px; }
+    .home-journal-chip-name { white-space: normal; max-width: 180px; }
     .home-search-wrapper { flex-wrap: wrap; }
     .home-search-input { min-width: 100%; }
     .home-article-footer { flex-direction: column; gap: 12px; align-items: flex-start; }
