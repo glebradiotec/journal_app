@@ -43,7 +43,7 @@
                 Экспорт
             </a>
             <a href="{{ url_for('admin_trash') }}" class="adm-nav-item adm-nav-active">
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2.75C2 1.784 2.784 1 3.75 1h2.5a.75.75 0 0 1 0 1.5h-2.5a.25.25 0 0 0-.25.25v9.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14H4.75A1.75 1.75 0 0 1 3 12.25v-9.5a.25.25 0 0 0-.25-.25H.75a.75.75 0 0 1 0-1.5h1.5A1.75 1.75 0 0 1 2 2.75ZM8 4.75a.75.75 0 0 1 .75.75v4.5a.75.75 0 0 1-1.5 0v-4.5A.75.75 0 0 1 8 4.75Zm3.25.75a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5a.75.75 0 0 1 .75-.75Zm-6.5 0a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 4.75 5.5Z"/></svg>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M11 1.75V3h2.25a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1 0-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75ZM4.496 6.675l.66 6.6a.25.25 0 0 0 .249.225h5.19a.25.25 0 0 0 .249-.225l.66-6.6a.75.75 0 0 1 1.492.149l-.66 6.6A1.748 1.748 0 0 1 10.595 15h-5.19a1.75 1.75 0 0 1-1.741-1.575l-.66-6.6a.75.75 0 1 1 1.492-.15ZM6.5 1.75V3h3V1.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z"/></svg>
                 Корзина
             </a>
             <a href="{{ url_for('admin_users') }}" class="adm-nav-item">
@@ -129,6 +129,57 @@
 </div>
 
 <style>
+/* =============================================
+   ADMIN LAYOUT (как на остальных админ-страницах)
+   ============================================= */
+.adm-layout { display: flex; min-height: 100vh; }
+.adm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 998; backdrop-filter: blur(2px); }
+.adm-overlay.active { display: block; }
+
+.adm-sidebar { width: 260px; min-height: 100vh; background: var(--color-canvas-subtle); border-right: 1px solid var(--color-border-default); display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 999; }
+.adm-sidebar-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 20px 20px; border-bottom: 1px solid var(--color-border-muted); }
+.adm-sidebar-close { display: none; background: none; border: none; color: var(--color-fg-muted); cursor: pointer; padding: 4px; border-radius: 6px; }
+.adm-sidebar-close:hover { background: var(--color-canvas-inset); }
+.adm-logo { display: flex; align-items: center; gap: 12px; }
+.adm-logo-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #5BA4B0, #4A8E99); color: #fff; display: flex; align-items: center; justify-content: center; }
+[data-theme="dark"] .adm-logo-icon { background: linear-gradient(135deg, #5BA4B0, #7CC5D0); }
+.adm-logo-text { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
+
+.adm-nav { padding: 16px 12px; }
+.adm-nav-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-fg-muted); padding: 0 12px; margin-bottom: 8px; }
+.adm-nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; font-size: 14px; font-weight: 500; color: var(--color-fg-muted); text-decoration: none; border-radius: 8px; margin-bottom: 2px; transition: background 0.15s, color 0.15s; }
+.adm-nav-item:hover { background: var(--color-canvas-inset); color: var(--color-fg-default); }
+.adm-nav-active { background: linear-gradient(135deg, rgba(91,164,176,0.12), rgba(91,164,176,0.06)); color: #5BA4B0; font-weight: 600; }
+[data-theme="dark"] .adm-nav-active { color: #7CC5D0; background: linear-gradient(135deg, rgba(124,197,208,0.15), rgba(124,197,208,0.06)); }
+.adm-nav-active:hover { background: linear-gradient(135deg, rgba(91,164,176,0.18), rgba(91,164,176,0.1)); }
+
+.adm-sidebar-footer { padding: 8px 12px 20px; border-top: 1px solid var(--color-border-muted); margin-top: 8px; }
+.adm-user-block { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.adm-user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--color-canvas-inset); border: 2px solid var(--color-border-default); display: flex; align-items: center; justify-content: center; color: var(--color-fg-muted); flex-shrink: 0; }
+.adm-user-info { display: flex; flex-direction: column; min-width: 0; }
+.adm-user-name { font-size: 13px; font-weight: 600; color: var(--color-fg-default); }
+.adm-user-role { font-size: 12px; color: var(--color-fg-muted); }
+
+.adm-main { flex: 1; min-width: 0; padding: 32px 36px 48px; background: var(--color-canvas-default); position: relative; }
+.adm-toolbar { position: absolute; top: 20px; right: 24px; display: flex; gap: 6px; z-index: 10; }
+.adm-toolbar-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; text-decoration: none; font-size: 14px; transition: all 0.15s; }
+.adm-toolbar-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); border-color: var(--color-border-muted); }
+.adm-toolbar-exit:hover { color: #cf222e; border-color: rgba(207,34,46,0.3); background: rgba(207,34,46,0.06); }
+[data-theme="dark"] .adm-toolbar-exit:hover { color: #f85149; }
+.adm-burger { display: none; position: fixed; top: 16px; left: 16px; z-index: 1000; width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--color-border-default); background: var(--color-canvas-default); color: var(--color-fg-default); cursor: pointer; align-items: center; justify-content: center; }
+.adm-content { padding: 32px; max-width: 900px; }
+
+@media (max-width: 768px) {
+    .adm-sidebar { position: fixed; left: -280px; top: 0; height: 100vh; width: 270px; transition: left 0.25s ease; box-shadow: none; }
+    .adm-sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.15); }
+    .adm-sidebar-close { display: flex; }
+    .adm-toolbar { display: none; }
+    .adm-main { padding: 20px 16px 36px; padding-top: 64px; }
+    .adm-content { padding: 20px 16px; }
+    .adm-burger { display: flex; }
+}
+
+/* Страница корзины */
 .trash-title { font-size: 24px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 8px 0; }
 .trash-desc { font-size: 14px; color: var(--color-fg-muted); margin: 0 0 24px 0; }
 .trash-section { margin-bottom: 28px; }
