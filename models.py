@@ -48,6 +48,12 @@ class Issue(db.Model):
     journal_id = db.Column(db.Integer, db.ForeignKey('journal.id'), nullable=False, index=True)
     journal = db.relationship('Journal', backref='issues')
     articles = db.relationship('Article', backref='issue', cascade='all, delete-orphan')
+    deleted_at = db.Column(db.DateTime, nullable=True, index=True)  # корзина: не None = удалён
+
+    @classmethod
+    def visible(cls):
+        """Запрос только неудалённых выпусков (не в корзине)."""
+        return cls.query.filter(cls.deleted_at.is_(None))
 
 
 class Article(db.Model):
@@ -59,9 +65,15 @@ class Article(db.Model):
     has_review = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text)
     issue_id = db.Column(db.Integer, db.ForeignKey('issue.id'), nullable=False, index=True)
+    deleted_at = db.Column(db.DateTime, nullable=True, index=True)  # корзина: не None = удалён
 
     has_expertise_act = db.Column(db.Boolean, default=False)
     expertise_act_file = db.Column(db.String(500))
+
+    @classmethod
+    def visible(cls):
+        """Запрос только неудалённых статей (не в корзине)."""
+        return cls.query.filter(cls.deleted_at.is_(None))
 
     # Дополнительные поля
     submission_date = db.Column(db.String(50))

@@ -59,7 +59,7 @@ def register_public_routes(app):
     @login_required
     def index():
         # Статьи загружаются через AJAX-поиск, а не при открытии страницы
-        total_articles = Article.query.count()
+        total_articles = Article.visible().count()
         total_authors = db.session.query(db.func.count(db.distinct(ArticleAuthor.full_name))).scalar()
         return render_template('index.html', total_articles=total_articles, total_authors=total_authors)
 
@@ -85,7 +85,7 @@ def register_public_routes(app):
         )
 
         query = (
-            Article.query
+            Article.visible()
             .join(Issue)
             .join(Journal)
             .options(
@@ -166,10 +166,10 @@ def register_public_routes(app):
             .all()
         )
         issues_default = [{'issue': issue, 'article_count': count} for issue, count in rows]
-        total_issues = Issue.query.filter_by(journal_id=journal_id).count()
-        total_articles = Article.query.join(Issue).filter(Issue.journal_id == journal_id).count()
+        total_issues = Issue.visible().filter_by(journal_id=journal_id).count()
+        total_articles = Article.visible().join(Issue).filter(Issue.journal_id == journal_id).count()
         last_issue = (
-            Issue.query.filter_by(journal_id=journal_id)
+            Issue.visible().filter_by(journal_id=journal_id)
             .order_by(Issue.position.asc(), Issue.id.desc())
             .first()
         )
@@ -216,14 +216,14 @@ def register_public_routes(app):
     @app.route("/issue/<int:issue_id>")
     @login_required
     def issue_articles(issue_id):
-        issue = Issue.query.options(
+        issue = Issue.visible().options(
             joinedload(Issue.journal)
-        ).get_or_404(issue_id)
+        ).filter_by(id=issue_id).first_or_404()
         journal = issue.journal
         search = request.args.get('search', '').strip()
 
         all_articles = (
-            Article.query
+            Article.visible()
             .filter_by(issue_id=issue_id)
             .options(
                 joinedload(Article.article_authors),
@@ -295,7 +295,7 @@ def register_public_routes(app):
         # Получаем все статьи автора
         article_ids = [r.article_id for r in author_records]
         articles = (
-            Article.query
+            Article.visible()
             .filter(Article.id.in_(article_ids))
             .options(
                 joinedload(Article.issue).joinedload(Issue.journal),

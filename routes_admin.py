@@ -21,7 +21,7 @@ from flask import (
 from flask_login import login_required, current_user
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
@@ -153,10 +153,11 @@ def _process_authors(article):
 
 
 def _filtered_articles_query(journal_id=None, status_filter='', search=''):
-    """Общий запрос статей с фильтрами. Используется в API, экспорте и странице статей."""
+    """Общий запрос статей с фильтрами. Только неудалённые статьи и выпуски."""
     query = (
-        Article.query
+        Article.visible()
         .join(Issue).join(Journal)
+        .filter(Issue.deleted_at.is_(None))
         .options(
             joinedload(Article.issue).joinedload(Issue.journal),
             joinedload(Article.article_authors)
@@ -204,8 +205,8 @@ def register_admin_routes(app):
     def reorder_issues(journal_id):
         data = request.json['order']
         for new_pos, issue_id in enumerate(data):
-            issue = Issue.query.get(issue_id)
-            if issue and issue.journal_id == journal_id:
+            issue = Issue.visible().filter_by(id=issue_id, journal_id=journal_id).first()
+            if issue:
                 issue.position = new_pos
         db.session.commit()
         return jsonify({'status': 'ok'})
@@ -268,7 +269,7 @@ def register_admin_routes(app):
     @app.route("/article/<int:article_id>/toggle/<field>", methods=['POST'])
     @login_required
     def toggle_article(article_id, field):
-        article = Article.query.get_or_404(article_id)
+        article = Article.visible().filter_by(id=article_id).first_or_404()
         issue_id = article.issue_id
         new_value = False
 
@@ -301,7 +302,7 @@ def register_admin_routes(app):
     @login_required
     def update_notes(article_id):
         data = request.json
-        article = Article.query.get(article_id)
+        article = Article.visible().filter_by(id=article_id).first()
         if article:
             article.notes = data.get('notes', '')
             db.session.commit()
@@ -311,34 +312,35 @@ def register_admin_routes(app):
     @app.route("/article/<int:article_id>/delete", methods=['POST'])
     @login_required
     def delete_article(article_id):
-        article = Article.query.get_or_404(article_id)
+        article = Article.visible().filter_by(id=article_id).first_or_404()
         issue_id = article.issue_id
         log_activity('deleted', 'article', article.id, article.title)
-        db.session.delete(article)
+        article.deleted_at = datetime.now(timezone.utc)
         db.session.commit()
-        flash('Статья удалена', 'success')
+        flash('Статья перемещена в корзину', 'success')
         return redirect(f'/issue/{issue_id}')
 
     @app.route("/issue/<int:issue_id>/delete", methods=['POST'])
     @login_required
     def delete_issue(issue_id):
-        issue = Issue.query.get_or_404(issue_id)
+        issue = Issue.visible().options(joinedload(Issue.journal)).filter_by(id=issue_id).first_or_404()
         journal_id = issue.journal_id
         log_activity('deleted', 'issue', issue.id, f'№{issue.number}/{issue.year}', f'Журнал: {issue.journal.name}')
+        now = datetime.now(timezone.utc)
+        issue.deleted_at = now
         for article in issue.articles:
-            db.session.delete(article)
-        db.session.delete(issue)
+            article.deleted_at = now
         db.session.commit()
-        flash(f'Выпуск №{issue.number}/{issue.year} удалён', 'success')
+        flash(f'Выпуск №{issue.number}/{issue.year} перемещён в корзину', 'success')
         return redirect(f'/journal/{journal_id}')
 
     @app.route("/article/<int:article_id>/edit", methods=['GET', 'POST'])
     @login_required
     def edit_article(article_id):
-        article = Article.query.options(
+        article = Article.visible().options(
             joinedload(Article.article_authors),
             joinedload(Article.images)
-        ).get_or_404(article_id)
+        ).filter_by(id=article_id).first_or_404()
         issue = Issue.query.options(joinedload(Issue.journal)).get(article.issue_id)
         journal = issue.journal if issue else None
         
@@ -456,11 +458,11 @@ def register_admin_routes(app):
         data = request.get_json()
         new_issue_id = data.get('issue_id')
 
-        article = Article.query.get(article_id)
+        article = Article.visible().filter_by(id=article_id).first()
         if not article:
             return jsonify({'error': 'Статья не найдена'}), 404
 
-        issue = Issue.query.get(new_issue_id)
+        issue = Issue.visible().filter_by(id=new_issue_id).first()
         if not issue:
             return jsonify({'error': 'Выпуск не найден'}), 400
 
@@ -480,7 +482,7 @@ def register_admin_routes(app):
     @login_required
     def export_issue_excel(issue_id):
         """Экспортирует все статьи выпуска в Excel"""
-        issue = Issue.query.get(issue_id)
+        issue = Issue.visible().filter_by(id=issue_id).first()
         if not issue:
             return "Выпуск не найден", 404
 
@@ -502,8 +504,9 @@ def register_admin_routes(app):
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Данные статей
-        for idx, article in enumerate(issue.articles, 1):
+        # Данные статей (только неудалённые)
+        articles_list = Article.visible().filter_by(issue_id=issue_id).options(joinedload(Article.article_authors)).all()
+        for idx, article in enumerate(articles_list, 1):
             authors = ", ".join([f"{a.full_name}" for a in article.article_authors]) if article.article_authors else article.authors or "-"
 
             ws.append([
@@ -541,7 +544,7 @@ def register_admin_routes(app):
     @login_required
     def export_issue_csv(issue_id):
         """Экспортирует все статьи выпуска в CSV"""
-        issue = Issue.query.get(issue_id)
+        issue = Issue.visible().filter_by(id=issue_id).first()
         if not issue:
             return "Выпуск не найден", 404
 
@@ -553,8 +556,9 @@ def register_admin_routes(app):
         headers = ["№", "Название статьи", "Авторы", "Дата поступления", "Оплачено", "Рецензия", "Редактировано"]
         writer.writerow(headers)
 
-        # Данные статей
-        for idx, article in enumerate(issue.articles, 1):
+        # Данные статей (только неудалённые)
+        articles_list = Article.visible().filter_by(issue_id=issue_id).options(joinedload(Article.article_authors)).all()
+        for idx, article in enumerate(articles_list, 1):
             authors = ", ".join([f"{a.full_name}" for a in article.article_authors]) if article.article_authors else article.authors or "-"
 
             writer.writerow([
@@ -592,15 +596,15 @@ def register_admin_routes(app):
     @admin_required
     def admin_dashboard():
         try:
-            total_articles = Article.query.count()
-            unpaid = Article.query.filter_by(payment_received=False).count()
-            no_review = Article.query.filter_by(has_review=False).count()
-            not_edited = Article.query.filter_by(edited=False).count()
-            no_expertise = Article.query.filter_by(has_expertise_act=False).count()
+            total_articles = Article.visible().count()
+            unpaid = Article.visible().filter_by(payment_received=False).count()
+            no_review = Article.visible().filter_by(has_review=False).count()
+            not_edited = Article.visible().filter_by(edited=False).count()
+            no_expertise = Article.visible().filter_by(has_expertise_act=False).count()
             
             stats = {
                 'journals': Journal.query.count(),
-                'issues': Issue.query.count(),
+                'issues': Issue.visible().count(),
                 'articles': total_articles,
                 'unpaid': unpaid,
                 'no_review': no_review,
@@ -608,7 +612,7 @@ def register_admin_routes(app):
                 'no_expertise': no_expertise,
             }
             recent_articles = (
-                Article.query
+                Article.visible()
                 .options(joinedload(Article.issue).joinedload(Issue.journal))
                 .order_by(Article.id.desc())
                 .limit(10)
@@ -616,11 +620,12 @@ def register_admin_routes(app):
             )
             recent_activity = ActivityLog.query.order_by(ActivityLog.created_at.desc()).limit(15).all()
             
-            # Данные для графика: статьи по журналам (один запрос вместо N)
+            # Данные для графика: статьи по журналам (только неудалённые)
             chart_query = (
                 db.session.query(Journal.name, func.count(Article.id))
                 .join(Issue, Issue.journal_id == Journal.id)
                 .join(Article, Article.issue_id == Issue.id)
+                .filter(Issue.deleted_at.is_(None), Article.deleted_at.is_(None))
                 .group_by(Journal.id, Journal.name)
                 .having(func.count(Article.id) > 0)
                 .order_by(func.count(Article.id).desc())
@@ -669,8 +674,8 @@ def register_admin_routes(app):
                 func.count(func.distinct(Issue.id)).label('issue_count'),
                 func.count(Article.id).label('article_count')
             )
-            .outerjoin(Issue, Issue.journal_id == Journal.id)
-            .outerjoin(Article, Article.issue_id == Issue.id)
+            .outerjoin(Issue, and_(Issue.journal_id == Journal.id, Issue.deleted_at.is_(None)))
+            .outerjoin(Article, and_(Article.issue_id == Issue.id, Article.deleted_at.is_(None)))
             .group_by(Journal.id)
             .order_by(Journal.id)
             .all()
@@ -738,7 +743,7 @@ def register_admin_routes(app):
         """Удаление журнала"""
         journal = Journal.query.get_or_404(journal_id)
         # Проверяем наличие выпусков
-        issue_count = Issue.query.filter_by(journal_id=journal_id).count()
+        issue_count = Issue.visible().filter_by(journal_id=journal_id).count()
         if issue_count > 0:
             return jsonify({
                 'success': False,
@@ -758,7 +763,7 @@ def register_admin_routes(app):
         search = request.args.get('search', '').strip()
         
         journals = Journal.query.all()
-        total_articles = Article.query.count()
+        total_articles = Article.visible().count()
         
         return render_template('admin/articles.html', 
                                journals=journals,
@@ -831,15 +836,16 @@ def register_admin_routes(app):
         if not article_ids:
             return jsonify({'success': False, 'message': 'Не выбрано ни одной статьи'}), 400
         
+        now = datetime.now(timezone.utc)
         deleted_count = 0
         for aid in article_ids:
-            article = Article.query.get(aid)
-            if article:
-                db.session.delete(article)  # каскад удалит авторов, изображения и историю
+            article = Article.query.get(aid)  # любой, в т.ч. из корзины — проверяем deleted_at
+            if article and not article.deleted_at:
+                article.deleted_at = now
                 deleted_count += 1
-        
+
         db.session.commit()
-        return jsonify({'success': True, 'message': f'Удалено статей: {deleted_count}'})
+        return jsonify({'success': True, 'message': f'В корзину перемещено статей: {deleted_count}'})
 
     @app.route('/admin/articles/bulk-toggle', methods=['POST'])
     @admin_required
@@ -855,7 +861,7 @@ def register_admin_routes(app):
         
         updated_count = 0
         for article_id in article_ids:
-            article = Article.query.get(article_id)
+            article = Article.visible().filter_by(id=article_id).first()
             if article:
                 if field == 'payment':
                     article.payment_received = value
@@ -887,7 +893,7 @@ def register_admin_routes(app):
         if article_ids:
             ids_list = [int(x) for x in article_ids.split(',') if x.isdigit()]
             articles = (
-                Article.query
+                Article.visible()
                 .filter(Article.id.in_(ids_list))
                 .options(
                     joinedload(Article.issue).joinedload(Issue.journal),
@@ -934,7 +940,7 @@ def register_admin_routes(app):
         if article_ids:
             ids_list = [int(x) for x in article_ids.split(',') if x.isdigit()]
             articles = (
-                Article.query
+                Article.visible()
                 .filter(Article.id.in_(ids_list))
                 .options(
                     joinedload(Article.issue).joinedload(Issue.journal),
@@ -1057,6 +1063,58 @@ def register_admin_routes(app):
         return jsonify({'success': True})
 
     # =============================================
+    #   КОРЗИНА (восстановление удалённых)
+    # =============================================
+    @app.route('/admin/trash')
+    @admin_required
+    def admin_trash():
+        """Список удалённых статей и выпусков с возможностью восстановления."""
+        deleted_articles = (
+            Article.query
+            .filter(Article.deleted_at.isnot(None))
+            .options(
+                joinedload(Article.issue).joinedload(Issue.journal),
+                joinedload(Article.article_authors)
+            )
+            .order_by(Article.deleted_at.desc())
+            .all()
+        )
+        deleted_issues = (
+            Issue.query
+            .filter(Issue.deleted_at.isnot(None))
+            .options(joinedload(Issue.journal))
+            .order_by(Issue.deleted_at.desc())
+            .all()
+        )
+        return render_template(
+            'admin/trash.html',
+            deleted_articles=deleted_articles,
+            deleted_issues=deleted_issues,
+        )
+
+    @app.route('/admin/trash/article/<int:article_id>/restore', methods=['POST'])
+    @admin_required
+    def admin_trash_restore_article(article_id):
+        article = Article.query.filter(Article.id == article_id, Article.deleted_at.isnot(None)).first_or_404()
+        article.deleted_at = None
+        db.session.commit()
+        log_activity('restored', 'article', article.id, article.title)
+        flash('Статья восстановлена', 'success')
+        return redirect(url_for('admin_trash'))
+
+    @app.route('/admin/trash/issue/<int:issue_id>/restore', methods=['POST'])
+    @admin_required
+    def admin_trash_restore_issue(issue_id):
+        issue = Issue.query.filter(Issue.id == issue_id, Issue.deleted_at.isnot(None)).first_or_404()
+        issue.deleted_at = None
+        for article in issue.articles:
+            article.deleted_at = None
+        db.session.commit()
+        log_activity('restored', 'issue', issue.id, f'№{issue.number}/{issue.year}', f'Журнал: {issue.journal.name}')
+        flash(f'Выпуск №{issue.number}/{issue.year} и его статьи восстановлены', 'success')
+        return redirect(url_for('admin_trash'))
+
+    # =============================================
     #   СТРАНИЦА ЭКСПОРТА
     # =============================================
     @app.route('/admin/export')
@@ -1064,7 +1122,7 @@ def register_admin_routes(app):
     def admin_export():
         """Страница экспорта с выбором формата и фильтров."""
         journals = Journal.query.order_by(Journal.name).all()
-        total_articles = Article.query.count()
+        total_articles = Article.visible().count()
         return render_template('admin/export.html', journals=journals, total_articles=total_articles)
 
     # =============================================
@@ -1207,7 +1265,7 @@ def register_admin_routes(app):
     @app.route('/article/<int:article_id>/history')
     @login_required
     def article_history(article_id):
-        article = Article.query.get_or_404(article_id)
+        article = Article.visible().filter_by(id=article_id).first_or_404()
         entries = ArticleHistory.query.filter_by(article_id=article_id).order_by(ArticleHistory.created_at.desc()).limit(50).all()
         result = []
         for e in entries:
@@ -1225,11 +1283,11 @@ def register_admin_routes(app):
     @app.route('/article/<int:article_id>/json')
     @login_required
     def article_json(article_id):
-        article = Article.query.options(
+        article = Article.visible().options(
             joinedload(Article.article_authors),
             joinedload(Article.images),
             joinedload(Article.issue).joinedload(Issue.journal)
-        ).get_or_404(article_id)
+        ).filter_by(id=article_id).first_or_404()
 
         authors = []
         for a in sorted(article.article_authors, key=lambda x: x.order):
@@ -1276,11 +1334,11 @@ def register_admin_routes(app):
     @app.route('/article/<int:article_id>/edit-data')
     @login_required
     def article_edit_data(article_id):
-        article = Article.query.options(
+        article = Article.visible().options(
             joinedload(Article.article_authors),
             joinedload(Article.images),
             joinedload(Article.issue).joinedload(Issue.journal)
-        ).get_or_404(article_id)
+        ).filter_by(id=article_id).first_or_404()
 
         authors = []
         for a in sorted(article.article_authors, key=lambda x: x.order):
@@ -1340,7 +1398,7 @@ def register_admin_routes(app):
     @app.route('/article/<int:article_id>/comments', methods=['POST'])
     @login_required
     def add_article_comment(article_id):
-        Article.query.get_or_404(article_id)
+        Article.visible().filter_by(id=article_id).first_or_404()
         data = request.get_json()
         text = (data.get('text') or '').strip()
         if not text:
