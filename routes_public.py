@@ -64,19 +64,26 @@ def register_public_routes(app):
         # Статьи загружаются через AJAX-поиск, а не при открытии страницы
         total_articles = Article.visible().count()
         total_authors = db.session.query(db.func.count(db.distinct(ArticleAuthor.full_name))).scalar()
-        # Журналы с выпусками 2026 для быстрого доступа
-        journals = Journal.query.options(
-            subqueryload(Journal.issues)
-        ).filter(db.or_(Journal.is_hidden == False, Journal.is_hidden.is_(None))).all()
-        journals_data = []
+        # Журналы с выпусками 2026 для быстрого доступа (только нужные данные, без загрузки всех выпусков)
+        journals = Journal.query.filter(
+            db.or_(Journal.is_hidden == False, Journal.is_hidden.is_(None))
+        ).order_by(Journal.name).all()
+        journal_ids = [j.id for j in journals]
+        issues_2026 = (
+            Issue.visible()
+            .filter(Issue.journal_id.in_(journal_ids), Issue.year == 2026)
+            .order_by(Issue.journal_id, Issue.position, Issue.number)
+            .all()
+        )
+        by_journal = {}
         for j in journals:
-            issues_2026 = [i for i in j.issues if i.year == 2026 and i.deleted_at is None]
-            issues_2026.sort(key=lambda x: (x.position, x.number))
-            journals_data.append({
-                'id': j.id,
-                'name': j.name,
-                'issues_2026': [{'id': i.id, 'number': i.number} for i in issues_2026]
-            })
+            by_journal[j.id] = []
+        for i in issues_2026:
+            by_journal[i.journal_id].append({'id': i.id, 'number': i.number})
+        journals_data = [
+            {'id': j.id, 'name': j.name, 'issues_2026': by_journal[j.id]}
+            for j in journals
+        ]
         return render_template(
             'index.html',
             total_articles=total_articles,
