@@ -205,6 +205,40 @@
         </div>
     </div>
 
+    <!-- Quick access: journals + 2026 issues (accordion) -->
+    {% if journals_quick %}
+    <div class="home-quick-access">
+        <h2 class="home-quick-title">Быстрый доступ</h2>
+        <div class="home-quick-grid">
+            {% for j in journals_quick %}
+            <div class="home-quick-block{% if j.issues_2026 %} has-issues{% endif %}" data-journal-id="{{ j.id }}">
+                <button type="button" class="home-quick-trigger" aria-expanded="false" aria-controls="quick-{{ j.id }}" id="trigger-{{ j.id }}">
+                    <span class="home-quick-name">{{ j.name }}</span>
+                    {% if j.issues_2026 %}
+                    <span class="home-quick-badge">{{ j.issues_2026|length }} {{ (j.issues_2026|length)|pluralize_ru('выпуск', 'выпуска', 'выпусков') }} 2026</span>
+                    {% endif %}
+                    <svg class="home-quick-chevron" width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg>
+                </button>
+                <div class="home-quick-panel" id="quick-{{ j.id }}" role="region" aria-labelledby="trigger-{{ j.id }}" aria-hidden="true">
+                    <div class="home-quick-panel-inner">
+                        {% if j.issues_2026 %}
+                        <div class="home-quick-issues">
+                            {% for i in j.issues_2026 %}
+                            <a href="/issue/{{ i.id }}" class="home-quick-issue">№{{ i.number }} / 2026</a>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="home-quick-empty">Нет выпусков 2026</p>
+                        {% endif %}
+                        <a href="/journal/{{ j.id }}" class="home-quick-all">Все выпуски →</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Results (populated by JS) -->
     <div class="home-results" id="searchResults"></div>
     
@@ -368,6 +402,36 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.value = '';
         doSearch();
         searchInput.focus();
+    });
+
+    // Accordion: быстрый доступ к журналам
+    document.querySelectorAll('.home-quick-trigger').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const block = this.closest('.home-quick-block');
+            const panel = block.querySelector('.home-quick-panel');
+            const isOpen = block.classList.contains('is-open');
+
+            // Закрыть все остальные
+            document.querySelectorAll('.home-quick-block').forEach(function(b) {
+                if (b !== block) {
+                    b.classList.remove('is-open');
+                    const p = b.querySelector('.home-quick-panel');
+                    if (p) { p.setAttribute('aria-hidden', 'true'); }
+                    const t = b.querySelector('.home-quick-trigger');
+                    if (t) { t.setAttribute('aria-expanded', 'false'); }
+                }
+            });
+
+            if (isOpen) {
+                block.classList.remove('is-open');
+                panel.setAttribute('aria-hidden', 'true');
+                this.setAttribute('aria-expanded', 'false');
+            } else {
+                block.classList.add('is-open');
+                panel.setAttribute('aria-hidden', 'false');
+                this.setAttribute('aria-expanded', 'true');
+            }
+        });
     });
 });
 </script>
@@ -650,6 +714,155 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--color-accent-fg);
 }
 
+/* Quick access: journals + 2026 issues (accordion) */
+.home-quick-access {
+    margin-bottom: 28px;
+}
+
+.home-quick-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    margin: 0 0 12px 0;
+}
+
+.home-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.home-quick-block {
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.home-quick-block:hover {
+    border-color: var(--color-border-muted);
+}
+
+.home-quick-block.is-open {
+    border-color: var(--color-accent-emphasis);
+    box-shadow: 0 4px 16px rgba(91, 164, 176, 0.12);
+}
+
+.home-quick-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px 16px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: var(--color-fg-default);
+    transition: background 0.15s;
+}
+
+.home-quick-trigger:hover {
+    background: var(--color-canvas-subtle);
+}
+
+.home-quick-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.home-quick-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.1);
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+[data-theme="dark"] .home-quick-badge {
+    background: rgba(124, 197, 208, 0.15);
+}
+
+.home-quick-chevron {
+    flex-shrink: 0;
+    color: var(--color-fg-muted);
+    transition: transform 0.25s ease;
+}
+
+.home-quick-block.is-open .home-quick-chevron {
+    transform: rotate(90deg);
+}
+
+.home-quick-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.home-quick-block.is-open .home-quick-panel {
+    max-height: 280px;
+}
+
+.home-quick-panel-inner {
+    padding: 0 16px 14px 16px;
+    border-top: 1px solid var(--color-border-default);
+}
+
+.home-quick-issues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 10px 0;
+}
+
+.home-quick-issue {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.1);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.home-quick-issue:hover {
+    background: rgba(91, 164, 176, 0.2);
+}
+
+[data-theme="dark"] .home-quick-issue {
+    background: rgba(124, 197, 208, 0.12);
+}
+
+[data-theme="dark"] .home-quick-issue:hover {
+    background: rgba(124, 197, 208, 0.22);
+}
+
+.home-quick-empty {
+    font-size: 13px;
+    color: var(--color-fg-muted);
+    margin: 12px 0 10px 0;
+}
+
+.home-quick-all {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-accent-fg);
+    text-decoration: none;
+    transition: gap 0.2s;
+}
+
+.home-quick-all:hover {
+    text-decoration: underline;
+}
+
 /* Results */
 .home-results {
     display: flex;
@@ -853,6 +1066,8 @@ document.addEventListener('DOMContentLoaded', function() {
     .home-btn { justify-content: center; }
     .home-search-wrapper { flex-wrap: wrap; }
     .home-search-input { min-width: 100%; }
+    .home-quick-grid { grid-template-columns: 1fr; }
+    .home-quick-trigger { flex-wrap: wrap; }
     .home-article-footer { flex-direction: column; gap: 12px; align-items: flex-start; }
 }
 </style>
