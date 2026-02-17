@@ -354,6 +354,8 @@ def register_public_routes(app):
         if not os.path.isfile(filepath):
             abort(404)
 
+        is_download = request.path.startswith('/download/')
+
         # X-Accel-Redirect: Nginx отдаёт файл напрямую (быстрее, не блокирует воркеры)
         if os.environ.get('USE_X_ACCEL_REDIRECT') == '1':
             # Путь для Nginx internal location
@@ -361,7 +363,13 @@ def register_public_routes(app):
             response = Response(status=200)
             response.headers['X-Accel-Redirect'] = internal_path
             response.headers['X-Accel-Charset'] = 'utf-8'
+            if is_download:
+                # Скачивание, а не отображение в браузере
+                response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}"'
             return response
 
-        return send_from_directory(upload_folder, safe_name)
+        return send_from_directory(
+            upload_folder, safe_name,
+            as_attachment=is_download,
+        )
 
