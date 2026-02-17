@@ -8,6 +8,9 @@ from flask import (
     url_for,
     flash,
     send_from_directory,
+    current_app,
+    Response,
+    abort,
 )
 from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy import func
@@ -344,5 +347,21 @@ def register_public_routes(app):
     @app.route('/uploads/<filename>')
     @login_required
     def download_file(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        # Безопасность: только имя файла, без path traversal
+        safe_name = os.path.basename(filename)
+        filepath = os.path.join(upload_folder, safe_name)
+        if not os.path.isfile(filepath):
+            abort(404)
+
+        # X-Accel-Redirect: Nginx отдаёт файл напрямую (быстрее, не блокирует воркеры)
+        if os.environ.get('USE_X_ACCEL_REDIRECT') == '1':
+            # Путь для Nginx internal location
+            internal_path = '/internal-uploads/' + safe_name
+            response = Response(status=200)
+            response.headers['X-Accel-Redirect'] = internal_path
+            response.headers['X-Accel-Charset'] = 'utf-8'
+            return response
+
+        return send_from_directory(upload_folder, safe_name)
 
