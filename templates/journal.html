@@ -99,6 +99,7 @@
     <!-- Статьи без номера выпуска (ожидают привязки) -->
     <div class="solyanka-section">
         <div class="solyanka-card">
+            <a href="/issue/{{ solyanka_issue.id }}" class="solyanka-stretched-link" aria-label="Открыть статьи без номера выпуска"></a>
             <div class="solyanka-card-main">
                 <div class="solyanka-icon">
                     <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor">
@@ -106,7 +107,7 @@
                     </svg>
                 </div>
                 <div class="solyanka-info">
-                    <a href="/issue/{{ solyanka_issue.id }}" class="solyanka-title">Статьи без номера выпуска</a>
+                    <span class="solyanka-title">Статьи без номера выпуска</span>
                     <span class="solyanka-desc">Статьи, ожидающие привязки к выпуску</span>
                     <span class="solyanka-meta">{{ solyanka_article_count }} {{ solyanka_article_count|pluralize_ru('статья', 'статьи', 'статей') }}</span>
                 </div>
@@ -122,7 +123,7 @@
     <div class="table-container">
         <div class="table-header">
             <h2 class="table-title">Выпуски журнала</h2>
-            {% if total_issues and issues_default and default_year > 2025 %}
+            {% if total_issues and issues_default %}
             <span class="table-hint">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M10 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm-4 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm1-5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm1-5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6 5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/>
@@ -142,49 +143,18 @@
             <button class="btn-primary" onclick="toggleNewIssueForm()">Создать выпуск</button>
         </div>
         {% else %}
-        <div class="issues-by-year">
-            {# Секция года по умолчанию (раскрыта) #}
-            <div class="year-section year-section-expanded{% if default_year <= 2025 %} year-section-compact{% endif %}">
-                <h3 class="year-section-title">{{ default_year }}</h3>
-                <div class="issues-list" id="issues-list-default">
-                    {% if default_year <= 2025 %}
-                    <table class="issues-table-compact">
-                        <thead>
-                            <tr>
-                                <th>№</th>
-                                <th>Год</th>
-                                <th>Статей</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in issues_default %}
-                            {% set issue = item.issue %}
-                            {% set article_count = item.article_count %}
-                            <tr class="issue-row-trigger" data-issue-id="{{ issue.id }}" data-article-count="{{ article_count }}" tabindex="0" role="button">
-                                <td>{{ issue.number }}</td>
-                                <td>{{ issue.year }}</td>
-                                <td>{{ article_count }} {{ article_count|pluralize_ru('статья', 'статьи', 'статей') }}</td>
-                                <td class="issue-row-expand"><svg class="expand-chevron" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg></td>
-                            </tr>
-                            <tr class="issue-row-detail" id="detail-{{ issue.id }}" aria-hidden="true">
-                                <td colspan="4">
-                                    <div class="issue-detail-inner">
-                                        <a href="/issue/{{ issue.id }}" class="issue-detail-link">Выпуск №{{ issue.number }} / {{ issue.year }}</a>
-                                        <div class="issue-detail-actions">
-                                            <a href="/issue/{{ issue.id }}/export-excel" class="action-btn">Экспорт</a>
-                                            <form method="POST" action="/issue/{{ issue.id }}/delete" style="display:inline;" onsubmit="return confirm('Удалить выпуск №{{ issue.number }}?');">
-                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                                <button type="submit" class="action-btn action-btn-danger">Удалить</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
+        {# Сетка годов — плашки как на эскизе #}
+        <div class="year-plaques-grid" id="yearPlaquesGrid">
+            <button type="button" class="year-plaque is-selected" data-year="{{ default_year }}" aria-pressed="true">{{ default_year }}</button>
+            {% for y in years %}
+            {% if y != default_year %}
+            <button type="button" class="year-plaque" data-year="{{ y }}" aria-pressed="false">{{ y }}</button>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="issues-detail" id="issues-detail">
+            <h3 class="issues-detail-title" id="issuesDetailTitle">Выпуски {{ default_year }}</h3>
+            <div class="issues-list" id="issues-list-default">
                     {% for item in issues_default %}
                     {% set issue = item.issue %}
                     {% set article_count = item.article_count %}
@@ -247,28 +217,7 @@
                         </div>
                     </div>
                     {% endfor %}
-                    {% endif %}
-                </div>
             </div>
-
-            {# Остальные годы — свёрнутые, подгрузка по клику #}
-            {% for y in years %}
-            {% if y != default_year %}
-            <div class="year-section year-section-collapsed" data-year="{{ y }}">
-                <button type="button" class="year-section-header" onclick="toggleYearSection({{ y }})" aria-expanded="false">
-                    <span class="year-section-title">{{ y }}</span>
-                    <svg class="year-section-chevron" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/>
-                    </svg>
-                </button>
-                <div class="year-section-body" id="year-body-{{ y }}">
-                    <div class="year-section-body-inner">
-                        <div class="issues-list issues-list-lazy" id="issues-list-year-{{ y }}" data-year="{{ y }}"></div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% endfor %}
         </div>
         {% endif %}
     </div>
@@ -278,7 +227,6 @@
 <script>
 var JOURNAL_ID = {{ journal.id }};
 var DEFAULT_YEAR = {{ default_year }};
-var OLD_YEAR_THRESHOLD = 2025;
 var CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').getAttribute('content') : '';
 
 function toggleNewIssueForm() {
@@ -291,27 +239,6 @@ function pluralizeRu(n, one, few, many) {
     if (mod10 === 1 && mod100 !== 11) return one;
     if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
     return many;
-}
-
-function renderIssueTableRows(issue) {
-    var count = issue.article_count || 0;
-    var label = count + ' ' + pluralizeRu(count, 'статья', 'статьи', 'статей');
-    return '<tr class="issue-row-trigger" data-issue-id="' + issue.id + '" data-article-count="' + count + '" tabindex="0" role="button">' +
-        '<td>' + issue.number + '</td>' +
-        '<td>' + issue.year + '</td>' +
-        '<td>' + label + '</td>' +
-        '<td class="issue-row-expand"><svg class="expand-chevron" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/></svg></td>' +
-        '</tr>' +
-        '<tr class="issue-row-detail" id="detail-' + issue.id + '" aria-hidden="true">' +
-        '<td colspan="4">' +
-        '<div class="issue-detail-inner">' +
-        '<a href="/issue/' + issue.id + '" class="issue-detail-link">Выпуск №' + issue.number + ' / ' + issue.year + '</a>' +
-        '<div class="issue-detail-actions">' +
-        '<a href="/issue/' + issue.id + '/export-excel" class="action-btn">Экспорт</a>' +
-        '<form method="POST" action="/issue/' + issue.id + '/delete" style="display:inline;" onsubmit="return confirm(\'Удалить выпуск №' + issue.number + '?\');">' +
-        '<input type="hidden" name="csrf_token" value="' + (CSRF_TOKEN || '') + '">' +
-        '<button type="submit" class="action-btn action-btn-danger">Удалить</button></form>' +
-        '</div></div></td></tr>';
 }
 
 function renderIssueCard(issue) {
@@ -337,88 +264,79 @@ function renderIssueCard(issue) {
 }
 
 var loadedYears = {};
+var defaultYearHtml = null;
 
-function toggleYearSection(year) {
-    var section = document.querySelector('.year-section[data-year="' + year + '"]');
-    if (!section) return;
-    var btn = section.querySelector('.year-section-header');
-    var body = section.querySelector('.year-section-body');
-    var listEl = document.getElementById('issues-list-year-' + year);
-    var isExpanded = body.classList.contains('year-section-body-open');
-    if (isExpanded) {
-        body.classList.remove('year-section-body-open');
-        btn.setAttribute('aria-expanded', 'false');
-        section.classList.remove('year-section-expanded');
-        section.classList.add('year-section-collapsed');
-    } else {
-        btn.setAttribute('aria-expanded', 'true');
-        section.classList.add('year-section-expanded');
-        section.classList.remove('year-section-collapsed');
-        if (!loadedYears[year]) {
-            loadedYears[year] = true;
-            fetch('/api/journal/' + JOURNAL_ID + '/issues?year=' + year)
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (listEl && data.issues && data.issues.length) {
-                        if (year <= OLD_YEAR_THRESHOLD) {
-                            listEl.innerHTML = '<table class="issues-table-compact"><thead><tr><th>№</th><th>Год</th><th>Статей</th><th></th></tr></thead><tbody>' +
-                                data.issues.map(renderIssueTableRows).join('') + '</tbody></table>';
-                        } else {
-                            listEl.innerHTML = data.issues.map(renderIssueCard).join('');
-                        }
-                    } else if (listEl) {
-                        listEl.innerHTML = '<p class="year-section-empty">Нет выпусков за этот год.</p>';
-                    }
-                    body.classList.add('year-section-body-open');
-                });
-        } else {
-            body.classList.add('year-section-body-open');
+function initSortableIfDefault() {
+    var list = document.getElementById('issues-list-default');
+    if (!list || !list.querySelector('.sortable-item')) return null;
+    return new Sortable(list, {
+        animation: 150,
+        handle: '.handle',
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        onEnd: function(evt) {
+            var issueIds = Array.from(evt.to.children).map(function(item) { return item.dataset.issueId; });
+            fetch('/journal/' + JOURNAL_ID + '/issues/reorder', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({order: issueIds})
+            }).then(function() {
+                if (typeof showToast === 'function') showToast('Порядок сохранён');
+            });
         }
+    });
+}
+
+function selectYear(year) {
+    var grid = document.getElementById('yearPlaquesGrid');
+    var titleEl = document.getElementById('issuesDetailTitle');
+    var listEl = document.getElementById('issues-list-default');
+    if (!grid || !titleEl || !listEl) return;
+    grid.querySelectorAll('.year-plaque').forEach(function(btn) {
+        var y = parseInt(btn.getAttribute('data-year'), 10);
+        if (y === year) {
+            btn.classList.add('is-selected');
+            btn.setAttribute('aria-pressed', 'true');
+        } else {
+            btn.classList.remove('is-selected');
+            btn.setAttribute('aria-pressed', 'false');
+        }
+    });
+    titleEl.textContent = 'Выпуски ' + year;
+    if (year === DEFAULT_YEAR) {
+        if (defaultYearHtml !== null) {
+            listEl.innerHTML = defaultYearHtml;
+            initSortableIfDefault();
+        }
+        return;
     }
+    if (defaultYearHtml === null) defaultYearHtml = listEl.innerHTML;
+    if (loadedYears[year]) {
+        listEl.innerHTML = loadedYears[year];
+        return;
+    }
+    listEl.innerHTML = '<p class="year-section-empty">Загрузка…</p>';
+    fetch('/api/journal/' + JOURNAL_ID + '/issues?year=' + year)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.issues && data.issues.length) {
+                loadedYears[year] = data.issues.map(renderIssueCard).join('');
+                listEl.innerHTML = loadedYears[year];
+            } else {
+                loadedYears[year] = '<p class="year-section-empty">Нет выпусков за этот год.</p>';
+                listEl.innerHTML = loadedYears[year];
+            }
+        });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Раскрытие строки выпуска в табличном виде (годы <= 2025)
-    document.addEventListener('click', function(e) {
-        var trigger = e.target.closest('.issue-row-trigger');
-        if (!trigger) return;
-        e.preventDefault();
-        var issueId = trigger.getAttribute('data-issue-id');
-        var detailRow = document.getElementById('detail-' + issueId);
-        if (!detailRow) return;
-        var isHidden = detailRow.getAttribute('aria-hidden') === 'true';
-        detailRow.setAttribute('aria-hidden', !isHidden);
-        detailRow.classList.toggle('is-open', isHidden);
-        var chevron = trigger.querySelector('.expand-chevron');
-        if (chevron) chevron.classList.toggle('is-open', isHidden);
+    document.getElementById('yearPlaquesGrid').addEventListener('click', function(e) {
+        var plaque = e.target.closest('.year-plaque');
+        if (!plaque) return;
+        var year = parseInt(plaque.getAttribute('data-year'), 10);
+        selectYear(year);
     });
-    document.addEventListener('keydown', function(e) {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        var trigger = e.target.closest('.issue-row-trigger');
-        if (!trigger) return;
-        e.preventDefault();
-        trigger.click();
-    });
-
-    var issuesList = document.getElementById('issues-list-default');
-    if (issuesList && issuesList.children.length && !issuesList.querySelector('.issues-table-compact')) {
-        new Sortable(issuesList, {
-            animation: 150,
-            handle: '.handle',
-            ghostClass: 'sortable-ghost',
-            dragClass: 'sortable-drag',
-            onEnd: function(evt) {
-                var issueIds = Array.from(evt.to.children).map(function(item) { return item.dataset.issueId; });
-                fetch('/journal/' + JOURNAL_ID + '/issues/reorder', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({order: issueIds})
-                }).then(function() {
-                    if (typeof showToast === 'function') showToast('Порядок сохранён');
-                });
-            }
-        });
-    }
+    initSortableIfDefault();
 });
 </script>
 
@@ -697,20 +615,44 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .solyanka-card {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 20px;
     padding: 18px 22px;
     background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
-    border: 1px solid var(--color-border-default);
+    border: 2px solid var(--color-accent-emphasis);
     border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(91, 164, 176, 0.15), 0 4px 16px rgba(91, 164, 176, 0.08);
     flex-wrap: wrap;
+    cursor: pointer;
 }
 
 .solyanka-card:hover {
-    border-color: var(--color-border-muted);
+    border-color: var(--color-accent-fg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba(91, 164, 176, 0.2), 0 6px 24px rgba(91, 164, 176, 0.12);
+}
+
+[data-theme="dark"] .solyanka-card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(124, 197, 208, 0.2), 0 4px 16px rgba(124, 197, 208, 0.06);
+}
+
+[data-theme="dark"] .solyanka-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(124, 197, 208, 0.3), 0 6px 24px rgba(124, 197, 208, 0.1);
+}
+
+.solyanka-stretched-link {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 14px;
+}
+
+.solyanka-card-main,
+.solyanka-actions {
+    position: relative;
+    z-index: 1;
 }
 
 .solyanka-card-main {
@@ -744,13 +686,6 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 16px;
     font-weight: 600;
     color: var(--color-accent-fg);
-    text-decoration: none;
-    transition: color 0.15s;
-}
-
-.solyanka-title:hover {
-    color: var(--color-fg-default);
-    text-decoration: underline;
 }
 
 .solyanka-desc {
@@ -823,92 +758,58 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--color-fg-muted);
 }
 
-/* Issues by year */
-.issues-by-year {
+/* Сетка годов — плашки как на эскизе */
+.year-plaques-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
     padding: 20px;
 }
 
-.year-section {
-    margin-bottom: 24px;
+.year-plaque {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 72px;
+    padding: 16px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+    border: 2px solid var(--color-border-default);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    font-family: inherit;
 }
 
-.year-section:last-child {
-    margin-bottom: 0;
+.year-plaque:hover {
+    border-color: var(--color-accent-emphasis);
+    background: var(--color-canvas-subtle);
+    box-shadow: 0 2px 8px rgba(91, 164, 176, 0.1);
 }
 
-.year-section-title {
+.year-plaque.is-selected {
+    border-color: var(--color-accent-emphasis);
+    background: linear-gradient(135deg, rgba(91, 164, 176, 0.08) 0%, rgba(91, 164, 176, 0.04) 100%);
+    color: var(--color-accent-fg);
+    box-shadow: 0 0 0 1px rgba(91, 164, 176, 0.2), 0 2px 12px rgba(91, 164, 176, 0.12);
+}
+
+[data-theme="dark"] .year-plaque.is-selected {
+    background: linear-gradient(135deg, rgba(124, 197, 208, 0.12) 0%, rgba(124, 197, 208, 0.06) 100%);
+    box-shadow: 0 0 0 1px rgba(124, 197, 208, 0.25), 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.issues-detail {
+    padding: 0 20px 20px;
+}
+
+.issues-detail-title {
     font-size: 16px;
     font-weight: 600;
     color: var(--color-fg-default);
     margin: 0 0 12px 0;
-}
-
-.year-section-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 14px 18px;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--color-fg-default);
-    background: var(--color-canvas-subtle);
-    border: 1px solid var(--color-border-default);
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.15s;
-    text-align: left;
-    font-family: inherit;
-}
-
-.year-section-header:hover {
-    background: var(--color-canvas-inset);
-    border-color: var(--color-accent-emphasis);
-}
-
-.year-section-count {
-    font-weight: 500;
-    color: var(--color-fg-muted);
-    font-size: 14px;
-}
-
-.year-section-chevron {
-    margin-left: auto;
-    flex-shrink: 0;
-    transition: transform 0.3s ease;
-}
-
-.year-section-expanded .year-section-chevron {
-    transform: rotate(90deg);
-}
-
-.year-section-body {
-    margin-top: 0;
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    visibility: hidden;
-    transition:
-        max-height 0.35s ease,
-        opacity 0.25s ease,
-        margin-top 0.3s ease,
-        visibility 0s 0.35s;
-}
-
-.year-section-body.year-section-body-open {
-    max-height: 2200px;
-    opacity: 1;
-    margin-top: 12px;
-    visibility: visible;
-    transition:
-        max-height 0.4s ease,
-        opacity 0.3s ease,
-        margin-top 0.3s ease,
-        visibility 0s 0s;
-}
-
-.year-section-body-inner {
-    padding-left: 4px;
 }
 
 .year-section-empty {
@@ -918,135 +819,11 @@ document.addEventListener('DOMContentLoaded', function() {
     margin: 0;
 }
 
-/* Компактная таблица выпусков (годы до 2025 включительно) */
-.issues-table-compact {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-}
-
-.issues-table-compact thead th {
-    text-align: left;
-    padding: 10px 14px;
-    font-weight: 600;
-    color: var(--color-fg-muted);
-    border-bottom: 1px solid var(--color-border-default);
-    background: var(--color-canvas-subtle);
-}
-
-.issues-table-compact thead th:last-child {
-    width: 44px;
-    text-align: center;
-}
-
-.issue-row-trigger {
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.issue-row-trigger:hover {
-    background: var(--color-canvas-subtle);
-}
-
-.issue-row-trigger td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--color-border-default);
-    vertical-align: middle;
-}
-
-.issue-row-trigger td:last-child {
-    text-align: right;
-}
-
-.issue-row-expand .expand-chevron {
-    display: inline-block;
-    transition: transform 0.2s ease;
-    color: var(--color-fg-muted);
-}
-
-.issue-row-trigger .expand-chevron.is-open {
-    transform: rotate(90deg);
-}
-
-.issue-row-detail {
-    background: var(--color-canvas-subtle);
-}
-
-.issue-row-detail td {
-    padding: 0;
-    border-bottom: 1px solid var(--color-border-default);
-    vertical-align: top;
-    overflow: hidden;
-}
-
-.issue-row-detail[aria-hidden="true"] .issue-detail-inner {
-    max-height: 0;
-    padding: 0;
-    margin: 0;
-    overflow: hidden;
-    opacity: 0;
-    transition: max-height 0.25s ease, opacity 0.15s ease;
-}
-
-.issue-row-detail[aria-hidden="true"] td {
-    padding-top: 0;
-    padding-bottom: 0;
-    border-bottom-color: transparent;
-}
-
-.issue-row-detail.is-open .issue-detail-inner,
-.issue-row-detail[aria-hidden="false"] .issue-detail-inner {
-    max-height: 80px;
-    opacity: 1;
-}
-
-.issue-row-detail.is-open td,
-.issue-row-detail[aria-hidden="false"] td {
-    padding: 12px 14px;
-    border-bottom-color: var(--color-border-default);
-}
-
-.issue-detail-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-}
-
-.issue-detail-link {
-    font-weight: 600;
-    color: var(--color-accent-fg);
-    text-decoration: none;
-}
-
-.issue-detail-link:hover {
-    text-decoration: underline;
-}
-
-.issue-detail-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.issue-detail-actions .action-btn {
-    padding: 6px 12px;
-    font-size: 13px;
-}
-
 /* Issues List */
 .issues-list {
     padding: 20px;
 }
 
-.issues-list-lazy {
-    padding: 0 0 0 8px;
-}
-
-.issues-list .issues-table-compact {
-    margin: 0;
-}
 
 .issue-card {
     display: flex;
@@ -1306,6 +1083,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     .solyanka-actions {
         justify-content: flex-end;
+    }
+    
+    .year-plaques-grid {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 16px;
+    }
+    
+    .year-plaque {
+        min-height: 60px;
+        font-size: 16px;
     }
     
     .table-header {
