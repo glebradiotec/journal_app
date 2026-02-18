@@ -254,13 +254,18 @@
                     {% endfor %}
             </div>
         </div>
-        {# Сетка остальных годов (без текущего) #}
-        <div class="year-plaques-grid" id="yearPlaquesGrid">
-            {% for y in years %}
-            {% if y != default_year %}
-            <button type="button" class="year-plaque" data-year="{{ y }}" aria-pressed="false">{{ y }}</button>
-            {% endif %}
-            {% endfor %}
+        {# Годы — отдельный блок #}
+        <div class="years-section">
+            <div class="years-section-header">
+                <h3 class="years-section-title">Годы</h3>
+            </div>
+            <div class="year-plaques-grid" id="yearPlaquesGrid">
+                {% for y in years %}
+                {% if y != default_year %}
+                <button type="button" class="year-plaque" data-year="{{ y }}" aria-pressed="false">{{ y }}</button>
+                {% endif %}
+                {% endfor %}
+            </div>
         </div>
         <div class="issues-detail issues-detail-other" id="issues-detail-other">
             <h3 class="issues-detail-title" id="issuesDetailTitle" style="display:none;"></h3>
@@ -846,13 +851,31 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--color-fg-muted);
 }
 
+/* Блок «Годы» — отдельный прямоугольник под актуальными выпусками */
+.years-section {
+    margin-top: 24px;
+    padding: 20px 24px 24px;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+}
+.years-section-header {
+    margin-bottom: 16px;
+}
+.years-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0;
+}
+
 /* Годы — табличка ровно 2 строки, много колонок, заполнение слева направо */
 .year-plaques-grid {
     display: grid;
     grid-template-columns: repeat(12, 56px);
     grid-template-rows: repeat(2, 52px);
     gap: 8px;
-    padding: 0 20px 16px;
+    padding: 0;
     width: max-content;
     max-width: 100%;
 }
