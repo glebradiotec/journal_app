@@ -145,7 +145,6 @@
         {% else %}
         {# Текущий год (2026) — отдельно сверху, без плашки в сетке #}
         <div class="issues-detail issues-detail-default" id="issues-detail-default">
-            <h3 class="issues-detail-title">Выпуски {{ default_year }}</h3>
             <div class="issues-list" id="issues-list-default">
                     {% for item in issues_default %}
                     {% set issue = item.issue %}
@@ -290,6 +289,17 @@ function initSortableIfDefault() {
     });
 }
 
+function collapseYearPanel() {
+    var grid = document.getElementById('yearPlaquesGrid');
+    var detailOther = document.getElementById('issues-detail-other');
+    if (!grid || !detailOther) return;
+    grid.querySelectorAll('.year-plaque').forEach(function(btn) {
+        btn.classList.remove('is-selected');
+        btn.setAttribute('aria-pressed', 'false');
+    });
+    detailOther.classList.remove('is-open');
+}
+
 function selectYear(year) {
     var grid = document.getElementById('yearPlaquesGrid');
     var titleEl = document.getElementById('issuesDetailTitle');
@@ -306,13 +316,15 @@ function selectYear(year) {
             btn.setAttribute('aria-pressed', 'false');
         }
     });
-    detailOther.style.display = 'block';
+    detailOther.classList.add('is-open');
     titleEl.style.display = 'block';
     titleEl.textContent = 'Выпуски ' + year;
     if (loadedYears[year]) {
+        listEl.classList.remove('is-loading');
         listEl.innerHTML = loadedYears[year];
         return;
     }
+    listEl.classList.add('is-loading');
     listEl.innerHTML = '<p class="year-section-empty">Загрузка…</p>';
     fetch('/api/journal/' + JOURNAL_ID + '/issues?year=' + year)
         .then(function(r) { return r.json(); })
@@ -324,6 +336,7 @@ function selectYear(year) {
                 loadedYears[year] = '<p class="year-section-empty">Нет выпусков за этот год.</p>';
                 listEl.innerHTML = loadedYears[year];
             }
+            listEl.classList.remove('is-loading');
         });
 }
 
@@ -334,6 +347,10 @@ document.addEventListener('DOMContentLoaded', function() {
             var plaque = e.target.closest('.year-plaque');
             if (!plaque) return;
             var year = parseInt(plaque.getAttribute('data-year'), 10);
+            if (plaque.classList.contains('is-selected')) {
+                collapseYearPanel();
+                return;
+            }
             selectYear(year);
         });
     }
@@ -622,39 +639,46 @@ document.addEventListener('DOMContentLoaded', function() {
     justify-content: space-between;
     gap: 20px;
     padding: 18px 22px;
-    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    background: linear-gradient(135deg, rgba(91, 164, 176, 0.08) 0%, rgba(91, 164, 176, 0.03) 100%);
     border: 2px dashed var(--color-accent-emphasis);
     border-radius: 14px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
     flex-wrap: wrap;
     cursor: pointer;
-    transition: box-shadow 0.2s, transform 0.2s ease;
+    transition: box-shadow 0.2s, transform 0.2s ease, background 0.2s ease;
 }
 
 .solyanka-card:hover {
+    background: linear-gradient(135deg, rgba(91, 164, 176, 0.12) 0%, rgba(91, 164, 176, 0.05) 100%);
     box-shadow: 0 4px 16px rgba(91, 164, 176, 0.1);
     transform: translateY(-2px);
 }
 
 [data-theme="dark"] .solyanka-card {
     border-color: var(--color-accent-fg);
+    background: linear-gradient(135deg, rgba(124, 197, 208, 0.1) 0%, rgba(124, 197, 208, 0.04) 100%);
 }
 
 [data-theme="dark"] .solyanka-card:hover {
+    background: linear-gradient(135deg, rgba(124, 197, 208, 0.14) 0%, rgba(124, 197, 208, 0.06) 100%);
     box-shadow: 0 4px 16px rgba(124, 197, 208, 0.12);
 }
 
 .solyanka-stretched-link {
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: 2;
     border-radius: 14px;
 }
 
-.solyanka-card-main,
-.solyanka-actions {
+.solyanka-card-main {
     position: relative;
     z-index: 1;
+}
+
+.solyanka-actions {
+    position: relative;
+    z-index: 3;
 }
 
 .solyanka-card-main {
@@ -760,47 +784,49 @@ document.addEventListener('DOMContentLoaded', function() {
     color: var(--color-fg-muted);
 }
 
-/* Сетка годов — плашки как на эскизе */
+/* Годы — табличка ровно 2 строки, много колонок, заполнение слева направо */
 .year-plaques-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    padding: 20px;
+    grid-template-columns: repeat(12, 56px);
+    grid-template-rows: repeat(2, 52px);
+    gap: 8px;
+    padding: 0 20px 16px;
+    width: max-content;
+    max-width: 100%;
 }
 
 .year-plaque {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 72px;
-    padding: 16px;
-    font-size: 18px;
+    min-width: 0;
+    padding: 0;
+    font-size: 15px;
     font-weight: 600;
     color: var(--color-fg-default);
-    background: var(--color-canvas-default);
-    border: 2px solid var(--color-border-default);
-    border-radius: 12px;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
     cursor: pointer;
-    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
     font-family: inherit;
 }
 
 .year-plaque:hover {
     border-color: var(--color-accent-emphasis);
-    background: var(--color-canvas-subtle);
-    box-shadow: 0 2px 8px rgba(91, 164, 176, 0.1);
+    background: var(--color-canvas-inset);
+    color: var(--color-accent-fg);
 }
 
 .year-plaque.is-selected {
     border-color: var(--color-accent-emphasis);
-    background: linear-gradient(135deg, rgba(91, 164, 176, 0.08) 0%, rgba(91, 164, 176, 0.04) 100%);
+    background: rgba(91, 164, 176, 0.12);
     color: var(--color-accent-fg);
-    box-shadow: 0 0 0 1px rgba(91, 164, 176, 0.2), 0 2px 12px rgba(91, 164, 176, 0.12);
 }
 
 [data-theme="dark"] .year-plaque.is-selected {
-    background: linear-gradient(135deg, rgba(124, 197, 208, 0.12) 0%, rgba(124, 197, 208, 0.06) 100%);
-    box-shadow: 0 0 0 1px rgba(124, 197, 208, 0.25), 0 2px 12px rgba(0, 0, 0, 0.2);
+    background: rgba(124, 197, 208, 0.18);
+    border-color: var(--color-accent-fg);
 }
 
 .issues-detail {
@@ -809,11 +835,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .issues-detail-default {
     padding-top: 0;
+    padding-bottom: 0;
 }
 
+.table-container > .issues-detail-default .issues-list {
+    padding-top: 12px;
+    padding-bottom: 8px;
+}
+
+/* Блок выпусков выбранного года — выезжает/сворачивается */
 .issues-detail-other {
-    display: none;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transition: max-height 0.35s ease, opacity 0.35s ease;
+}
+
+.issues-detail-other.is-open {
+    max-height: 2000px;
+    opacity: 1;
     padding-top: 8px;
+    padding-bottom: 20px;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.issues-detail-other .issues-detail-title,
+.issues-detail-other #issues-list-other {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+.issues-detail-other.is-open .issues-detail-title {
+    animation: issuesDetailSlideIn 0.35s ease 0.05s forwards;
+}
+
+.issues-detail-other.is-open #issues-list-other {
+    animation: issuesDetailSlideIn 0.35s ease 0.1s forwards;
+}
+
+#issues-list-other {
+    transition: opacity 0.25s ease;
+}
+
+#issues-list-other.is-loading {
+    opacity: 0.5;
+}
+
+@keyframes issuesDetailSlideIn {
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .issues-detail-title {
@@ -1097,13 +1169,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     .year-plaques-grid {
-        grid-template-columns: repeat(2, 1fr);
-        padding: 16px;
+        grid-template-columns: repeat(12, 48px);
+        grid-template-rows: repeat(2, 44px);
+        padding: 8px 16px 12px;
+        gap: 6px;
     }
     
     .year-plaque {
-        min-height: 60px;
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .table-header {
