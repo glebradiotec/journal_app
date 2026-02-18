@@ -625,14 +625,15 @@ document.addEventListener('DOMContentLoaded', function() {
     background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
     border: 2px dashed var(--color-accent-emphasis);
     border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
     flex-wrap: wrap;
     cursor: pointer;
+    transition: box-shadow 0.2s, transform 0.2s ease;
 }
 
 .solyanka-card:hover {
-    border-style: solid;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(91, 164, 176, 0.1);
+    box-shadow: 0 4px 16px rgba(91, 164, 176, 0.1);
+    transform: translateY(-2px);
 }
 
 [data-theme="dark"] .solyanka-card {
@@ -640,7 +641,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 [data-theme="dark"] .solyanka-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(124, 197, 208, 0.08);
+    box-shadow: 0 4px 16px rgba(124, 197, 208, 0.12);
 }
 
 .solyanka-stretched-link {
