@@ -225,6 +225,24 @@ def register_admin_routes(app):
         flash(f'Выпуск №{number}/{year} создан', 'success')
         return redirect(f'/journal/{journal_id}')
 
+    @app.route("/journal/<int:journal_id>/article/<int:article_id>/assign", methods=['POST'])
+    @login_required
+    @admin_required
+    def assign_article_to_issue(journal_id, article_id):
+        """Перенос статьи от автора в выбранный выпуск (или в нулевой). После этого статья как добавленная вручную."""
+        issue_id = request.form.get('issue_id', type=int)
+        if not issue_id:
+            flash('Укажите выпуск', 'error')
+            return redirect(url_for('journal_page', journal_id=journal_id))
+        article = Article.visible().filter_by(id=article_id).first_or_404()
+        issue = Issue.query.filter_by(id=issue_id, journal_id=journal_id).first_or_404()
+        article.issue_id = issue_id
+        # submitted_by_user_id не сбрасываем — статья остаётся видна автору в кабинете
+        db.session.commit()
+        log_activity('updated', 'article', article.id, article.title, f'Перенесена в выпуск №{issue.number}/{issue.year}')
+        flash('Статья перенесена в выпуск №{} / {}'.format(issue.number, issue.year), 'success')
+        return redirect(url_for('journal_page', journal_id=journal_id))
+
     @app.route("/issue/<int:issue_id>/add-article", methods=['POST'])
     @login_required
     def add_article(issue_id):
@@ -504,8 +522,11 @@ def register_admin_routes(app):
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Данные статей (только неудалённые)
-        articles_list = Article.visible().filter_by(issue_id=issue_id).options(joinedload(Article.article_authors)).all()
+        # Данные статей (для выпуска «без номера» — без авторских подач, они только в «От авторов»)
+        articles_query = Article.visible().filter_by(issue_id=issue_id).options(joinedload(Article.article_authors))
+        if issue.number == 0 and issue.year == 0:
+            articles_query = articles_query.filter(Article.submitted_by_user_id.is_(None))
+        articles_list = articles_query.all()
         for idx, article in enumerate(articles_list, 1):
             authors = ", ".join([f"{a.full_name}" for a in article.article_authors]) if article.article_authors else article.authors or "-"
 
@@ -556,8 +577,11 @@ def register_admin_routes(app):
         headers = ["№", "Название статьи", "Авторы", "Дата поступления", "Оплачено", "Рецензия", "Редактировано"]
         writer.writerow(headers)
 
-        # Данные статей (только неудалённые)
-        articles_list = Article.visible().filter_by(issue_id=issue_id).options(joinedload(Article.article_authors)).all()
+        # Данные статей (для выпуска «без номера» — без авторских подач)
+        articles_query = Article.visible().filter_by(issue_id=issue_id).options(joinedload(Article.article_authors))
+        if issue.number == 0 and issue.year == 0:
+            articles_query = articles_query.filter(Article.submitted_by_user_id.is_(None))
+        articles_list = articles_query.all()
         for idx, article in enumerate(articles_list, 1):
             authors = ", ".join([f"{a.full_name}" for a in article.article_authors]) if article.article_authors else article.authors or "-"
 

@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block title %}Кабинет автора{% endblock %}
+
+{% block content %}
+<!-- Анимация перехода: летучая мышь (как на главной) -->
+<script>
+(function() {
+    if (!sessionStorage.getItem('fromLoading')) return;
+    sessionStorage.removeItem('fromLoading');
+    window.__fromLoading = true;
+    window.__skipPageAnimation = true;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'loadingOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:var(--color-canvas-default);';
+
+    var placeholder = document.createElement('img');
+    placeholder.src = '{{ url_for("static", filename="logo.png") }}';
+    placeholder.style.cssText = 'width:340px;max-width:80vw;height:auto;';
+    placeholder.id = 'overlayPlaceholder';
+    overlay.appendChild(placeholder);
+
+    document.body.appendChild(overlay);
+    document.body.style.opacity = '1';
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var overlayEl = document.getElementById('loadingOverlay');
+        var ph = document.getElementById('overlayPlaceholder');
+        var batLogo = document.getElementById('batLogo');
+
+        if (!overlayEl || !batLogo) {
+            if (overlayEl) overlayEl.remove();
+            return;
+        }
+        batLogo.loading = 'eager';
+
+        function startFlyAnimation() {
+            var rect = batLogo.getBoundingClientRect();
+            var phRect = ph.getBoundingClientRect();
+            var scaleUp = phRect.width / rect.width;
+            var dx = (phRect.left + phRect.width / 2) - (rect.left + rect.width / 2);
+            var dy = (phRect.top + phRect.height / 2) - (rect.top + rect.height / 2);
+
+            batLogo.style.position = 'relative';
+            batLogo.style.zIndex = '10001';
+            batLogo.style.transform = 'translate(' + dx + 'px, ' + dy + 'px) scale(' + scaleUp + ')';
+            batLogo.getBoundingClientRect();
+            if (ph) ph.style.display = 'none';
+
+            batLogo.animate([
+                { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + scaleUp + ')' },
+                { transform: 'translate(0, 0) scale(1)' }
+            ], {
+                duration: 900,
+                easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                fill: 'forwards'
+            }).onfinish = function() {
+                batLogo.style.position = '';
+                batLogo.style.zIndex = '';
+                batLogo.style.transform = '';
+            };
+
+            overlayEl.style.background = 'var(--color-canvas-default)';
+            overlayEl.animate([
+                { opacity: 1 },
+                { opacity: 0 }
+            ], {
+                duration: 600,
+                delay: 250,
+                easing: 'ease-out',
+                fill: 'forwards'
+            }).onfinish = function() {
+                overlayEl.remove();
+            };
+        }
+
+        function onReady() {
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    setTimeout(startFlyAnimation, 30);
+                });
+            });
+        }
+        if (batLogo.complete && batLogo.naturalWidth > 0) {
+            onReady();
+        } else {
+            batLogo.onload = onReady;
+            setTimeout(onReady, 2000);
+        }
+    });
+})();
+</script>
+
+<div class="author-page">
+    <!-- Hero -->
+    <div class="author-hero">
+        <div class="author-hero-bg" aria-hidden="true">
+            <svg class="author-hero-mesh" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <linearGradient id="authorMeshGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="rgba(255, 255, 255, 0.4)"/>
+                        <stop offset="50%" stop-color="rgba(240, 248, 252, 0.15)"/>
+                        <stop offset="100%" stop-color="rgba(230, 240, 250, 0.06)"/>
+                    </linearGradient>
+                    <filter id="authorGlow">
+                        <feGaussianBlur stdDeviation="2" result="blur"/>
+                        <feMerge>
+                            <feMergeNode in="blur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#authorMeshGrad)"/>
+                <g class="author-hero-lines" stroke="rgba(0, 160, 200, 0.2)" stroke-width="0.8" fill="none">
+                    <line x1="80" y1="120" x2="220" y2="80"/><line x1="220" y1="80" x2="320" y2="140"/>
+                    <line x1="120" y1="200" x2="200" y2="160"/><line x1="400" y1="100" x2="480" y2="160"/>
+                </g>
+                <g class="author-hero-nodes" fill="rgba(0, 160, 200, 0.28)" filter="url(#authorGlow)">
+                    <circle cx="80" cy="120" r="4"/><circle cx="220" cy="80" r="5"/>
+                    <circle cx="400" cy="100" r="5"/><circle cx="480" cy="160" r="4"/>
+                </g>
+            </svg>
+        </div>
+        <div class="author-hero-content">
+            <h1 class="author-hero-title">Кабинет автора</h1>
+            <p class="author-hero-subtitle">Подача и редактирование статей в журналы</p>
+            <div class="author-hero-actions">
+                <a href="{{ url_for('author.new') }}" class="author-btn author-btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+                    </svg>
+                    Новая статья
+                </a>
+            </div>
+            <div class="author-stats">
+                <div class="author-stat" style="--stat-index: 0">
+                    <span class="author-stat-number">{{ submissions|length }}</span>
+                    <span class="author-stat-label">{{ submissions|length|pluralize_ru('подача', 'подачи', 'подач') }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="author-flash author-flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if not submissions %}
+    <div class="author-block author-empty-block">
+        <div class="author-empty-icon">
+            <svg width="48" height="48" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574Z"/>
+            </svg>
+        </div>
+        <h2 class="author-empty-title">Пока нет подач</h2>
+        <p class="author-empty-desc">Вы ещё не подали ни одной статьи. Создайте первую — выберите журнал, заполните данные и загрузите файлы.</p>
+        <a href="{{ url_for('author.new') }}" class="author-btn author-btn-primary author-btn-lg">Подать статью</a>
+    </div>
+    {% else %}
+    <div class="author-block author-submissions-block">
+        <h2 class="author-block-title">Мои подачи</h2>
+        <div class="author-submissions-grid">
+            {% for art in submissions %}
+            <div class="author-card">
+                <div class="author-card-main">
+                    <h3 class="author-card-title">{{ art.title }}</h3>
+                    <p class="author-card-meta">
+                        <span class="author-card-journal">{{ art.issue.journal.name }}</span>
+                        {% if art.submission_date %}<span class="author-card-date">{{ art.submission_date }}</span>{% endif %}
+                        {% if art.authors %}<span class="author-card-authors">{{ art.authors[:80] }}{% if art.authors|length > 80 %}…{% endif %}</span>{% endif %}
+                    </p>
+                    {% if art.issue and (art.issue.number != -1 or art.issue.year != 0) %}
+                    <p class="author-card-status">Направлена в выпуск №{{ art.issue.number }} / {{ art.issue.year }}</p>
+                    {% endif %}
+                </div>
+                <div class="author-card-actions">
+                    <a href="{{ url_for('author.edit', article_id=art.id) }}" class="author-card-btn">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Z"/>
+                        </svg>
+                        Редактировать
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <footer class="author-footer">
+        <img id="batLogo" src="{{ url_for('static', filename='logo.png') }}" alt="Логотип" loading="lazy" class="author-bat-logo">
+    </footer>
+</div>
+
+<style>
+.author-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 20px 32px;
+}
+.author-hero {
+    position: relative;
+    padding: 36px 32px;
+    margin-bottom: 24px;
+    background: linear-gradient(105deg,
+        rgba(255, 255, 255, 0.95) 0%,
+        rgba(248, 252, 255, 0.9) 40%,
+        rgba(228, 238, 248, 0.25) 100%);
+    background-size: 200% 100%;
+    animation: authorGradientShift 12s ease-in-out infinite;
+    border: 1px solid var(--color-border-default);
+    border-radius: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.02);
+    overflow: hidden;
+}
+.author-hero-bg { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+.author-hero-mesh { position: absolute; inset: -20%; width: 140%; height: 140%; object-fit: cover; opacity: 0.95; }
+.author-hero-lines { animation: authorLinesPulse 5s ease-in-out infinite; }
+.author-hero-nodes circle { animation: authorNodePulse 3s ease-in-out infinite; }
+@keyframes authorGradientShift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes authorLinesPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@keyframes authorNodePulse { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+
+.author-hero-content { position: relative; z-index: 1; }
+.author-hero-title {
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--color-fg-default);
+    margin: 0 0 8px 0;
+    letter-spacing: -0.5px;
+}
+.author-hero-subtitle {
+    font-size: 17px;
+    color: var(--color-fg-muted);
+    margin: 0 0 24px 0;
+}
+.author-hero-actions { margin-bottom: 24px; }
+.author-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.author-btn-primary {
+    color: #fff;
+    background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%);
+    box-shadow: 0 4px 14px rgba(91, 164, 176, 0.35);
+}
+.author-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45);
+    transform: translateY(-1px);
+}
+.author-btn-lg { padding: 16px 32px; font-size: 16px; }
+
+.author-stats {
+    display: flex;
+    gap: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-default);
+}
+.author-stat {
+    text-align: left;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: authorStatAppear 0.45s ease forwards;
+    animation-delay: calc(0.1s + var(--stat-index, 0) * 0.15s);
+}
+@keyframes authorStatAppear { to { opacity: 1; transform: translateY(0); } }
+.author-stat-number { display: block; font-size: 28px; font-weight: 800; color: var(--color-accent-fg); line-height: 1.2; }
+.author-stat-label { font-size: 14px; color: var(--color-fg-muted); }
+
+.author-flash {
+    padding: 14px 18px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+.author-flash-success { background: rgba(31, 136, 61, 0.12); color: #1a7f37; border: 1px solid rgba(31, 136, 61, 0.25); }
+.author-flash-error { background: rgba(207, 34, 46, 0.1); color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
+
+.author-block {
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.02);
+}
+.author-block-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0 0 20px 0;
+}
+
+.author-empty-block {
+    text-align: center;
+    padding: 48px 32px;
+}
+.author-empty-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(91, 164, 176, 0.12) 0%, rgba(74, 142, 153, 0.08) 100%);
+    border-radius: 20px;
+    color: var(--color-accent-fg);
+}
+.author-empty-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-fg-default);
+    margin: 0 0 12px 0;
+}
+.author-empty-desc {
+    font-size: 15px;
+    color: var(--color-fg-muted);
+    margin: 0 0 24px 0;
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.author-submissions-grid { display: flex; flex-direction: column; gap: 12px; }
+.author-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
+    border: 1px solid var(--color-border-default);
+    border-radius: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.author-card:hover {
+    border-color: rgba(91, 164, 176, 0.4);
+    box-shadow: 0 4px 16px rgba(91, 164, 176, 0.08);
+}
+.author-card-main { flex: 1; min-width: 0; }
+.author-card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin: 0 0 8px 0;
+    line-height: 1.35;
+}
+.author-card-meta {
+    font-size: 13px;
+    color: var(--color-fg-muted);
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.author-card-journal { font-weight: 500; color: var(--color-accent-fg); }
+.author-card-status {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    margin: 4px 0 0 0;
+}
+.author-card-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.1);
+    border: 1px solid rgba(91, 164, 176, 0.25);
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.author-card-btn:hover {
+    background: rgba(91, 164, 176, 0.2);
+    border-color: var(--color-accent-emphasis);
+    color: var(--color-accent-fg);
+}
+
+.author-footer {
+    display: flex;
+    justify-content: center;
+    padding: 48px 0 16px 0;
+}
+.author-bat-logo { height: 56px; cursor: pointer; }
+
+[data-theme="dark"] .author-hero {
+    background: linear-gradient(105deg, rgba(20, 45, 65, 0.98) 0%, rgba(15, 55, 85, 0.95) 40%, rgba(0, 100, 140, 0.15) 100%);
+    background-size: 200% 100%;
+}
+[data-theme="dark"] .author-empty-icon {
+    background: linear-gradient(135deg, rgba(124, 197, 208, 0.15) 0%, rgba(91, 164, 176, 0.1) 100%);
+}
+@media (max-width: 768px) {
+    .author-page { padding: 16px 12px; }
+    .author-hero { padding: 28px 20px; }
+    .author-hero-title { font-size: 26px; }
+    .author-card { flex-direction: column; align-items: stretch; text-align: left; }
+    .author-card-actions { justify-content: flex-start; }
+}
+</style>
+{% endblock %}

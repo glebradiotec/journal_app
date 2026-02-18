@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Редактирование подачи' if article else 'Подать статью' }}{% endblock %}
+
+{% block content %}
+<div class="author-form-page">
+    <ul class="breadcrumbs">
+        <li><a href="{{ url_for('author.index') }}">Кабинет автора</a></li>
+        <li><span class="breadcrumb-current">{{ 'Редактирование' if article else 'Новая статья' }}</span></li>
+    </ul>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="author-flash author-flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="author-form-hero">
+        <h1 class="author-form-hero-title">{{ 'Редактировать подачу' if article else 'Подать статью в журнал' }}</h1>
+        <p class="author-form-hero-subtitle">{{ 'Дополняйте данные и догружайте файлы' if article else 'Выберите журнал, заполните поля и загрузите файлы' }}</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="author-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="author-form-block">
+            <h2 class="author-form-block-title">Основные данные</h2>
+            {% if not article %}
+            <div class="author-form-field">
+                <label class="author-form-label">Журнал *</label>
+                <select name="journal_id" class="author-form-input author-form-input-lg" required>
+                    <option value="">— Выберите журнал —</option>
+                    {% for j in journals %}
+                    <option value="{{ j.id }}">{{ j.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            <div class="author-form-field">
+                <label class="author-form-label">Журнал</label>
+                <p class="author-form-static">{{ journal.name if journal else '' }}</p>
+            </div>
+            {% endif %}
+            <div class="author-form-field">
+                <label class="author-form-label">Название статьи *</label>
+                <input type="text" name="title" class="author-form-input author-form-input-lg" value="{{ article.title if article else '' }}" required placeholder="Полное название статьи">
+            </div>
+            <div class="author-form-field">
+                <label class="author-form-label">Дата поступления</label>
+                {% if article and article.submission_date %}
+                    {% set date_parts = article.submission_date.split('.') %}
+                {% else %}
+                    {% set date_parts = ['', '', ''] %}
+                {% endif %}
+                <div class="author-form-date-row">
+                    <select name="submission_day" class="author-form-select">
+                        <option value="">День</option>
+                        {% for d in range(1, 32) %}
+                        <option value="{{ '%02d'|format(d) }}" {% if date_parts[0] == '%02d'|format(d) %}selected{% endif %}>{{ d }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="submission_month" class="author-form-select">
+                        <option value="">Месяц</option>
+                        {% for m in range(1, 13) %}
+                        <option value="{{ '%02d'|format(m) }}" {% if date_parts[1] == '%02d'|format(m) %}selected{% endif %}>{{ '%02d'|format(m) }}</option>
+                        {% endfor %}
+                    </select>
+                    <select name="submission_year" class="author-form-select">
+                        <option value="">Год</option>
+                        {% for y in range(2024, 2029) %}
+                        <option value="{{ y }}" {% if date_parts[2]|string == y|string %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="author-form-field">
+                <label class="author-form-label">Заметки</label>
+                <textarea name="notes" class="author-form-input author-form-textarea" rows="3" placeholder="Дополнительная информация для редакции">{{ article.notes if article else '' }}</textarea>
+            </div>
+        </div>
+
+        <div class="author-form-block">
+            <div class="author-form-block-header">
+                <h2 class="author-form-block-title">Авторы</h2>
+                <button type="button" class="author-form-add-btn" onclick="addAuthorField()">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
+                    Добавить автора
+                </button>
+            </div>
+            <div id="authorsContainer" class="author-form-authors">
+                {% if article and article.article_authors %}
+                    {% for author in article.article_authors|sort(attribute='order') %}
+                    <div class="author-form-author-card">
+                        <div class="author-form-author-row">
+                            <input type="text" name="author_name[]" class="author-form-input" placeholder="ФИО *" value="{{ author.full_name }}" required>
+                            <input type="email" name="author_email[]" class="author-form-input" placeholder="Email" value="{{ author.email or '' }}">
+                            <input type="text" name="author_organization[]" class="author-form-input" placeholder="Организация" value="{{ author.organization or '' }}">
+                            <button type="button" class="author-form-remove-btn" onclick="removeAuthorField(this)" title="Удалить">×</button>
+                        </div>
+                        <div class="author-form-author-details" style="display:none;">
+                            <input type="text" name="author_degree[]" class="author-form-input" placeholder="Учёная степень" value="{{ author.degree or '' }}">
+                            <input type="text" name="author_position[]" class="author-form-input" placeholder="Должность" value="{{ author.position or '' }}">
+                            <input type="text" name="author_phone[]" class="author-form-input" placeholder="Телефон" value="{{ author.phone or '' }}">
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="author-form-author-card">
+                        <div class="author-form-author-row">
+                            <input type="text" name="author_name[]" class="author-form-input" placeholder="ФИО *" required>
+                            <input type="email" name="author_email[]" class="author-form-input" placeholder="Email">
+                            <input type="text" name="author_organization[]" class="author-form-input" placeholder="Организация">
+                            <button type="button" class="author-form-remove-btn" onclick="removeAuthorField(this)">×</button>
+                        </div>
+                        <div class="author-form-author-details" style="display:none;">
+                            <input type="text" name="author_degree[]" class="author-form-input" placeholder="Учёная степень">
+                            <input type="text" name="author_position[]" class="author-form-input" placeholder="Должность">
+                            <input type="text" name="author_phone[]" class="author-form-input" placeholder="Телефон">
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="author-form-block">
+            <h2 class="author-form-block-title">Файлы</h2>
+            <p class="author-form-block-desc">Загрузите рукопись, рецензию и другие материалы. При редактировании можно догружать новые файлы.</p>
+            <div class="author-form-files">
+                <div class="author-form-file-item">
+                    <span class="author-form-file-label">Текст статьи (рукопись)</span>
+                    {% if article and article.manuscript_file %}
+                    <div class="author-form-file-current">
+                        <a href="/uploads/{{ article.manuscript_file }}" target="_blank">{{ article.manuscript_file }}</a>
+                        <label class="author-form-file-delete"><input type="checkbox" name="delete_manuscript"> Удалить</label>
+                    </div>
+                    {% endif %}
+                    <div class="author-form-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                         ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                         ondrop="event.preventDefault(); this.classList.remove('drop-active'); authorDropToFile(event, this)">
+                        <span class="author-form-file-drop-text">Перетащите файл сюда или нажмите</span>
+                        <span class="author-form-file-drop-name"></span>
+                        <input type="file" name="manuscript_file" accept=".doc,.docx,.pdf" style="display:none" onchange="authorDropShowName(this)">
+                    </div>
+                </div>
+                <div class="author-form-file-item">
+                    <span class="author-form-file-label">Рецензия</span>
+                    {% if article and article.review_file %}
+                    <div class="author-form-file-current">
+                        <a href="/uploads/{{ article.review_file }}" target="_blank">{{ article.review_file }}</a>
+                        <label class="author-form-file-delete"><input type="checkbox" name="delete_review"> Удалить</label>
+                    </div>
+                    {% endif %}
+                    <div class="author-form-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                         ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                         ondrop="event.preventDefault(); this.classList.remove('drop-active'); authorDropToFile(event, this)">
+                        <span class="author-form-file-drop-text">Перетащите файл сюда или нажмите</span>
+                        <span class="author-form-file-drop-name"></span>
+                        <input type="file" name="review_file" accept=".doc,.docx,.pdf,.txt,.jpg,.png" style="display:none" onchange="authorDropShowName(this)">
+                    </div>
+                </div>
+                <div class="author-form-file-item">
+                    <span class="author-form-file-label">Титульная страница (PDF)</span>
+                    {% if article and article.title_pdf %}
+                    <div class="author-form-file-current">
+                        <a href="/uploads/{{ article.title_pdf }}" target="_blank">{{ article.title_pdf }}</a>
+                        <label class="author-form-file-delete"><input type="checkbox" name="delete_title_pdf"> Удалить</label>
+                    </div>
+                    {% endif %}
+                    <div class="author-form-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                         ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                         ondrop="event.preventDefault(); this.classList.remove('drop-active'); authorDropToFile(event, this)">
+                        <span class="author-form-file-drop-text">Перетащите файл сюда или нажмите</span>
+                        <span class="author-form-file-drop-name"></span>
+                        <input type="file" name="title_pdf" accept=".pdf" style="display:none" onchange="authorDropShowName(this)">
+                    </div>
+                </div>
+                <div class="author-form-file-item">
+                    <span class="author-form-file-label">Акт экспертизы</span>
+                    {% if article and article.expertise_act_file %}
+                    <div class="author-form-file-current">
+                        <a href="/uploads/{{ article.expertise_act_file }}" target="_blank">{{ article.expertise_act_file }}</a>
+                        <label class="author-form-file-delete"><input type="checkbox" name="delete_expertise_act"> Удалить</label>
+                    </div>
+                    {% endif %}
+                    <div class="author-form-file-drop" onclick="this.querySelector('input[type=file]').click()"
+                         ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                         ondrop="event.preventDefault(); this.classList.remove('drop-active'); authorDropToFile(event, this)">
+                        <span class="author-form-file-drop-text">Перетащите файл сюда или нажмите</span>
+                        <span class="author-form-file-drop-name"></span>
+                        <input type="file" name="expertise_act_file" style="display:none" onchange="authorDropShowName(this)">
+                    </div>
+                </div>
+                <div class="author-form-file-item">
+                    <span class="author-form-file-label">Разное (доп. файлы)</span>
+                    {% if article and article.images %}
+                    {% for img in article.images %}
+                    <div class="author-form-file-current">
+                        <a href="/uploads/{{ img.filename }}" target="_blank">{{ img.filename }}</a>
+                        <label class="author-form-file-delete"><input type="checkbox" name="delete_image[]" value="{{ img.id }}"> Удалить</label>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    <div class="author-form-file-drop author-form-file-drop-multi" onclick="this.querySelector('input[type=file]').click()"
+                         ondragenter="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragover="event.preventDefault(); this.classList.add('drop-active')"
+                         ondragleave="event.preventDefault(); this.classList.remove('drop-active')"
+                         ondrop="event.preventDefault(); this.classList.remove('drop-active'); authorDropToFile(event, this)">
+                        <span class="author-form-file-drop-text">Перетащите файлы сюда или нажмите</span>
+                        <span class="author-form-file-drop-name"></span>
+                        <input type="file" name="article_images" multiple style="display:none" onchange="authorDropShowName(this)">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="author-form-actions">
+            <button type="submit" class="author-btn author-btn-primary author-btn-lg">
+                {{ 'Сохранить изменения' if article else 'Подать статью' }}
+            </button>
+            <a href="{{ url_for('author.index') }}" class="author-form-cancel">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.author-form-page { max-width: 720px; margin: 0 auto; padding: 24px 20px 48px; }
+.author-flash { padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 14px; }
+.author-flash-success { background: rgba(31, 136, 61, 0.12); color: #1a7f37; border: 1px solid rgba(31, 136, 61, 0.25); }
+.author-flash-error { background: rgba(207, 34, 46, 0.1); color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
+
+.author-form-hero {
+    margin-bottom: 28px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--color-border-default);
+}
+.author-form-hero-title { font-size: 26px; font-weight: 800; color: var(--color-fg-default); margin: 0 0 8px 0; }
+.author-form-hero-subtitle { font-size: 15px; color: var(--color-fg-muted); margin: 0; }
+
+.author-form-block {
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.02);
+}
+.author-form-block-title { font-size: 18px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 20px 0; }
+.author-form-block-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.author-form-block-header .author-form-block-title { margin: 0; }
+.author-form-block-desc { font-size: 14px; color: var(--color-fg-muted); margin: -8px 0 20px 0; }
+
+.author-form-field { margin-bottom: 20px; }
+.author-form-field:last-child { margin-bottom: 0; }
+.author-form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    margin-bottom: 8px;
+}
+.author-form-static { margin: 0; padding: 10px 0; color: var(--color-fg-muted); font-size: 15px; }
+.author-form-input, .author-form-select {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 10px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+.author-form-input:focus, .author-form-select:focus {
+    border-color: #5BA4B0;
+    box-shadow: 0 0 0 3px rgba(91, 164, 176, 0.15);
+    background: var(--color-canvas-default);
+}
+.author-form-input-lg { font-size: 16px; padding: 14px 18px; }
+.author-form-textarea { resize: vertical; min-height: 80px; }
+.author-form-date-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.author-form-date-row .author-form-select { width: auto; min-width: 90px; }
+
+.author-form-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.12);
+    border: 1px solid rgba(91, 164, 176, 0.3);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.author-form-add-btn:hover { background: rgba(91, 164, 176, 0.2); border-color: var(--color-accent-emphasis); }
+.author-form-add-btn svg { flex-shrink: 0; }
+
+.author-form-authors { display: flex; flex-direction: column; gap: 12px; }
+.author-form-author-card {
+    padding: 16px;
+    background: var(--color-canvas-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    transition: border-color 0.2s;
+}
+.author-form-author-card:hover { border-color: rgba(91, 164, 176, 0.3); }
+.author-form-author-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.author-form-author-row .author-form-input { flex: 1; min-width: 140px; }
+.author-form-remove-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--color-fg-muted);
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+.author-form-remove-btn:hover { color: #cf222e; border-color: rgba(207, 34, 46, 0.4); background: rgba(207, 34, 46, 0.06); }
+.author-form-author-details {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--color-border-default);
+}
+.author-form-author-details .author-form-input { flex: 1; min-width: 120px; }
+
+.author-form-files { display: flex; flex-direction: column; gap: 20px; }
+.author-form-file-item { padding: 16px; background: var(--color-canvas-subtle); border-radius: 12px; border: 1px solid var(--color-border-default); }
+.author-form-file-label { display: block; font-size: 14px; font-weight: 600; color: var(--color-fg-default); margin-bottom: 10px; }
+.author-form-file-current { margin-bottom: 10px; font-size: 13px; }
+.author-form-file-current a { color: var(--color-accent-fg); text-decoration: none; margin-right: 12px; }
+.author-form-file-current a:hover { text-decoration: underline; }
+.author-form-file-delete { font-weight: 400; color: var(--color-fg-muted); cursor: pointer; }
+
+/* Drag-and-drop зоны */
+.author-form-file-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 12px;
+    border: 2px dashed var(--color-border-default);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--color-canvas-default);
+    min-height: 56px;
+    gap: 4px;
+}
+.author-form-file-drop:hover {
+    border-color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.06);
+}
+.author-form-file-drop.drop-active {
+    border-color: var(--color-accent-fg);
+    background: rgba(91, 164, 176, 0.12);
+    transform: scale(1.01);
+}
+.author-form-file-drop.has-file {
+    border-color: var(--color-success-fg, #2da44e);
+    background: rgba(45, 164, 78, 0.06);
+    border-style: solid;
+}
+.author-form-file-drop-text {
+    font-size: 13px;
+    color: var(--color-fg-muted);
+}
+.author-form-file-drop-name {
+    display: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-fg-default);
+    word-break: break-all;
+    text-align: center;
+}
+.author-form-file-drop-name:not(:empty) { display: block; }
+.author-form-file-drop-multi { min-height: 64px; }
+
+.author-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border-default);
+}
+.author-form-cancel {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-fg-muted);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+.author-form-cancel:hover { color: var(--color-accent-fg); }
+.author-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 28px; font-size: 15px; font-weight: 600; border-radius: 12px; text-decoration: none; border: none; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.author-btn-primary { color: #fff; background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%); box-shadow: 0 4px 14px rgba(91, 164, 176, 0.35); }
+.author-btn-primary:hover { box-shadow: 0 6px 20px rgba(91, 164, 176, 0.45); transform: translateY(-1px); }
+.author-btn-lg { padding: 16px 32px; font-size: 16px; }
+
+@media (max-width: 768px) {
+    .author-form-page { padding: 16px 12px 32px; }
+    .author-form-block { padding: 20px; }
+    .author-form-author-row { flex-direction: column; align-items: stretch; }
+    .author-form-author-row .author-form-input { min-width: 0; }
+}
+</style>
+<script>
+function addAuthorField() {
+    var c = document.getElementById('authorsContainer');
+    var card = document.createElement('div');
+    card.className = 'author-form-author-card';
+    card.innerHTML = '<div class="author-form-author-row">' +
+        '<input type="text" name="author_name[]" class="author-form-input" placeholder="ФИО *" required>' +
+        '<input type="email" name="author_email[]" class="author-form-input" placeholder="Email">' +
+        '<input type="text" name="author_organization[]" class="author-form-input" placeholder="Организация">' +
+        '<button type="button" class="author-form-remove-btn" onclick="removeAuthorField(this)">×</button>' +
+        '</div><div class="author-form-author-details" style="display:none;">' +
+        '<input type="text" name="author_degree[]" class="author-form-input" placeholder="Учёная степень">' +
+        '<input type="text" name="author_position[]" class="author-form-input" placeholder="Должность">' +
+        '<input type="text" name="author_phone[]" class="author-form-input" placeholder="Телефон">' +
+        '</div>';
+    c.appendChild(card);
+}
+function removeAuthorField(btn) {
+    var card = btn.closest('.author-form-author-card');
+    if (document.querySelectorAll('.author-form-author-card').length > 1) card.remove();
+}
+
+function authorDropToFile(e, zone) {
+    var input = zone.querySelector('input[type=file]');
+    if (e.dataTransfer.files.length && input) {
+        input.files = e.dataTransfer.files;
+        authorDropShowName(input);
+    }
+}
+function authorDropShowName(input) {
+    var zone = input.closest('.author-form-file-drop');
+    var nameEl = zone.querySelector('.author-form-file-drop-name');
+    var textEl = zone.querySelector('.author-form-file-drop-text');
+    if (input.files && input.files.length > 0) {
+        if (input.multiple && input.files.length > 1) {
+            nameEl.textContent = 'Выбрано файлов: ' + input.files.length;
+        } else {
+            nameEl.textContent = input.files[0].name;
+        }
+        nameEl.style.display = 'block';
+        textEl.style.display = 'none';
+        zone.classList.add('has-file');
+    } else {
+        nameEl.textContent = '';
+        nameEl.style.display = 'none';
+        textEl.style.display = '';
+        zone.classList.remove('has-file');
+    }
+}
+</script>
+{% endblock %}

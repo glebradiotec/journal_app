@@ -18,7 +18,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     display_name = db.Column(db.String(150), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='user')  # 'admin' or 'user'
+    role = db.Column(db.String(20), nullable=False, default='user')  # 'admin', 'user', 'author'
     is_active_user = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=_utcnow)
 
@@ -31,6 +31,10 @@ class User(UserMixin, db.Model):
     @property
     def is_admin(self):
         return self.role == 'admin'
+
+    @property
+    def is_author(self):
+        return self.role == 'author'
 
 
 class Journal(db.Model):
@@ -66,6 +70,9 @@ class Article(db.Model):
     notes = db.Column(db.Text)
     issue_id = db.Column(db.Integer, db.ForeignKey('issue.id'), nullable=False, index=True)
     deleted_at = db.Column(db.DateTime, nullable=True, index=True)  # корзина: не None = удалён
+    # Статья отправлена через кабинет автора (отображается во вкладке «От авторов» в журнале)
+    submitted_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    submitted_by_user = db.relationship('User', backref=db.backref('submitted_articles', lazy='dynamic'))
 
     has_expertise_act = db.Column(db.Boolean, default=False)
     expertise_act_file = db.Column(db.String(500))

@@ -187,6 +187,20 @@
             box-shadow: 0 2px 8px rgba(91, 164, 176, 0.3);
         }
 
+        .login-register-link {
+            display: block;
+            text-align: center;
+            margin-top: 14px;
+            font-size: 14px;
+            color: var(--color-fg-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .login-register-link:hover {
+            color: #5BA4B0;
+        }
+
         /* Theme toggle */
         .login-footer {
             display: flex;
@@ -307,6 +321,7 @@
                     </div>
                 </div>
                 <button type="submit" class="login-btn">Войти</button>
+                <a href="{{ url_for('register') }}" class="login-register-link">Регистрация</a>
             </form>
         </div>
 

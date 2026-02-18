@@ -16,6 +16,7 @@ from backup import create_backup
 from models import db, User, Journal, Article, ArticleImage, ArticleHistory, ArticleComment
 from routes_public import register_public_routes
 from routes_admin import register_admin_routes
+from routes_author import author_bp
 
 
 BASE_DIR = Path(__file__).parent
@@ -83,6 +84,17 @@ def make_session_permanent():
     session.permanent = True
 
 
+@app.before_request
+def restrict_author_to_cabinet():
+    """Авторы (роль author) имеют доступ только к кабинету /author/ и выходу."""
+    from flask import request, redirect, url_for
+    from flask_login import current_user
+    if current_user.is_authenticated and getattr(current_user, 'role', None) == 'author':
+        path = request.path
+        if path == '/' or (not path.startswith('/author') and not path.startswith('/static') and path not in ('/logout', '/loading')):
+            return redirect(url_for('author.index'))
+
+
 # Инициализация БД и регистрация маршрутов
 db.init_app(app)
 migrate = Migrate(app, db)  # Миграции БД (flask db init/migrate/upgrade)
@@ -97,6 +109,8 @@ from sqlalchemy.engine import Engine
 @event.listens_for(Engine, "connect")
 def _sqlite_unicode_lower(dbapi_connection, connection_record):
     dbapi_connection.create_function("lower", 1, lambda s: s.lower() if s else s)
+# Blueprint автора регистрируем до публичных маршрутов, чтобы /author/ и /author/new не перехватывались маршрутом /author/<path:author_name>
+app.register_blueprint(author_bp)
 register_public_routes(app)
 register_admin_routes(app)
 

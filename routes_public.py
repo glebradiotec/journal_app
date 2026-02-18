@@ -32,6 +32,8 @@ def register_public_routes(app):
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         if current_user.is_authenticated:
+            if getattr(current_user, 'role', None) == 'author':
+                return redirect(url_for('author.index'))
             return redirect(url_for('index'))
         if request.method == 'POST':
             username = request.form.get('username', '').strip()
@@ -39,10 +41,38 @@ def register_public_routes(app):
             user = User.query.filter_by(username=username).first()
             if user and user.is_active_user and user.check_password(password):
                 login_user(user, remember=True)
-                next_page = request.args.get('next') or url_for('index')
+                if user.role == 'author':
+                    next_page = url_for('author.index')
+                else:
+                    next_page = request.args.get('next') or url_for('index')
                 return redirect(url_for('loading', next=next_page))
             flash('Неверный логин или пароль', 'error')
         return render_template('login.html')
+
+    @app.route('/register', methods=['GET', 'POST'])
+    def register():
+        if current_user.is_authenticated:
+            if getattr(current_user, 'role', None) == 'author':
+                return redirect(url_for('author.index'))
+            return redirect(url_for('index'))
+        if request.method == 'POST':
+            username = request.form.get('username', '').strip()
+            display_name = request.form.get('display_name', '').strip()
+            password = request.form.get('password', '')
+            if not username or not display_name or not password:
+                flash('Заполните все поля', 'error')
+            elif len(password) < 6:
+                flash('Пароль должен быть не короче 6 символов', 'error')
+            elif User.query.filter_by(username=username).first():
+                flash('Такой логин уже занят', 'error')
+            else:
+                user = User(username=username, display_name=display_name, role='author')
+                user.set_password(password)
+                db.session.add(user)
+                db.session.commit()
+                flash('Регистрация успешна. Войдите в систему.', 'success')
+                return redirect(url_for('login'))
+        return render_template('register.html')
 
     @app.route('/loading')
     @login_required
@@ -188,7 +218,13 @@ def register_public_routes(app):
             )
             db.session.add(solyanka_issue)
             db.session.commit()
-        solyanka_article_count = Article.visible().filter_by(issue_id=solyanka_issue.id).count()
+        # В «без номера» не показываем авторские подачи — они только во вкладке «От авторов»
+        solyanka_article_count = (
+            Article.visible()
+            .filter_by(issue_id=solyanka_issue.id)
+            .filter(Article.submitted_by_user_id.is_(None))
+            .count()
+        )
 
         # Годы только обычных выпусков (без блока «без номера»)
         years = [
@@ -240,6 +276,30 @@ def register_public_routes(app):
             .group_by(Issue.year)
             .all()
         )
+        # Подачи от авторов: только для админов и пользователей (не для роли «автор»), только статьи в очереди (выпуск -1/0)
+        if getattr(current_user, 'role', None) in ('admin', 'user'):
+            author_submissions = (
+                Article.visible()
+                .join(Issue)
+                .filter(
+                    Issue.journal_id == journal_id,
+                    Issue.number == -1,
+                    Issue.year == 0,
+                )
+                .options(joinedload(Article.submitted_by_user))
+                .order_by(Article.id.desc())
+                .all()
+            )
+        else:
+            author_submissions = []
+        # Все выпуски для выбора «в какой выпуск отправить» (без служебной очереди авторских подач -1/0)
+        issues_all = (
+            Issue.visible()
+            .filter_by(journal_id=journal_id)
+            .filter(db.or_(Issue.number != -1, Issue.year != 0))
+            .order_by(Issue.year.desc(), Issue.position, Issue.number)
+            .all()
+        )
         return render_template(
             'journal.html',
             journal=journal,
@@ -252,6 +312,8 @@ def register_public_routes(app):
             issue_count_by_year=issue_count_by_year,
             solyanka_issue=solyanka_issue,
             solyanka_article_count=solyanka_article_count,
+            author_submissions=author_submissions,
+            issues_all=issues_all,
         )
 
     @app.route("/api/journal/<int:journal_id>/issues")
@@ -286,15 +348,18 @@ def register_public_routes(app):
         journal = issue.journal
         search = request.args.get('search', '').strip()
 
-        all_articles = (
+        query = (
             Article.visible()
             .filter_by(issue_id=issue_id)
             .options(
                 joinedload(Article.article_authors),
                 joinedload(Article.images)
             )
-            .all()
         )
+        # В выпуске «без номера» показываем только статьи, не поданные через кабинет автора
+        if issue.number == 0 and issue.year == 0:
+            query = query.filter(Article.submitted_by_user_id.is_(None))
+        all_articles = query.all()
         
         if search:
             search_term = normalize_text(search)

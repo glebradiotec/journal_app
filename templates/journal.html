@@ -119,6 +119,50 @@
         </div>
     </div>
 
+    <!-- Подачи от авторов: для админов и пользователей (не для авторов), только если есть статьи в очереди -->
+    {% if author_submissions %}
+    <div class="author-submissions-section table-container" style="margin-top: 20px;">
+        <div class="table-header">
+            <h2 class="table-title">От авторов</h2>
+            <span class="table-hint">Подано через кабинет автора — можно отправить в выпуск или в «без номера»</span>
+        </div>
+        <div class="issues-detail" style="padding: 16px 20px;">
+            <table class="author-submissions-table">
+                <thead>
+                    <tr>
+                        <th>Автор</th>
+                        <th>Название статьи</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for art in author_submissions %}
+                    <tr>
+                        <td>{{ art.submitted_by_user.display_name if art.submitted_by_user else '—' }}</td>
+                        <td><a href="/article/{{ art.id }}/edit">{{ art.title[:60] }}{% if art.title|length > 60 %}...{% endif %}</a></td>
+                        <td>
+                            <form method="POST" action="/journal/{{ journal.id }}/article/{{ art.id }}/assign" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <select name="issue_id" class="form-select" style="min-width:140px;" required>
+                                    <option value="">— Выберите выпуск —</option>
+                                    <option value="{{ solyanka_issue.id }}">Без номера (ожидают)</option>
+                                    {% for iss in issues_all %}
+                                    {% if iss.number != 0 or iss.year != 0 %}
+                                    <option value="{{ iss.id }}">№{{ iss.number }} / {{ iss.year }}</option>
+                                    {% endif %}
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="action-btn action-btn-primary">В выпуск</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Issues Table -->
     <div class="table-container">
         <div class="table-header">
@@ -759,6 +803,24 @@ document.addEventListener('DOMContentLoaded', function() {
     overflow: hidden;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.03);
 }
+
+.author-submissions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.author-submissions-table th,
+.author-submissions-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-default);
+}
+.author-submissions-table th {
+    font-weight: 600;
+    color: var(--color-fg-muted);
+}
+.author-submissions-table a { color: var(--color-accent-fg); text-decoration: none; }
+.author-submissions-table a:hover { text-decoration: underline; }
 
 .table-header {
     display: flex;
