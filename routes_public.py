@@ -177,33 +177,66 @@ def register_public_routes(app):
         from datetime import datetime
         journal = Journal.query.get_or_404(journal_id)
         default_year = datetime.now().year
+
+        # Выпуск для статей без номера (number=0, year=0) — привязка к выпуску позже
+        solyanka_issue = Issue.visible().filter_by(
+            journal_id=journal_id, number=0, year=0
+        ).first()
+        if not solyanka_issue:
+            solyanka_issue = Issue(
+                number=0, year=0, journal_id=journal_id, position=-1
+            )
+            db.session.add(solyanka_issue)
+            db.session.commit()
+        solyanka_article_count = Article.visible().filter_by(issue_id=solyanka_issue.id).count()
+
+        # Годы только обычных выпусков (без блока «без номера»)
         years = [
             row[0] for row in
-            db.session.query(Issue.year)
+            Issue.visible()
             .filter_by(journal_id=journal_id)
+            .filter(Issue.year != 0)
+            .with_entities(Issue.year)
             .distinct()
             .order_by(Issue.year.desc())
             .all()
         ]
+        # Выпуски года по умолчанию (без блока «без номера»)
         rows = (
             db.session.query(Issue, func.count(Article.id).label('article_count'))
+            .select_from(Issue)
             .outerjoin(Article, Article.issue_id == Issue.id)
-            .filter(Issue.journal_id == journal_id, Issue.year == default_year)
+            .filter(
+                Issue.deleted_at.is_(None),
+                Issue.journal_id == journal_id,
+                Issue.year == default_year,
+                Issue.year != 0,
+            )
             .group_by(Issue.id)
             .order_by(Issue.position.asc(), Issue.id.desc())
             .all()
         )
         issues_default = [{'issue': issue, 'article_count': count} for issue, count in rows]
-        total_issues = Issue.visible().filter_by(journal_id=journal_id).count()
+        # Количество обычных выпусков (без блока «без номера»)
+        total_issues = (
+            Issue.visible()
+            .filter_by(journal_id=journal_id)
+            .filter(Issue.year != 0)
+            .count()
+        )
         total_articles = Article.visible().join(Issue).filter(Issue.journal_id == journal_id).count()
         last_issue = (
-            Issue.visible().filter_by(journal_id=journal_id)
+            Issue.visible()
+            .filter_by(journal_id=journal_id)
+            .filter(Issue.year != 0)
             .order_by(Issue.position.asc(), Issue.id.desc())
             .first()
         )
         issue_count_by_year = dict(
-            db.session.query(Issue.year, func.count(Issue.id))
+            Issue.visible()
             .filter_by(journal_id=journal_id)
+            .filter(Issue.year != 0)
+            .with_entities(Issue.year, func.count(Issue.id))
             .group_by(Issue.year)
             .all()
         )
@@ -217,6 +250,8 @@ def register_public_routes(app):
             total_articles=total_articles,
             last_issue=last_issue,
             issue_count_by_year=issue_count_by_year,
+            solyanka_issue=solyanka_issue,
+            solyanka_article_count=solyanka_article_count,
         )
 
     @app.route("/api/journal/<int:journal_id>/issues")
@@ -229,8 +264,9 @@ def register_public_routes(app):
         Journal.query.get_or_404(journal_id)
         rows = (
             db.session.query(Issue, func.count(Article.id).label('article_count'))
+            .select_from(Issue)
             .outerjoin(Article, Article.issue_id == Issue.id)
-            .filter(Issue.journal_id == journal_id, Issue.year == year)
+            .filter(Issue.deleted_at.is_(None), Issue.journal_id == journal_id, Issue.year == year)
             .group_by(Issue.id)
             .order_by(Issue.position.asc(), Issue.id.desc())
             .all()
