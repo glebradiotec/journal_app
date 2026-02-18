@@ -143,17 +143,9 @@
             <button class="btn-primary" onclick="toggleNewIssueForm()">Создать выпуск</button>
         </div>
         {% else %}
-        {# Сетка годов — плашки как на эскизе #}
-        <div class="year-plaques-grid" id="yearPlaquesGrid">
-            <button type="button" class="year-plaque is-selected" data-year="{{ default_year }}" aria-pressed="true">{{ default_year }}</button>
-            {% for y in years %}
-            {% if y != default_year %}
-            <button type="button" class="year-plaque" data-year="{{ y }}" aria-pressed="false">{{ y }}</button>
-            {% endif %}
-            {% endfor %}
-        </div>
-        <div class="issues-detail" id="issues-detail">
-            <h3 class="issues-detail-title" id="issuesDetailTitle">Выпуски {{ default_year }}</h3>
+        {# Текущий год (2026) — отдельно сверху, без плашки в сетке #}
+        <div class="issues-detail issues-detail-default" id="issues-detail-default">
+            <h3 class="issues-detail-title">Выпуски {{ default_year }}</h3>
             <div class="issues-list" id="issues-list-default">
                     {% for item in issues_default %}
                     {% set issue = item.issue %}
@@ -219,6 +211,18 @@
                     {% endfor %}
             </div>
         </div>
+        {# Сетка остальных годов (без текущего) #}
+        <div class="year-plaques-grid" id="yearPlaquesGrid">
+            {% for y in years %}
+            {% if y != default_year %}
+            <button type="button" class="year-plaque" data-year="{{ y }}" aria-pressed="false">{{ y }}</button>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="issues-detail issues-detail-other" id="issues-detail-other">
+            <h3 class="issues-detail-title" id="issuesDetailTitle" style="display:none;"></h3>
+            <div class="issues-list" id="issues-list-other"></div>
+        </div>
         {% endif %}
     </div>
 </div>
@@ -264,7 +268,6 @@ function renderIssueCard(issue) {
 }
 
 var loadedYears = {};
-var defaultYearHtml = null;
 
 function initSortableIfDefault() {
     var list = document.getElementById('issues-list-default');
@@ -290,7 +293,8 @@ function initSortableIfDefault() {
 function selectYear(year) {
     var grid = document.getElementById('yearPlaquesGrid');
     var titleEl = document.getElementById('issuesDetailTitle');
-    var listEl = document.getElementById('issues-list-default');
+    var detailOther = document.getElementById('issues-detail-other');
+    var listEl = document.getElementById('issues-list-other');
     if (!grid || !titleEl || !listEl) return;
     grid.querySelectorAll('.year-plaque').forEach(function(btn) {
         var y = parseInt(btn.getAttribute('data-year'), 10);
@@ -302,15 +306,9 @@ function selectYear(year) {
             btn.setAttribute('aria-pressed', 'false');
         }
     });
+    detailOther.style.display = 'block';
+    titleEl.style.display = 'block';
     titleEl.textContent = 'Выпуски ' + year;
-    if (year === DEFAULT_YEAR) {
-        if (defaultYearHtml !== null) {
-            listEl.innerHTML = defaultYearHtml;
-            initSortableIfDefault();
-        }
-        return;
-    }
-    if (defaultYearHtml === null) defaultYearHtml = listEl.innerHTML;
     if (loadedYears[year]) {
         listEl.innerHTML = loadedYears[year];
         return;
@@ -330,12 +328,15 @@ function selectYear(year) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('yearPlaquesGrid').addEventListener('click', function(e) {
-        var plaque = e.target.closest('.year-plaque');
-        if (!plaque) return;
-        var year = parseInt(plaque.getAttribute('data-year'), 10);
-        selectYear(year);
-    });
+    var grid = document.getElementById('yearPlaquesGrid');
+    if (grid) {
+        grid.addEventListener('click', function(e) {
+            var plaque = e.target.closest('.year-plaque');
+            if (!plaque) return;
+            var year = parseInt(plaque.getAttribute('data-year'), 10);
+            selectYear(year);
+        });
+    }
     initSortableIfDefault();
 });
 </script>
@@ -622,24 +623,24 @@ document.addEventListener('DOMContentLoaded', function() {
     gap: 20px;
     padding: 18px 22px;
     background: linear-gradient(135deg, var(--color-canvas-default) 0%, var(--color-canvas-subtle) 100%);
-    border: 2px solid var(--color-accent-emphasis);
+    border: 2px dashed var(--color-accent-emphasis);
     border-radius: 14px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(91, 164, 176, 0.15), 0 4px 16px rgba(91, 164, 176, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     flex-wrap: wrap;
     cursor: pointer;
 }
 
 .solyanka-card:hover {
-    border-color: var(--color-accent-fg);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 0 0 2px rgba(91, 164, 176, 0.2), 0 6px 24px rgba(91, 164, 176, 0.12);
+    border-style: solid;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(91, 164, 176, 0.1);
 }
 
 [data-theme="dark"] .solyanka-card {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(124, 197, 208, 0.2), 0 4px 16px rgba(124, 197, 208, 0.06);
+    border-color: var(--color-accent-fg);
 }
 
 [data-theme="dark"] .solyanka-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(124, 197, 208, 0.3), 0 6px 24px rgba(124, 197, 208, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(124, 197, 208, 0.08);
 }
 
 .solyanka-stretched-link {
@@ -803,6 +804,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .issues-detail {
     padding: 0 20px 20px;
+}
+
+.issues-detail-default {
+    padding-top: 0;
+}
+
+.issues-detail-other {
+    display: none;
+    padding-top: 8px;
 }
 
 .issues-detail-title {
