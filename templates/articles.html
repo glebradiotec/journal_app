@@ -458,7 +458,7 @@
                     {% for img in article.images %}
                     {% set ext = img.filename.rsplit('.', 1)[-1].lower() %}
                     {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'] %}
-                    <a href="/uploads/{{ img.filename }}" class="article-image-thumb" target="_blank" title="{{ img.filename }}">
+                    <a href="/uploads/{{ img.filename }}" class="article-image-thumb" title="{{ img.filename }}">
                         <img src="/uploads/{{ img.filename }}" alt="Изображение {{ loop.index }}" loading="lazy">
                     </a>
                     {% else %}
@@ -1410,7 +1410,7 @@ function quickView(articleId, initialTab, originEvent) {
                     var ext = img.filename.split('.').pop().toLowerCase();
                     var imageExts = ['jpg','jpeg','png','gif','bmp','webp','svg'];
                     if (imageExts.indexOf(ext) !== -1) {
-                        html += '<img class="qv-thumb" src="/uploads/' + encodeURIComponent(img.filename) + '" onclick="window.open(this.src,\'_blank\')" title="' + escHtml(img.filename) + '">';
+                        html += '<img class="qv-thumb" src="/uploads/' + encodeURIComponent(img.filename) + '" onclick="(window.openImageLightbox||function(u){window.open(u,\'_blank\')})(this.src)" title="' + escHtml(img.filename) + '" role="button" tabindex="0">';
                     } else {
                         html += '<a class="qv-file-thumb" href="/uploads/' + encodeURIComponent(img.filename) + '" target="_blank" title="' + escHtml(img.filename) + '">';
                         html += '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/></svg>';
@@ -1690,7 +1690,7 @@ function buildEditForm(data) {
             var imageExts = ['jpg','jpeg','png','gif','bmp','webp','svg'];
             h += '<div class="sp-img-item" id="spImg' + img.id + '">';
             if (imageExts.indexOf(ext) !== -1) {
-                h += '<img src="/uploads/' + encodeURIComponent(img.filename) + '" alt="">';
+                h += '<a href="/uploads/' + encodeURIComponent(img.filename) + '" class="sp-img-link"><img src="/uploads/' + encodeURIComponent(img.filename) + '" alt=""></a>';
             } else {
                 h += '<a href="/uploads/' + encodeURIComponent(img.filename) + '" target="_blank" class="sp-file-icon-link" title="' + escHtml(img.filename) + '">';
                 h += '<svg width="28" height="28" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 1.75v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073H3.75a.25.25 0 0 0-.25.25Zm-1.5 0A1.75 1.75 0 0 1 3.75 0h5.086c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 11.75 16h-8A1.75 1.75 0 0 1 2 14.25Z"/></svg>';
@@ -4226,6 +4226,7 @@ function updateArticleCard(article) {
     border: 1px solid var(--color-border-default);
     aspect-ratio: 1;
 }
+.sp-img-link { display: block; width: 100%; height: 100%; }
 .sp-img-item img {
     width: 100%; height: 100%; object-fit: cover;
     display: block;

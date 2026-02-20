@@ -205,7 +205,7 @@
                     {% if article and article.images %}
                     {% for img in article.images %}
                     <div class="author-form-file-current">
-                        <a href="/uploads/{{ img.filename }}" target="_blank">{{ img.filename }}</a>
+                        <a href="/uploads/{{ img.filename }}" class="image-link">{{ img.filename }}</a>
                         <label class="author-form-file-delete"><input type="checkbox" name="delete_image[]" value="{{ img.id }}"> Удалить</label>
                     </div>
                     {% endfor %}
