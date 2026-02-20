@@ -9,7 +9,6 @@ from flask import (
     flash,
     send_from_directory,
     current_app,
-    Response,
     abort,
 )
 from flask_login import login_user, logout_user, login_required, current_user
@@ -464,20 +463,12 @@ def register_public_routes(app):
 
         is_download = request.path.startswith('/download/')
 
-        # X-Accel-Redirect: Nginx отдаёт файл напрямую (быстрее, не блокирует воркеры)
-        if os.environ.get('USE_X_ACCEL_REDIRECT') == '1':
-            # Путь для Nginx internal location
-            internal_path = '/internal-uploads/' + safe_name
-            response = Response(status=200)
-            response.headers['X-Accel-Redirect'] = internal_path
-            response.headers['X-Accel-Charset'] = 'utf-8'
-            if is_download:
-                # Скачивание, а не отображение в браузере
-                response.headers['Content-Disposition'] = f'attachment; filename="{safe_name}"'
-            return response
-
+        # Всегда отдаём файл через Flask. X-Accel-Redirect можно включить (USE_X_ACCEL_REDIRECT=1),
+        # только когда на Nginx настроен internal location /internal-uploads/, иначе браузер получает пустой ответ.
         return send_from_directory(
-            upload_folder, safe_name,
+            upload_folder,
+            safe_name,
             as_attachment=is_download,
+            download_name=safe_name,
         )
 
