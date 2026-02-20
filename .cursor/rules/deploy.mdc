@@ -41,7 +41,9 @@ ssh root@141.105.68.223 "cd /var/www/journal_app && git pull && systemctl restar
 2. **systemd** — в `journal.service` добавить в блок `[Service]`:
    ```
    Environment="USE_X_ACCEL_REDIRECT=1"
+   Environment="RUN_BACKUP=1"
    ```
+   (`RUN_BACKUP=1` — чтобы при старте приложения создавался бэкап и отправлялся в Telegram; локально не задавать.)
 
 3. Перезапустить:
    ```

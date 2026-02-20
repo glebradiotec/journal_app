@@ -59,12 +59,16 @@ def send_excel_to_telegram():
 
 
 def create_backup():
+    # На локальном запуске не создаём бэкап и не шлём в Telegram (избегаем таймаутов и лишних файлов)
+    if os.environ.get('RUN_BACKUP') != '1':
+        return
+
     # Файлы в папке instance
     base_dir = os.path.dirname(os.path.abspath(__file__))
     instance_dir = os.path.join(base_dir, 'instance')
     db_file = os.path.join(instance_dir, 'journal.db')
     backups_dir = os.path.join(base_dir, 'backups')
-    
+
     if not os.path.exists(db_file):
         print(f'DB file not found: {db_file}')
         return

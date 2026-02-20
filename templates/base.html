@@ -792,20 +792,23 @@
             }
             
             // ---- Анимация счётчиков (слот-машина) ----
+            // Запускается только для элементов с data-slot (в полосках статистики отключена, чтобы не сдвигались влево)
             function animateCounters(container) {
                 var counters = container.querySelectorAll(
                     '.stat-value, .journals-stat-value, .journals-count, .adm-stat-number'
                 );
                 counters.forEach(function(el) {
+                    if (!el.hasAttribute('data-slot')) return;
                     var text = el.textContent.trim();
                     var target = parseInt(text);
                     if (isNaN(target) || target <= 0) return;
                     if (el.dataset.slotBusy) return;
-                    if (el.hasAttribute('data-no-slot')) return;
                     el.dataset.slotBusy = '1';
                     
-                    // Lock element height to prevent layout shift
+                    // Фиксируем размеры, чтобы при замене контента блок не сдвигался влево
+                    var origW = el.offsetWidth;
                     var origH = el.offsetHeight;
+                    el.style.minWidth = origW + 'px';
                     el.style.height = origH + 'px';
                     el.style.overflow = 'hidden';
                     
@@ -865,9 +868,10 @@
                     
                     el.appendChild(wrapper);
                     
-                    // После остановки всех барабанов — возвращаем чистый текст
+                    // После остановки всех барабанов — возвращаем чистый текст и снимаем фиксацию размеров
                     setTimeout(function() {
                         el.textContent = text;
+                        el.style.minWidth = '';
                         el.style.height = '';
                         el.style.overflow = '';
                         delete el.dataset.slotBusy;

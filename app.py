@@ -223,12 +223,11 @@ def init_users():
 
 if __name__ == "__main__":
     print("Starting app...")
-    # Бэкап только если настроен Telegram (на сервере), иначе не блокируем старт
-    if os.environ.get('TELEGRAM_BOT_TOKEN'):
-        try:
-            create_backup()
-        except Exception as e:
-            print(f"Backup skip: {e}")
+    # Бэкап при старте только на сервере (RUN_BACKUP=1 в systemd), локально пропускаем
+    try:
+        create_backup()
+    except Exception as e:
+        print(f"Backup skip: {e}")
     try:
         init_journals()
         init_users()
