@@ -405,10 +405,17 @@ def _extract_text_from_doc(file_path):
     try:
         result = subprocess.run(
             ['antiword', '-w', '0', file_path],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, timeout=30
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
+        if result.returncode == 0 and result.stdout:
+            # antiword может вернуть текст в cp1251/koi8-r, не только в utf-8
+            for encoding in ('utf-8', 'cp1251', 'koi8-r', 'latin-1'):
+                try:
+                    text = result.stdout.decode(encoding)
+                    if text.strip():
+                        return text.strip()
+                except UnicodeDecodeError:
+                    continue
         return None
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
