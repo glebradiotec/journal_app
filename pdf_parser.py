@@ -402,20 +402,46 @@ def parse_article_pdf(file_path):
 def _extract_text_from_doc(file_path):
     """Извлекает текст из .doc (старый Word 97-2003) через antiword."""
     import subprocess
+
+    def _score_decoded_text(text):
+        """Оценивает качество декодирования: чем выше, тем лучше."""
+        if not text:
+            return float('-inf')
+        cyr_all = len(re.findall(r'[А-Яа-яЁё]', text))
+        cyr_upper = len(re.findall(r'[А-ЯЁ]', text))
+        replacement = text.count('\ufffd')
+        controls = sum(1 for ch in text if ord(ch) < 32 and ch not in '\n\r\t')
+        # Типичные куски mojibake (UTF-8, ошибочно прочитанный как cp1251)
+        mojibake = sum(text.count(tok) for tok in (
+            'Р°', 'Ре', 'Ри', 'Ро', 'Рн', 'Рс', 'Рт',
+            'С‚', 'СЊ', 'С‡', 'Сˆ', 'С…', 'СЏ'
+        ))
+        return (cyr_all * 2.0) - (cyr_upper * 1.5) - (replacement * 20.0) - (controls * 10.0) - (mojibake * 8.0)
+
+    def _decode_antiword_bytes(data):
+        """Пробует несколько кодировок и выбирает лучший текст по скорингу."""
+        best_text = None
+        best_score = float('-inf')
+        for encoding in ('utf-8', 'cp1251', 'cp866', 'koi8-r', 'latin-1'):
+            try:
+                text = data.decode(encoding, errors='replace').strip()
+            except Exception:
+                continue
+            if not text:
+                continue
+            score = _score_decoded_text(text)
+            if score > best_score:
+                best_score = score
+                best_text = text
+        return best_text
+
     try:
         result = subprocess.run(
             ['antiword', '-w', '0', file_path],
             capture_output=True, timeout=30
         )
         if result.returncode == 0 and result.stdout:
-            # antiword может вернуть текст в cp1251/koi8-r, не только в utf-8
-            for encoding in ('utf-8', 'cp1251', 'koi8-r', 'latin-1'):
-                try:
-                    text = result.stdout.decode(encoding)
-                    if text.strip():
-                        return text.strip()
-                except UnicodeDecodeError:
-                    continue
+            return _decode_antiword_bytes(result.stdout)
         return None
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None
