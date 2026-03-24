@@ -364,20 +364,20 @@ def parse_article_pdf(file_path):
     page = doc[0]
     raw_text = page.get_text("text")
 
-    # === AI-парсинг (GigaChat) — временно отключён ===
-    # try:
-    #     from ai_parser import parse_with_ai
-    #     ai_result = parse_with_ai(raw_text)
-    #     if ai_result and (ai_result.get("title") or ai_result.get("authors")):
-    #         doc.close()
-    #         return {
-    #             "title": ai_result.get("title", ""),
-    #             "authors": ai_result.get("authors", []),
-    #             "raw_text": raw_text[:500],
-    #             "method": "ai",
-    #         }
-    # except Exception:
-    #     pass  # AI недоступен — переходим к эвристике
+    # === AI-парсинг (GigaChat) ===
+    try:
+        from ai_parser import parse_with_ai
+        ai_result = parse_with_ai(raw_text)
+        if ai_result and (ai_result.get("title") or ai_result.get("authors")):
+            doc.close()
+            return {
+                "title": ai_result.get("title", ""),
+                "authors": ai_result.get("authors", []),
+                "raw_text": raw_text[:500],
+                "method": "ai",
+            }
+    except Exception:
+        pass  # AI недоступен — переходим к эвристике
 
     # === Эвристический парсер ===
     blocks = _extract_text_blocks(page)
@@ -449,19 +449,19 @@ def parse_article_docx(file_path):
 
     raw_text = "\n".join(paragraphs)
 
-    # === AI-парсинг (GigaChat) — временно отключён ===
-    # try:
-    #     from ai_parser import parse_with_ai
-    #     ai_result = parse_with_ai(raw_text)
-    #     if ai_result and (ai_result.get("title") or ai_result.get("authors")):
-    #         return {
-    #             "title": ai_result.get("title", ""),
-    #             "authors": ai_result.get("authors", []),
-    #             "raw_text": raw_text[:500],
-    #             "method": "ai",
-    #         }
-    # except Exception:
-    #     pass
+    # === AI-парсинг (GigaChat) ===
+    try:
+        from ai_parser import parse_with_ai
+        ai_result = parse_with_ai(raw_text)
+        if ai_result and (ai_result.get("title") or ai_result.get("authors")):
+            return {
+                "title": ai_result.get("title", ""),
+                "authors": ai_result.get("authors", []),
+                "raw_text": raw_text[:500],
+                "method": "ai",
+            }
+    except Exception:
+        pass
 
     # === Эвристика по тексту ===
     # --- Шаг 1: найти заголовок (пропускаем УДК, DOI и т.д.) ---
