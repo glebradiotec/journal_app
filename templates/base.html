@@ -352,7 +352,18 @@
 
                 var toast = document.createElement('div');
                 toast.className = 'toast-notification toast-' + type;
-                toast.innerHTML = (ICONS[type] || ICONS.info) + ' <span>' + message + '</span>';
+                
+                // Безопасная вставка: message кладём только через textContent (никакого innerHTML).
+                // Иконки берём из констант (ICONS) — они не зависят от входных данных пользователя.
+                var iconHolder = document.createElement('span');
+                iconHolder.innerHTML = (ICONS[type] || ICONS.info);
+                toast.appendChild(iconHolder);
+                
+                toast.appendChild(document.createTextNode(' '));
+                
+                var messageSpan = document.createElement('span');
+                messageSpan.textContent = message;
+                toast.appendChild(messageSpan);
 
                 container.appendChild(toast);
 

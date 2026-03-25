@@ -41,6 +41,9 @@ ALLOWED_EXTENSIONS = {
     'html', 'htm', 'xml', 'json', 'yaml', 'yml', 'md', 'tex', 'djvu', 'epub', 'fb2',
 }
 
+MAX_UPLOAD_SIZE_MB = 100
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
 
 def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -86,34 +89,226 @@ def log_article_history(article_id, action, changes=None, user_name=None):
     db.session.add(entry)
 
 
-def _save_uploaded_file(file, upload_folder):
-    """Сохраняет загруженный файл и возвращает имя файла, или None."""
-    if file and file.filename and allowed_file(file.filename):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        filename = secure_filename(timestamp + file.filename)
-        file.save(os.path.join(upload_folder, filename))
-        return filename
+def _read_sample_and_rewind(file, sample_size=8192):
+    """Читает первые байты файла и пытается вернуть указатель в начало."""
+    stream = getattr(file, "stream", None)
+    if stream is None:
+        return None
+    try:
+        pos = stream.tell()
+        sample = stream.read(sample_size)
+        # Надо обязательно перемотать обратно, иначе `file.save()` сохранит урезанный файл.
+        stream.seek(pos)
+        return sample
+    except Exception:
+        return None
+
+
+def _detect_mime_from_signature(sample: bytes):
+    """Пытается определить MIME по magic-signature (без внешних зависимостей)."""
+    if not sample:
+        return None
+
+    # PDF
+    if sample.startswith(b"%PDF-"):
+        return "application/pdf"
+
+    # PNG
+    if sample.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+
+    # JPEG
+    if sample.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+
+    # GIF
+    if sample.startswith(b"GIF87a") or sample.startswith(b"GIF89a"):
+        return "image/gif"
+
+    # WEBP: RIFF....WEBP
+    if sample.startswith(b"RIFF") and b"WEBP" in sample[8:32]:
+        return "image/webp"
+
+    # BMP
+    if sample.startswith(b"BM"):
+        return "image/bmp"
+
+    # TIFF
+    if sample.startswith(b"II*\x00") or sample.startswith(b"MM\x00*"):
+        return "image/tiff"
+
+    # SVG: ищем именно `<svg` (а не любой XML, начинающийся с `<?xml`)
+    stripped = sample.lstrip()
+    sample_lower = sample[:2048].lower()
+    if stripped.startswith(b"<svg") or (stripped.startswith(b"<?xml") and b"<svg" in sample_lower):
+        return "image/svg+xml"
+
+    # RTF
+    if sample.startswith(b"{\\rtf"):
+        return "application/rtf"
+
+    # OLE DOC (.doc)
+    if sample.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"):
+        # У многих форматов MS Office (doc/xls/ppt) используется общий OLE-заголовок.
+        return "application/x-ole-storage"
+
+    # ZIP-based formats (.docx/.xlsx/.pptx/.odt/.epub и т.п.)
+    if sample.startswith(b"PK\x03\x04") or sample.startswith(b"PK\x05\x06") or sample.startswith(b"PK\x07\x08"):
+        return "application/zip"
+
+    # 7z
+    if sample.startswith(b"7z\xBC\xAF\x27\x1C"):
+        return "application/x-7z-compressed"
+
+    # RAR
+    if sample.startswith(b"Rar!\x1a\x07\x00") or sample.startswith(b"Rar!\x1a\x07") or sample.startswith(b"Rar!\x1a"):
+        return "application/x-rar-compressed"
+
+    # GZIP
+    if sample.startswith(b"\x1f\x8b"):
+        return "application/gzip"
+
+    # TAR: в заголовке по смещению 257 лежит 'ustar'
+    if len(sample) > 262 and sample[257:262] == b"ustar":
+        return "application/x-tar"
+
+    # Текстовые файлы (очень грубая эвристика)
+    if b"\x00" not in sample:
+        try:
+            sample.decode("utf-8")
+            return "text/plain"
+        except UnicodeDecodeError:
+            try:
+                sample.decode("cp1251")
+                return "text/plain"
+            except UnicodeDecodeError:
+                return None
+
     return None
+
+
+def _expected_mime_for_extension(ext: str):
+    """Ожидаемый MIME для расширения (для тех, где можно проверить по сигнатуре)."""
+    ext = ext.lower().lstrip(".")
+    mapping = {
+        "pdf": "application/pdf",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "gif": "image/gif",
+        "webp": "image/webp",
+        "bmp": "image/bmp",
+        "tif": "image/tiff",
+        "tiff": "image/tiff",
+        "svg": "image/svg+xml",
+        "rtf": "application/rtf",
+        "doc": "application/x-ole-storage",
+        # ZIP-based office formats
+        "docx": "application/zip",
+        # старые xls/ppt тоже OLE-сущность
+        "xls": "application/x-ole-storage",
+        "xlsx": "application/zip",
+        "ppt": "application/x-ole-storage",
+        "pptx": "application/zip",
+        "odt": "application/zip",
+        "ods": "application/zip",
+        "odp": "application/zip",
+        "epub": "application/zip",
+        "tex": "text/plain",
+        "fb2": "text/plain",
+        "csv": "text/plain",
+        "txt": "text/plain",
+        "json": "text/plain",
+        "yaml": "text/plain",
+        "yml": "text/plain",
+        "md": "text/plain",
+        "xml": "text/plain",
+        "html": "text/plain",
+        "htm": "text/plain",
+        "zip": "application/zip",
+        "rar": "application/x-rar-compressed",
+        "7z": "application/x-7z-compressed",
+        "gz": "application/gzip",
+        "tar": "application/x-tar",
+    }
+    return mapping.get(ext)
+
+
+def _save_uploaded_file(file, upload_folder, field_label=None):
+    """Сохраняет загруженный файл и возвращает имя файла, или (None, error)."""
+    if not file or not getattr(file, "filename", None):
+        return None, None
+
+    original_name = file.filename
+    if not allowed_file(original_name):
+        return None, f"Файл \"{original_name}\" имеет неподдерживаемое расширение."
+
+    # Проверка размера (100MB)
+    size = getattr(file, "content_length", None)
+    if size is None:
+        # Иногда `content_length` может быть None — тогда попробуем узнать размер через stream.
+        try:
+            stream = file.stream
+            pos = stream.tell()
+            stream.seek(0, 2)
+            size = stream.tell()
+            stream.seek(pos)
+        except Exception:
+            size = None
+    if size is not None and size > MAX_UPLOAD_SIZE_BYTES:
+        label = f"{field_label}: " if field_label else ""
+        return None, f"{label}Файл слишком большой (максимум {MAX_UPLOAD_SIZE_MB}MB): \"{original_name}\""
+
+    ext = original_name.rsplit(".", 1)[1].lower() if "." in original_name else ""
+    expected_mime = _expected_mime_for_extension(ext)
+
+    if expected_mime:
+        sample = _read_sample_and_rewind(file)
+        detected_mime = _detect_mime_from_signature(sample)
+        if detected_mime != expected_mime:
+            label = f"{field_label}: " if field_label else ""
+            return None, (
+                f"{label}Недопустимый MIME-тип файла \"{original_name}\": "
+                f"обнаружено {detected_mime or 'unknown'}, ожидалось {expected_mime}."
+            )
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+    filename = secure_filename(timestamp + original_name)
+    file.save(os.path.join(upload_folder, filename))
+    return filename, None
 
 
 def _process_file_uploads(article, upload_folder):
     """Обрабатывает загрузку файлов (рукопись, рецензия, титульная, акт экспертизы) для статьи."""
+    errors = []
     for field_name in ('manuscript_file', 'review_file', 'title_pdf', 'expertise_act_file'):
         file = request.files.get(field_name)
-        saved = _save_uploaded_file(file, upload_folder)
+        field_labels = {
+            "manuscript_file": "Текст статьи",
+            "review_file": "Рецензия",
+            "title_pdf": "Титульная",
+            "expertise_act_file": "Акт экспертизы",
+        }
+        saved, err = _save_uploaded_file(file, upload_folder, field_label=field_labels.get(field_name, field_name))
+        if err:
+            errors.append(err)
         if saved:
             setattr(article, field_name, saved)
             # Автоматически включаем статус акта при загрузке файла
             if field_name == 'expertise_act_file':
                 article.has_expertise_act = True
+    return errors
 
 
 def _process_article_images(article, upload_folder, start_order=0):
     """Загружает файлы раздела 'Разное' для статьи. Возвращает количество добавленных."""
     images = request.files.getlist('article_images')
     added = 0
+    errors = []
     for i, img in enumerate(images):
-        saved = _save_uploaded_file(img, upload_folder)
+        saved, err = _save_uploaded_file(img, upload_folder, field_label="Изображение")
+        if err:
+            errors.append(err)
         if saved:
             db.session.add(ArticleImage(
                 article_id=article.id,
@@ -121,7 +316,7 @@ def _process_article_images(article, upload_folder, start_order=0):
                 order=start_order + i
             ))
             added += 1
-    return added
+    return added, errors
 
 
 def _process_authors(article):
@@ -263,7 +458,9 @@ def register_admin_routes(app):
         )
 
         upload_folder = current_app.config['UPLOAD_FOLDER']
-        _process_file_uploads(article, upload_folder)
+        upload_errors = _process_file_uploads(article, upload_folder)
+        for msg in upload_errors:
+            flash(msg, 'error')
 
         # Если рукопись была загружена через PDF-парсер
         parsed_manuscript = request.form.get('parsed_manuscript_filename')
@@ -275,7 +472,9 @@ def register_admin_routes(app):
         db.session.add(article)
         db.session.flush()
 
-        _process_article_images(article, upload_folder)
+        _, image_errors = _process_article_images(article, upload_folder)
+        for msg in image_errors:
+            flash(msg, 'error')
         article.authors = _process_authors(article)
 
         log_activity('created', 'article', article.id, article.title)
@@ -403,7 +602,14 @@ def register_admin_routes(app):
             
             # Загрузка файлов
             upload_folder = current_app.config['UPLOAD_FOLDER']
-            _process_file_uploads(article, upload_folder)
+            upload_errors = _process_file_uploads(article, upload_folder)
+            if upload_errors:
+                error_message = "; ".join(upload_errors)
+                if is_ajax:
+                    return jsonify({'success': False, 'error': error_message}), 400
+                for msg in upload_errors:
+                    flash(msg, 'error')
+                return redirect(url_for('edit_article', article_id=article.id))
             
             # Удаление файлов
             for field_name, form_key in [('manuscript_file', 'delete_manuscript'), ('review_file', 'delete_review'), ('title_pdf', 'delete_title_pdf'), ('expertise_act_file', 'delete_expertise_act')]:
@@ -422,7 +628,17 @@ def register_admin_routes(app):
             
             # Загрузка новых изображений
             current_max_order = max([img.order for img in article.images], default=-1)
-            _process_article_images(article, upload_folder, start_order=current_max_order + 1)
+            _, image_errors = _process_article_images(article, upload_folder, start_order=current_max_order + 1)
+            if image_errors:
+                upload_errors.extend(image_errors)
+
+            if upload_errors:
+                error_message = "; ".join(upload_errors)
+                if is_ajax:
+                    return jsonify({'success': False, 'error': error_message}), 400
+                for msg in upload_errors:
+                    flash(msg, 'error')
+                return redirect(url_for('edit_article', article_id=article.id))
             
             # Обновление авторов — удаляем старых и добавляем новых
             old_authors = article.authors or ''

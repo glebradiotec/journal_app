@@ -8,10 +8,6 @@ import json
 import os
 import uuid
 import logging
-import urllib3
-
-# Подавляем предупреждения о self-signed сертификатах Сбера
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +50,11 @@ def _get_access_token():
     import time
     import requests
 
+    # Включаем стандартную валидацию сертификата (requests -> certifi/системный CA).
+    # Если нужен нестандартный CA, задайте путь к файлу через env `GIGACHAT_CA_BUNDLE_PATH`
+    # (или `REQUESTS_CA_BUNDLE`, как поддерживает requests).
+    verify = os.environ.get("GIGACHAT_CA_BUNDLE_PATH") or os.environ.get("REQUESTS_CA_BUNDLE") or True
+
     # Проверяем кэш (с запасом 60 сек)
     if _token_cache["token"] and _token_cache["expires_at"] > time.time() + 60:
         return _token_cache["token"]
@@ -71,7 +72,7 @@ def _get_access_token():
             "Authorization": f"Basic {auth_key}",
         },
         data={"scope": "GIGACHAT_API_PERS"},
-        verify=False,  # Сертификаты Сбера — self-signed
+        verify=verify,
         timeout=10,
     )
     response.raise_for_status()
@@ -86,6 +87,11 @@ def _get_access_token():
 def _call_gigachat(text):
     """Отправляет текст в GigaChat и возвращает JSON-ответ."""
     import requests
+
+    # Включаем стандартную валидацию сертификата (requests -> certifi/системный CA).
+    # Если нужен нестандартный CA, задайте путь к файлу через env `GIGACHAT_CA_BUNDLE_PATH`
+    # (или `REQUESTS_CA_BUNDLE`, как поддерживает requests).
+    verify = os.environ.get("GIGACHAT_CA_BUNDLE_PATH") or os.environ.get("REQUESTS_CA_BUNDLE") or True
 
     token = _get_access_token()
 
@@ -105,7 +111,7 @@ def _call_gigachat(text):
             "temperature": 0.1,
             "max_tokens": 1500,
         },
-        verify=False,
+        verify=verify,
         timeout=30,
     )
     response.raise_for_status()

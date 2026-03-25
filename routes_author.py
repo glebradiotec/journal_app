@@ -26,17 +26,173 @@ ALLOWED_EXTENSIONS = {
     'zip', 'rar', '7z', 'tar', 'gz', 'html', 'htm', 'xml', 'json', 'md', 'tex', 'djvu', 'epub', 'fb2',
 }
 
+MAX_UPLOAD_SIZE_MB = 100
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _save_file(file, upload_folder):
-    if file and file.filename and allowed_file(file.filename):
-        name = datetime.now().strftime('%Y%m%d_%H%M%S_') + secure_filename(file.filename)
-        file.save(os.path.join(upload_folder, name))
-        return name
+def _read_sample_and_rewind(file, sample_size=8192):
+    stream = getattr(file, "stream", None)
+    if stream is None:
+        return None
+    try:
+        pos = stream.tell()
+        sample = stream.read(sample_size)
+        stream.seek(pos)
+        return sample
+    except Exception:
+        return None
+
+
+def _detect_mime_from_signature(sample: bytes):
+    if not sample:
+        return None
+
+    if sample.startswith(b"%PDF-"):
+        return "application/pdf"
+    if sample.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if sample.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if sample.startswith(b"GIF87a") or sample.startswith(b"GIF89a"):
+        return "image/gif"
+    if sample.startswith(b"RIFF") and b"WEBP" in sample[8:32]:
+        return "image/webp"
+    if sample.startswith(b"BM"):
+        return "image/bmp"
+    if sample.startswith(b"II*\x00") or sample.startswith(b"MM\x00*"):
+        return "image/tiff"
+    # SVG: ищем именно `<svg` (а не любой XML, начинающийся с `<?xml`)
+    stripped = sample.lstrip()
+    sample_lower = sample[:2048].lower()
+    if stripped.startswith(b"<svg") or (stripped.startswith(b"<?xml") and b"<svg" in sample_lower):
+        return "image/svg+xml"
+
+    # RTF
+    if sample.startswith(b"{\\rtf"):
+        return "application/rtf"
+
+    # OLE (old MS Office)
+    if sample.startswith(b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1"):
+        return "application/x-ole-storage"
+
+    # ZIP-based
+    if sample.startswith(b"PK\x03\x04") or sample.startswith(b"PK\x05\x06") or sample.startswith(b"PK\x07\x08"):
+        return "application/zip"
+
+    if sample.startswith(b"7z\xBC\xAF\x27\x1C"):
+        return "application/x-7z-compressed"
+
+    if sample.startswith(b"Rar!\x1a\x07\x00") or sample.startswith(b"Rar!\x1a\x07") or sample.startswith(b"Rar!\x1a"):
+        return "application/x-rar-compressed"
+
+    if sample.startswith(b"\x1f\x8b"):
+        return "application/gzip"
+
+    # TAR: в заголовке по смещению 257 лежит 'ustar'
+    if len(sample) > 262 and sample[257:262] == b"ustar":
+        return "application/x-tar"
+
+    if b"\x00" not in sample:
+        try:
+            sample.decode("utf-8")
+            return "text/plain"
+        except UnicodeDecodeError:
+            try:
+                sample.decode("cp1251")
+                return "text/plain"
+            except UnicodeDecodeError:
+                return None
+
     return None
+
+
+def _expected_mime_for_extension(ext: str):
+    ext = ext.lower().lstrip(".")
+    mapping = {
+        "pdf": "application/pdf",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "gif": "image/gif",
+        "webp": "image/webp",
+        "bmp": "image/bmp",
+        "tif": "image/tiff",
+        "tiff": "image/tiff",
+        "svg": "image/svg+xml",
+        "rtf": "application/rtf",
+        # old Office
+        "doc": "application/x-ole-storage",
+        "xls": "application/x-ole-storage",
+        "ppt": "application/x-ole-storage",
+        # zip-based office
+        "docx": "application/zip",
+        "xlsx": "application/zip",
+        "pptx": "application/zip",
+        "odt": "application/zip",
+        "ods": "application/zip",
+        "odp": "application/zip",
+        "epub": "application/zip",
+        "csv": "text/plain",
+        "txt": "text/plain",
+        "json": "text/plain",
+        "yaml": "text/plain",
+        "yml": "text/plain",
+        "md": "text/plain",
+        "xml": "text/plain",
+        "html": "text/plain",
+        "htm": "text/plain",
+        "zip": "application/zip",
+        "rar": "application/x-rar-compressed",
+        "7z": "application/x-7z-compressed",
+        "gz": "application/gzip",
+        "tar": "application/x-tar",
+        "tex": "text/plain",
+        "fb2": "text/plain",
+    }
+    return mapping.get(ext)
+
+
+def _save_file(file, upload_folder, field_label=None):
+    if not file or not getattr(file, "filename", None):
+        return None, None
+
+    original_name = file.filename
+    if not allowed_file(original_name):
+        return None, f"Файл \"{original_name}\" имеет неподдерживаемое расширение."
+
+    size = getattr(file, "content_length", None)
+    if size is None:
+        try:
+            stream = file.stream
+            pos = stream.tell()
+            stream.seek(0, 2)
+            size = stream.tell()
+            stream.seek(pos)
+        except Exception:
+            size = None
+    if size is not None and size > MAX_UPLOAD_SIZE_BYTES:
+        label = f"{field_label}: " if field_label else ""
+        return None, f"{label}Файл слишком большой (максимум {MAX_UPLOAD_SIZE_MB}MB): \"{original_name}\""
+
+    ext = original_name.rsplit(".", 1)[1].lower() if "." in original_name else ""
+    expected_mime = _expected_mime_for_extension(ext)
+    if expected_mime:
+        sample = _read_sample_and_rewind(file)
+        detected_mime = _detect_mime_from_signature(sample)
+        if detected_mime != expected_mime:
+            label = f"{field_label}: " if field_label else ""
+            return None, (
+                f"{label}Недопустимый MIME-тип файла \"{original_name}\": "
+                f"обнаружено {detected_mime or 'unknown'}, ожидалось {expected_mime}."
+            )
+
+    name = datetime.now().strftime('%Y%m%d_%H%M%S_') + secure_filename(original_name)
+    file.save(os.path.join(upload_folder, name))
+    return name, None
 
 
 def _get_or_create_author_holding_issue(journal_id):
@@ -79,18 +235,30 @@ def _process_author_form(article):
 
 def _process_author_uploads(article, upload_folder):
     """Загрузка файлов статьи в кабинете автора."""
+    errors = []
     for field in ('manuscript_file', 'review_file', 'title_pdf', 'expertise_act_file'):
         f = request.files.get(field)
-        name = _save_file(f, upload_folder)
+        field_labels = {
+            "manuscript_file": "Текст статьи",
+            "review_file": "Рецензия",
+            "title_pdf": "Титульная",
+            "expertise_act_file": "Акт экспертизы",
+        }
+        name, err = _save_file(f, upload_folder, field_label=field_labels.get(field, field))
+        if err:
+            errors.append(err)
         if name:
             setattr(article, field, name)
             if field == 'expertise_act_file':
                 article.has_expertise_act = True
     for f in request.files.getlist('article_images') or []:
-        name = _save_file(f, upload_folder)
+        name, err = _save_file(f, upload_folder, field_label="Изображение")
+        if err:
+            errors.append(err)
         if name:
             order = max([img.order for img in article.images], default=-1) + 1
             db.session.add(ArticleImage(article_id=article.id, filename=name, order=order))
+    return errors
 
 
 author_bp = Blueprint('author', __name__, url_prefix='/author')
@@ -163,7 +331,9 @@ def new():
             article.submission_date = f"{day}.{month}.{year}"
 
         upload_folder = current_app.config['UPLOAD_FOLDER']
-        _process_author_uploads(article, upload_folder)
+        upload_errors = _process_author_uploads(article, upload_folder)
+        for msg in upload_errors:
+            flash(msg, 'error')
         db.session.add(article)
         db.session.flush()
         article.authors = _process_author_form(article)
@@ -219,7 +389,9 @@ def edit(article_id):
             img = ArticleImage.query.get(int(img_id))
             if img and img.article_id == article.id:
                 db.session.delete(img)
-        _process_author_uploads(article, upload_folder)
+        upload_errors = _process_author_uploads(article, upload_folder)
+        for msg in upload_errors:
+            flash(msg, 'error')
         article.authors = _process_author_form(article)
         db.session.commit()
         flash('Изменения сохранены', 'success')

@@ -223,6 +223,7 @@ def init_users():
 
 if __name__ == "__main__":
     print("Starting app...")
+    debug = os.environ.get("FLASK_DEBUG") == "1"
     # Бэкап при старте только на сервере (RUN_BACKUP=1 в systemd), локально пропускаем
     try:
         create_backup()
@@ -234,4 +235,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Init skip: {e}")
     print("Сервер стартует на http://127.0.0.1:5000 ...")
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(host='127.0.0.1', port=5000, debug=debug)
