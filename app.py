@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # Загружаем переменные из .env файла
 
-from flask import Flask, session
+from flask import Flask, session, request, jsonify, redirect, url_for
 from flask_compress import Compress
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -71,6 +71,17 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Пожалуйста, войдите в систему.'
 login_manager.login_message_category = 'info'
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Return JSON for AJAX instead of redirect HTML."""
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'error': 'Сессия истекла. Обновите страницу и войдите снова.',
+            'auth_required': True
+        }), 401
+    return redirect(url_for('login'))
 
 
 @login_manager.user_loader

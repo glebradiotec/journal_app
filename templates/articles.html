@@ -768,7 +768,20 @@ function parsePdfAndFill(input) {
         body: formData,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
-    .then(r => r.json())
+    .then(async r => {
+        const contentType = (r.headers.get('content-type') || '').toLowerCase();
+        if (!contentType.includes('application/json')) {
+            if (r.status === 401 || r.redirected) {
+                throw new Error('Сессия истекла. Обновите страницу и войдите снова.');
+            }
+            throw new Error('Сервер вернул неожиданный формат ответа. Попробуйте позже.');
+        }
+        const data = await r.json();
+        if (!r.ok) {
+            throw new Error(data.error || ('Ошибка сервера (' + r.status + ')'));
+        }
+        return data;
+    })
     .then(data => {
         if (data.error) {
             status.className = 'pdf-parse-status error';
