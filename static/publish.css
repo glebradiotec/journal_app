@@ -101,7 +101,7 @@
 
 .pub-form-section { margin-bottom: 28px; }
 .pub-form-section-title { font-size: 14px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 14px 0; padding-bottom: 8px; border-bottom: 1px solid var(--color-border-muted); }
-.pub-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.pub-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; align-items: end; }
 .pub-field { display: flex; flex-direction: column; gap: 6px; }
 .pub-field-full { grid-column: 1 / -1; }
 .pub-label { font-size: 13px; font-weight: 600; color: var(--color-fg-default); }
