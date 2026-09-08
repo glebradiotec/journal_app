@@ -117,6 +117,18 @@ def _process_pub_authors(article: PubArticle, form):
         order += 1
 
 
+def _safe_list_journals():
+    """Список журналов сайта для выпадающего списка. Возвращает ([], ошибка) если
+    БД сайта недоступна/не настроена — форма в этом случае просто просит ISSN вручную."""
+    try:
+        engine = site_db.get_engine()
+        with engine.connect() as conn:
+            rows = site_db.list_journals(conn)
+        return [{'journ_id': r[0], 'name': r[1], 'issn': r[2]} for r in rows], None
+    except Exception as e:
+        return [], str(e)
+
+
 def _apply_article_fields(article: PubArticle, form):
     article.section_ru = form.get('section_ru', '').strip()
     article.section_en = form.get('section_en', '').strip()
@@ -156,25 +168,32 @@ def register_publish_routes(app):
             issn = request.form.get('issn', '').strip()
             year = request.form.get('year', '').strip()
             number = request.form.get('number', '').strip()
+            part = request.form.get('part', '').strip()
             if not issn or not year or not number:
                 flash('Заполните ISSN, год и номер выпуска.', 'error')
                 return redirect(url_for('admin_publish_issue_new'))
+            # "5" + часть "1" -> "5(1)" — так сайт хранит номера выпусков с частями.
+            stored_number = f'{number}({part})' if part else number
             issue = PubIssue(
                 issn=issn,
                 journal_name=request.form.get('journal_name', '').strip(),
                 year=int(year),
-                number=number,
+                number=stored_number,
                 alt_number=request.form.get('alt_number', '').strip(),
-                part=request.form.get('part', '').strip(),
+                part=part,
                 pages=request.form.get('pages', '').strip(),
                 elibrary_titleid=request.form.get('elibrary_titleid', '').strip(),
                 created_by_user_id=current_user.id,
             )
             db.session.add(issue)
             db.session.commit()
-            flash(f'Выпуск {year} №{number} создан. Теперь добавьте статьи.', 'success')
+            flash(f'Выпуск {year} №{stored_number} создан. Теперь добавьте статьи.', 'success')
             return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
-        return render_template('publish/issue_form.html')
+        journals, journals_error = _safe_list_journals()
+        return render_template(
+            'publish/issue_form.html', journals=journals, journals_error=journals_error,
+            current_year=datetime.now(timezone.utc).year,
+        )
 
     @app.route('/admin/publish/issue/<int:issue_id>')
     @admin_required

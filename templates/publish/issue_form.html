@@ -17,31 +17,53 @@
 
         <div class="adm-card">
             <div class="adm-card-body">
+                {% if journals %}
+                <div class="pub-field" style="margin-bottom: 18px; max-width: 420px;">
+                    <label class="pub-label">Журнал (с сайта)</label>
+                    <select id="journalSelect" class="pub-select">
+                        <option value="">— выбрать из списка —</option>
+                        {% for j in journals %}
+                        <option value="{{ j.issn }}" data-name="{{ j.name }}">{{ j.name }} ({{ j.issn }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="pub-note-box">
+                    Не удалось получить список журналов с сайта{% if journals_error %} ({{ journals_error }}){% endif %}
+                    — заполните ISSN и название вручную ниже.
+                </div>
+                {% endif %}
+
                 <form method="POST" action="{{ url_for('admin_publish_issue_new') }}">
                     <div class="pub-row">
                         <div class="pub-field">
                             <label class="pub-label">ISSN журнала *</label>
-                            <input type="text" name="issn" class="pub-input" placeholder="0033-8486" required>
+                            <input type="text" name="issn" id="f_issn" class="pub-input" placeholder="0033-8486" required>
                         </div>
                         <div class="pub-field">
-                            <label class="pub-label">Название журнала <span class="pub-hint">(для удобства, необязательно)</span></label>
-                            <input type="text" name="journal_name" class="pub-input" placeholder="Радиотехника">
+                            <label class="pub-label">Название журнала <span class="pub-hint">(необязательно)</span></label>
+                            <input type="text" name="journal_name" id="f_journal_name" class="pub-input" placeholder="Радиотехника">
                         </div>
                         <div class="pub-field">
                             <label class="pub-label">Год *</label>
-                            <input type="number" name="year" class="pub-input" placeholder="2026" required>
+                            <input type="number" name="year" class="pub-input" value="{{ current_year }}" required>
                         </div>
                         <div class="pub-field">
                             <label class="pub-label">Номер выпуска *</label>
-                            <input type="text" name="number" class="pub-input" placeholder="5 или 1(1)" required>
+                            <select name="number" class="pub-select">
+                                {% for n in range(1, 13) %}
+                                <option value="{{ n }}">{{ n }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Часть <span class="pub-hint">(обычно не нужно)</span></label>
+                            <input type="text" name="part" class="pub-input" placeholder="напр. 1"
+                                   title="Заполняйте, только если номер выпуска делится на части — например, часть «1» при номере «5» даст «5(1)». В большинстве случаев оставьте пустым.">
                         </div>
                         <div class="pub-field">
                             <label class="pub-label">Доп. номер <span class="pub-hint">(altNumber, необязательно)</span></label>
                             <input type="text" name="alt_number" class="pub-input">
-                        </div>
-                        <div class="pub-field">
-                            <label class="pub-label">Часть <span class="pub-hint">(необязательно)</span></label>
-                            <input type="text" name="part" class="pub-input">
                         </div>
                         <div class="pub-field">
                             <label class="pub-label">Страницы выпуска <span class="pub-hint">(необязательно)</span></label>
@@ -61,4 +83,18 @@
 </div>
 
 {% include "publish/_scripts.html" %}
+{% if journals %}
+<script>
+(function() {
+    var sel = document.getElementById('journalSelect');
+    if (!sel) return;
+    sel.addEventListener('change', function() {
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt.value) return;
+        document.getElementById('f_issn').value = opt.value;
+        document.getElementById('f_journal_name').value = opt.getAttribute('data-name') || '';
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
