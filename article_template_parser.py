@@ -114,9 +114,30 @@ def _parse_authors_line(line):
     return authors, org, town, country
 
 
+_KNOWN_HEADINGS = {
+    "Аннотация", "Ключевые слова", "Для цитирования", "Введение",
+    "Abstract", "Keywords", "For citation",
+}
+
+
+def _looks_like_org_line(line):
+    """Отличает «организация отдельной строкой» (напр. «1, 2 МГТУ им. Баумана (Москва, Россия)»)
+    от заголовка следующего блока (Аннотация/Abstract/...) — без этого организация-без-примет
+    ошибочно проглатывала «Аннотация» как своё название."""
+    line = line.strip()
+    if not line or line in _KNOWN_HEADINGS:
+        return False
+    if re.search(r"\([^,()]+,\s*[^()]+\)\s*$", line):
+        return True
+    if re.match(r"^\d+(\s*,\s*\d+)*\s+\S", line):
+        return True
+    return False
+
+
 def _parse_org_line(line):
     """'1, 2 Организация (Город, Страна)' -> (org, town, country) — та же строка, что
-    в конце _parse_authors_line, но когда организация стоит отдельной строкой без имён."""
+    в конце _parse_authors_line, но когда организация стоит отдельной строкой без имён.
+    Вызывающий код уже проверил _looks_like_org_line()."""
     m = re.search(r"\(([^,()]+),\s*([^()]+)\)\s*$", line)
     town, country = (m.group(1).strip(), m.group(2).strip()) if m else ("", "")
     rest = line[: m.start()].strip() if m else line
@@ -170,16 +191,19 @@ def _parse_authors_block(lines, start_idx):
         return authors, org, town, country, emails, start_idx + 1
     authors, org, town, country = _parse_authors_line(line)
     next_idx = start_idx + 1
-    if not org and next_idx < len(lines) and "@" not in lines[next_idx]:
+    if not org and next_idx < len(lines) and _looks_like_org_line(lines[next_idx]):
         # Организация иногда стоит отдельной строкой (не приклеена к строке с именами) —
         # тот же формат «1, 2 Организация (Город, Страна)», просто без имён впереди.
-        org2, town2, country2 = _parse_org_line(lines[next_idx])
-        if org2:
-            org, town, country = org2, town2, country2
-            next_idx += 1
-    emails_line = lines[next_idx] if next_idx < len(lines) else ""
-    emails = _parse_emails_line(emails_line)
-    return authors, org, town, country, emails, next_idx + 1
+        org, town, country = _parse_org_line(lines[next_idx])
+        next_idx += 1
+    # Строку с email-ами пропускаем, только если в ней реально есть "@" — иногда после
+    # авторов (и организации, если она была) сразу идёт «Аннотация»/«Abstract» без каких-либо
+    # контактов, и блёндно съедать следующую строку в этом случае нельзя (см. _looks_like_org_line).
+    emails = []
+    if next_idx < len(lines) and "@" in lines[next_idx]:
+        emails = _parse_emails_line(lines[next_idx])
+        next_idx += 1
+    return authors, org, town, country, emails, next_idx
 
 
 def _match_author_info(fio_line, authors_ru):
