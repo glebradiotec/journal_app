@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Публикация на сайте{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        {% set mobile_title = 'Публикация на сайте' %}
+        {% include "publish/_topbar.html" %}
+
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Публикация на сайте</h1>
+            <p class="adm-welcome-sub">
+                Отдельный процесс: разбор .doc статьи → запись напрямую в БД radiotec.ru →
+                генерация XML для CrossRef и eLibrary. Не связан с обычным учётом статей.
+            </p>
+        </div>
+
+        <div class="pub-actions">
+            <a href="{{ url_for('admin_publish_issue_new') }}" class="pub-btn pub-btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
+                Новый выпуск
+            </a>
+        </div>
+
+        <div class="adm-card">
+            <div class="adm-card-header">
+                <h2 class="adm-card-title">Черновики выпусков</h2>
+            </div>
+            {% if issues %}
+            <div>
+                {% for issue in issues %}
+                <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-list-item">
+                    <div>
+                        <div class="pub-list-title">
+                            {{ issue.journal_name or issue.issn }} — {{ issue.year }} №{{ issue.number }}
+                        </div>
+                        <div class="pub-list-sub">
+                            ISSN {{ issue.issn }} · {{ issue.articles|length }} стат.
+                            {% if issue.created_at %} · создан {{ issue.created_at.strftime('%d.%m.%Y') }}{% endif %}
+                        </div>
+                    </div>
+                    {% if issue.is_pushed %}
+                    <span class="pub-badge pub-badge-pushed">отправлен на сайт</span>
+                    {% else %}
+                    <span class="pub-badge pub-badge-draft">черновик</span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="pub-empty">Пока нет ни одного черновика выпуска.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% include "publish/_scripts.html" %}
+{% endblock %}

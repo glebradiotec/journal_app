@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "journal_app",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["app.py"],
+      "port": 5000
+    },
+    {
+      "name": "journal_app_test_db",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["dev_test_server.py"],
+      "port": 5000
+    }
+  ]
+}

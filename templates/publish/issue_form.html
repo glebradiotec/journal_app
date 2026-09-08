@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Новый выпуск — публикация{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        {% set mobile_title = 'Новый выпуск' %}
+        {% include "publish/_topbar.html" %}
+
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Новый выпуск</h1>
+            <p class="adm-welcome-sub">Данные о выпуске сайта — журнал ищется по ISSN в момент отправки.</p>
+        </div>
+
+        <div class="adm-card">
+            <div class="adm-card-body">
+                <form method="POST" action="{{ url_for('admin_publish_issue_new') }}">
+                    <div class="pub-row">
+                        <div class="pub-field">
+                            <label class="pub-label">ISSN журнала *</label>
+                            <input type="text" name="issn" class="pub-input" placeholder="0033-8486" required>
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Название журнала <span class="pub-hint">(для удобства, необязательно)</span></label>
+                            <input type="text" name="journal_name" class="pub-input" placeholder="Радиотехника">
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Год *</label>
+                            <input type="number" name="year" class="pub-input" placeholder="2026" required>
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Номер выпуска *</label>
+                            <input type="text" name="number" class="pub-input" placeholder="5 или 1(1)" required>
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Доп. номер <span class="pub-hint">(altNumber, необязательно)</span></label>
+                            <input type="text" name="alt_number" class="pub-input">
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Часть <span class="pub-hint">(необязательно)</span></label>
+                            <input type="text" name="part" class="pub-input">
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Страницы выпуска <span class="pub-hint">(необязательно)</span></label>
+                            <input type="text" name="pages" class="pub-input" placeholder="1-92">
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">eLibrary titleid <span class="pub-hint">(если журнала ещё нет в списке известных)</span></label>
+                            <input type="text" name="elibrary_titleid" class="pub-input">
+                        </div>
+                    </div>
+                    <button type="submit" class="pub-btn pub-btn-primary">Создать выпуск</button>
+                    <a href="{{ url_for('admin_publish_index') }}" class="pub-btn pub-btn-secondary">Отмена</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include "publish/_scripts.html" %}
+{% endblock %}

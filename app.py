@@ -14,9 +14,11 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backup import create_backup
 from models import db, User, Journal, Article, ArticleImage, ArticleHistory, ArticleComment
+import models_publish  # регистрирует PubIssue/PubArticle/PubAuthor в db.metadata (модуль «Публикация на сайте»)
 from routes_public import register_public_routes
 from routes_admin import register_admin_routes
 from routes_author import author_bp
+from routes_publish import register_publish_routes
 
 
 BASE_DIR = Path(__file__).parent
@@ -124,6 +126,7 @@ def _sqlite_unicode_lower(dbapi_connection, connection_record):
 app.register_blueprint(author_bp)
 register_public_routes(app)
 register_admin_routes(app)
+register_publish_routes(app)
 
 # Создаём таблицы (если новых модели добавились)
 with app.app_context():

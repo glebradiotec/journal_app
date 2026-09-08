@@ -701,3 +701,32 @@ def parse_article_docx(file_path):
         "raw_text": raw_text[:500],
         "method": "heuristic",
     }
+
+
+def extract_text_any(file_path):
+    """Извлекает обычный текст из .doc/.docx/.rtf — для модуля «Публикация на сайте»
+    (нужен полный текст статьи для разбора по article_template_parser, а не только
+    название/авторы, которые достаёт parse_article_docx выше).
+
+    Не переиспользует parse_article_docx намеренно: та функция возвращает уже
+    структурированный (title/authors) результат, а здесь нужен сырой текст целиком.
+    """
+    suffix = file_path.lower().rsplit('.', 1)[-1] if '.' in file_path else ''
+
+    if suffix == 'doc':
+        text = _extract_text_from_doc(file_path)
+        if not text:
+            raise RuntimeError("Не удалось прочитать .doc файл (antiword). Попробуйте сохранить как .docx")
+        return text
+
+    if suffix == 'docx':
+        from docx import Document as DocxDocument
+        doc = DocxDocument(file_path)
+        return "\n".join(p.text for p in doc.paragraphs)
+
+    if suffix == 'rtf':
+        from striprtf.striprtf import rtf_to_text
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            return rtf_to_text(f.read())
+
+    raise RuntimeError(f"Неподдерживаемый формат файла: .{suffix}")

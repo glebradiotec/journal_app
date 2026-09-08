@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Статья' if article else 'Новая статья' }} — публикация{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        {% set mobile_title = 'Статья' %}
+        {% include "publish/_topbar.html" %}
+
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">{{ 'Редактирование статьи' if article else 'Новая статья' }}</h1>
+            <p class="adm-welcome-sub">Выпуск {{ issue.year }} №{{ issue.number }} ({{ issue.issn }})</p>
+        </div>
+
+        <div class="adm-card">
+            <div class="adm-card-body">
+                <div class="pub-form-section">
+                    <div class="pub-form-section-title">Автозаполнение по файлу статьи</div>
+                    <p class="pub-hint" style="margin: 0 0 12px;">
+                        Загрузите .doc/.docx/.rtf, оформленный по шаблону издательства — поля ниже заполнятся
+                        автоматически (результат обязательно проверьте перед отправкой).
+                    </p>
+                    <div class="pub-dropzone" id="dropzone" onclick="document.getElementById('docFileInput').click()">
+                        <input type="file" id="docFileInput" accept=".doc,.docx,.rtf">
+                        <span id="dropzoneText">Нажмите или перетащите файл сюда</span>
+                    </div>
+                    <div id="parseWarnings"></div>
+                </div>
+
+                <form method="POST" id="articleForm"
+                      action="{{ url_for('admin_publish_article_edit', article_id=article.id) if article else url_for('admin_publish_article_new', issue_id=issue.id) }}">
+                    <input type="hidden" name="parsed_manuscript_filename" id="parsedManuscriptFilename"
+                           value="{{ article.manuscript_file if article else '' }}">
+
+                    <div class="pub-form-section">
+                        <div class="pub-form-section-title">Основное</div>
+                        <div class="pub-row">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Заглавие (ru) *</label>
+                                <input type="text" name="title_ru" id="f_title_ru" class="pub-input" required
+                                       value="{{ article.title_ru if article else '' }}">
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Заглавие (en)</label>
+                                <input type="text" name="title_en" id="f_title_en" class="pub-input"
+                                       value="{{ article.title_en if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Раздел (ru)</label>
+                                <input type="text" name="section_ru" class="pub-input" placeholder="Введение"
+                                       value="{{ article.section_ru if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Раздел (en)</label>
+                                <input type="text" name="section_en" class="pub-input"
+                                       value="{{ article.section_en if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Страницы</label>
+                                <input type="text" name="pages" class="pub-input" placeholder="5-14"
+                                       value="{{ article.pages if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Тип статьи</label>
+                                <select name="art_type" class="pub-select">
+                                    {% for code, label in article_types %}
+                                    <option value="{{ code }}" {% if article and article.art_type == code %}selected{% elif not article and code == 'RAR' %}selected{% endif %}>{{ label }} ({{ code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">УДК</label>
+                                <input type="text" name="udk" id="f_udk" class="pub-input"
+                                       value="{{ article.udk if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">DOI <span class="pub-hint">(пусто — посчитается автоматически)</span></label>
+                                <input type="text" name="doi" id="f_doi" class="pub-input"
+                                       value="{{ article.doi if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Цена <span class="pub-hint">(пусто — по умолчанию)</span></label>
+                                <input type="number" name="price" class="pub-input"
+                                       value="{{ article.price if article and article.price else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pub-form-section">
+                        <div class="pub-form-section-title">Аннотация и ключевые слова</div>
+                        <div class="pub-row">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Аннотация (ru)</label>
+                                <textarea name="abstract_ru" id="f_abstract_ru" class="pub-textarea">{{ article.abstract_ru if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Аннотация (en)</label>
+                                <textarea name="abstract_en" id="f_abstract_en" class="pub-textarea">{{ article.abstract_en if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Ключевые слова (ru) <span class="pub-hint">через запятую</span></label>
+                                <input type="text" name="keywords_ru" id="f_keywords_ru" class="pub-input"
+                                       value="{{ article.keywords_ru if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Ключевые слова (en) <span class="pub-hint">через запятую</span></label>
+                                <input type="text" name="keywords_en" id="f_keywords_en" class="pub-input"
+                                       value="{{ article.keywords_en if article else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pub-form-section">
+                        <div class="pub-form-section-title">Полный текст и источники</div>
+                        <div class="pub-row">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Полный текст (ru) <span class="pub-hint">нужен для eLibrary</span></label>
+                                <textarea name="fulltext_ru" id="f_fulltext_ru" class="pub-textarea" style="min-height:180px;">{{ article.fulltext_ru if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Список источников <span class="pub-hint">по одной ссылке на строку</span></label>
+                                <textarea name="references_text" id="f_references_text" class="pub-textarea">{{ article.references_text if article else '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pub-form-section">
+                        <div class="pub-form-section-title">Финансирование и даты</div>
+                        <div class="pub-row">
+                            <div class="pub-field">
+                                <label class="pub-label">Финансирование (ru)</label>
+                                <input type="text" name="funding_ru" class="pub-input" value="{{ article.funding_ru if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Финансирование (en)</label>
+                                <input type="text" name="funding_en" class="pub-input" value="{{ article.funding_en if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Поступила</label>
+                                <input type="text" name="date_received" id="f_date_received" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_received if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Одобрена после рецензирования</label>
+                                <input type="text" name="date_accepted" id="f_date_accepted" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_accepted if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Опубликована</label>
+                                <input type="text" name="date_published" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_published if article else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pub-form-section">
+                        <div class="pub-form-section-title">Авторы</div>
+                        <div id="authorsContainer"></div>
+                        <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" onclick="addAuthorCard()">+ Добавить автора</button>
+                        <input type="hidden" name="pub_author_count" id="pubAuthorCount" value="0">
+                    </div>
+
+                    <div class="pub-actions">
+                        <button type="submit" class="pub-btn pub-btn-primary">Сохранить</button>
+                        <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">Отмена</a>
+                        {% if article %}
+                        <button type="button" class="pub-btn pub-btn-danger" onclick="deleteArticle()">Удалить статью</button>
+                        {% endif %}
+                    </div>
+                </form>
+                {% if article %}
+                <form id="deleteForm" method="POST" action="{{ url_for('admin_publish_article_delete', article_id=article.id) }}" style="display:none;"></form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include "publish/_scripts.html" %}
+<script>
+var authorIndex = 0;
+var existingAuthors = {{ existing_authors|tojson }};
+
+function authorFieldRow(idx, field, label, value, half) {
+    return '<div class="pub-field' + (half ? '' : ' pub-field-full') + '">' +
+        '<label class="pub-label">' + label + '</label>' +
+        '<input type="text" class="pub-input" name="pub_author_' + idx + '_' + field + '" value="' + (value || '').replace(/"/g, '&quot;') + '">' +
+        '</div>';
+}
+
+function addAuthorCard(data) {
+    data = data || {};
+    var idx = authorIndex++;
+    var div = document.createElement('div');
+    div.className = 'pub-author-card';
+    div.id = 'authorCard' + idx;
+    div.innerHTML =
+        '<div class="pub-author-card-head">' +
+            '<span>Автор ' + (idx + 1) + '</span>' +
+            '<button type="button" class="pub-btn pub-btn-danger pub-btn-sm" onclick="document.getElementById(\'authorCard' + idx + '\').remove()">Удалить</button>' +
+        '</div>' +
+        '<div class="pub-row">' +
+            authorFieldRow(idx, 'surname_ru', 'Фамилия (ru)', data.surname_ru, true) +
+            authorFieldRow(idx, 'initials_ru', 'Инициалы (ru)', data.initials_ru, true) +
+            authorFieldRow(idx, 'surname_en', 'Фамилия (en)', data.surname_en, true) +
+            authorFieldRow(idx, 'initials_en', 'Инициалы (en)', data.initials_en, true) +
+            authorFieldRow(idx, 'org_ru', 'Организация (ru)', data.org_ru, true) +
+            authorFieldRow(idx, 'org_en', 'Организация (en)', data.org_en, true) +
+            authorFieldRow(idx, 'town_ru', 'Город (ru)', data.town_ru, true) +
+            authorFieldRow(idx, 'town_en', 'Город (en)', data.town_en, true) +
+            authorFieldRow(idx, 'position_ru', 'Должность (ru)', data.position_ru, true) +
+            authorFieldRow(idx, 'position_en', 'Должность (en)', data.position_en, true) +
+            authorFieldRow(idx, 'email', 'E-mail', data.email, true) +
+            authorFieldRow(idx, 'spin', 'SPIN-код', data.spin, true) +
+            authorFieldRow(idx, 'orcid', 'ORCID', data.orcid, true) +
+            authorFieldRow(idx, 'researcherid', 'ResearcherID', data.researcherid, true) +
+            authorFieldRow(idx, 'scopusid', 'ScopusID', data.scopusid, true) +
+        '</div>';
+    document.getElementById('authorsContainer').appendChild(div);
+    document.getElementById('pubAuthorCount').value = authorIndex;
+}
+
+function clearAuthors() {
+    document.getElementById('authorsContainer').innerHTML = '';
+    authorIndex = 0;
+}
+
+existingAuthors.forEach(function(a) { addAuthorCard(a); });
+
+function deleteArticle() {
+    if (confirm('Удалить статью из черновика?')) {
+        document.getElementById('deleteForm').submit();
+    }
+}
+
+// ---- Автозаполнение по файлу ----
+(function() {
+    var dropzone = document.getElementById('dropzone');
+    var input = document.getElementById('docFileInput');
+    var warningsBox = document.getElementById('parseWarnings');
+
+    function handleFile(file) {
+        if (!file) return;
+        document.getElementById('dropzoneText').textContent = 'Разбираю «' + file.name + '»...';
+        var fd = new FormData();
+        fd.append('doc_file', file);
+        fetch('{{ url_for("admin_publish_parse_doc") }}', { method: 'POST', body: fd })
+            .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+            .then(function(res) {
+                if (!res.ok) {
+                    document.getElementById('dropzoneText').textContent = 'Нажмите или перетащите файл сюда';
+                    showToast(res.data.error || 'Ошибка разбора файла', 'error');
+                    return;
+                }
+                var p = res.data.parsed;
+                document.getElementById('parsedManuscriptFilename').value = p.saved_filename || '';
+                document.getElementById('f_title_ru').value = p.title_ru || '';
+                document.getElementById('f_title_en').value = p.title_en || '';
+                document.getElementById('f_udk').value = p.udk || '';
+                document.getElementById('f_doi').value = p.doi || '';
+                document.getElementById('f_abstract_ru').value = p.abstract_ru || '';
+                document.getElementById('f_abstract_en').value = p.abstract_en || '';
+                document.getElementById('f_fulltext_ru').value = p.fulltext_ru || '';
+                document.getElementById('f_keywords_ru').value = (p.keywords_ru || []).join(', ');
+                document.getElementById('f_keywords_en').value = (p.keywords_en || []).join(', ');
+                document.getElementById('f_references_text').value = (p.references || []).join('\n');
+                document.getElementById('f_date_received').value = (p.dates && p.dates.received) || '';
+                document.getElementById('f_date_accepted').value = (p.dates && p.dates.accepted) || '';
+
+                clearAuthors();
+                (p.authors || []).forEach(function(a) { addAuthorCard(a); });
+
+                document.getElementById('dropzoneText').textContent = 'Разобрано: «' + file.name + '» — проверьте поля ниже';
+
+                warningsBox.innerHTML = '';
+                if (res.data.warnings && res.data.warnings.length) {
+                    var box = document.createElement('div');
+                    box.className = 'pub-warning-box';
+                    var ul = document.createElement('ul');
+                    res.data.warnings.forEach(function(w) {
+                        var li = document.createElement('li');
+                        li.textContent = w;
+                        ul.appendChild(li);
+                    });
+                    box.appendChild(ul);
+                    warningsBox.appendChild(box);
+                }
+                showToast('Файл разобран, проверьте поля', 'success');
+            })
+            .catch(function() {
+                document.getElementById('dropzoneText').textContent = 'Нажмите или перетащите файл сюда';
+                showToast('Не удалось отправить файл', 'error');
+            });
+    }
+
+    input.addEventListener('change', function() { handleFile(input.files[0]); });
+    dropzone.addEventListener('dragover', function(e) { e.preventDefault(); dropzone.classList.add('pub-dropzone-active'); });
+    dropzone.addEventListener('dragleave', function() { dropzone.classList.remove('pub-dropzone-active'); });
+    dropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropzone.classList.remove('pub-dropzone-active');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+})();
+</script>
+{% endblock %}

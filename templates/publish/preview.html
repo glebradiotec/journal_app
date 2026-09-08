@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Предпросмотр — {{ issue.year }} №{{ issue.number }}{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        {% set mobile_title = 'Предпросмотр' %}
+        {% include "publish/_topbar.html" %}
+
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Предпросмотр — {{ issue.year }} №{{ issue.number }}</h1>
+            <p class="adm-welcome-sub">
+                {% if production %}Целевая БД: боевой сайт (SITE_DATABASE_URL задан).
+                {% else %}Целевая БД: локальная тестовая копия — реальная запись на сайт не произойдёт.{% endif %}
+            </p>
+        </div>
+
+        {% if not issue.is_pushed %}
+            {% if warnings %}
+            <div class="pub-warning-box">
+                <strong>Проверьте перед отправкой:</strong>
+                <ul>
+                    {% for w in warnings %}<li>{{ w }}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="adm-card">
+                <div class="adm-card-header"><h2 class="adm-card-title">Статьи ({{ issue.articles|length }})</h2></div>
+                <div>
+                    {% for art in issue.articles %}
+                    <div class="pub-list-item">
+                        <div>
+                            <div class="pub-list-title">{{ art.title_ru }}</div>
+                            <div class="pub-list-sub">DOI: {{ computed_dois[loop.index0] }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('admin_publish_issue_confirm', issue_id=issue.id) }}"
+                  onsubmit="return confirm('{{ 'Записать эти статьи прямо в боевую БД сайта radiotec.ru?' if production else 'Записать статьи в локальную тестовую БД (без риска для сайта)?' }}');">
+                <div class="pub-actions">
+                    <button type="submit" class="pub-btn pub-btn-primary">
+                        {{ 'Отправить на сайт' if production else 'Отправить (тестовая БД)' }}
+                    </button>
+                    <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">← Назад к выпуску</a>
+                </div>
+            </form>
+        {% else %}
+            <div class="pub-success-box">
+                <strong>Выпуск отправлен {{ issue.pushed_at.strftime('%d.%m.%Y %H:%M') if issue.pushed_at else '' }}.</strong>
+                <p style="margin: 8px 0 0;">Статей записано: {{ issue.articles|selectattr('is_pushed')|list|length }} из {{ issue.articles|length }}.</p>
+            </div>
+            <div class="pub-actions">
+                <a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='crossref') }}" class="pub-btn pub-btn-secondary">Скачать CrossRef XML</a>
+                <a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='elibrary') }}" class="pub-btn pub-btn-secondary">Скачать eLibrary XML</a>
+                <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">← Назад к выпуску</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+{% include "publish/_scripts.html" %}
+{% endblock %}
