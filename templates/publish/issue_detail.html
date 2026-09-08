@@ -31,6 +31,36 @@
 
         <div class="adm-card">
             <div class="adm-card-header">
+                <h2 class="adm-card-title">Разделы выпуска <span class="pub-hint">({{ issue.sections|length }})</span></h2>
+            </div>
+            <div class="adm-card-body">
+                {% if issue.sections %}
+                <div style="margin-bottom: 14px;">
+                    {% for s in issue.sections %}
+                    <span class="pub-badge pub-badge-draft" style="margin: 0 6px 6px 0;">{{ s.title_ru }}{% if s.title_en %} / {{ s.title_en }}{% endif %}</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="pub-hint" style="margin: 0 0 14px;">Разделов пока нет — добавьте хотя бы один, чтобы выбирать его при добавлении статей.</p>
+                {% endif %}
+                <form method="POST" action="{{ url_for('admin_publish_issue_add_section', issue_id=issue.id) }}">
+                    <div class="pub-row" style="margin-bottom: 10px;">
+                        <div class="pub-field">
+                            <label class="pub-label">Название раздела (ru) *</label>
+                            <input type="text" name="title_ru" class="pub-input" placeholder="Введение">
+                        </div>
+                        <div class="pub-field">
+                            <label class="pub-label">Название раздела (en)</label>
+                            <input type="text" name="title_en" class="pub-input">
+                        </div>
+                    </div>
+                    <button type="submit" class="pub-btn pub-btn-secondary pub-btn-sm">+ Добавить раздел</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="adm-card">
+            <div class="adm-card-header">
                 <h2 class="adm-card-title">Статьи в выпуске <span class="pub-hint">({{ issue.articles|length }})</span></h2>
             </div>
             {% if issue.articles %}

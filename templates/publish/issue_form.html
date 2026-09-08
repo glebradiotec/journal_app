@@ -23,7 +23,7 @@
                     <select id="journalSelect" class="pub-select">
                         <option value="">— выбрать из списка —</option>
                         {% for j in journals %}
-                        <option value="{{ j.issn }}" data-name="{{ j.name }}">{{ j.name }} ({{ j.issn }})</option>
+                        <option value="{{ j.issn }}" data-name="{{ j.name }}" data-titleid="{{ j.titleid }}">{{ j.name }}{% if j.issn %} ({{ j.issn }}){% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -49,6 +49,10 @@
                             <input type="number" name="year" class="pub-input" value="{{ current_year }}" required>
                         </div>
                         <div class="pub-field">
+                            <label class="pub-label">Том <span class="pub-hint">(необязательно, напр. «28»)</span></label>
+                            <input type="text" name="volume" class="pub-input">
+                        </div>
+                        <div class="pub-field">
                             <label class="pub-label">Номер выпуска *</label>
                             <select name="number" class="pub-select">
                                 {% for n in range(1, 13) %}
@@ -70,8 +74,8 @@
                             <input type="text" name="pages" class="pub-input" placeholder="1-92">
                         </div>
                         <div class="pub-field">
-                            <label class="pub-label">eLibrary titleid <span class="pub-hint">(если журнала ещё нет в списке известных)</span></label>
-                            <input type="text" name="elibrary_titleid" class="pub-input">
+                            <label class="pub-label">eLibrary titleid <span class="pub-hint">(автозаполняется по выбору журнала)</span></label>
+                            <input type="text" name="elibrary_titleid" id="f_titleid" class="pub-input">
                         </div>
                     </div>
                     <button type="submit" class="pub-btn pub-btn-primary">Создать выпуск</button>
@@ -89,10 +93,11 @@
     var sel = document.getElementById('journalSelect');
     if (!sel) return;
     sel.addEventListener('change', function() {
+        if (sel.selectedIndex === 0) return;  // плейсхолдер «— выбрать из списка —»
         var opt = sel.options[sel.selectedIndex];
-        if (!opt.value) return;
         document.getElementById('f_issn').value = opt.value;
         document.getElementById('f_journal_name').value = opt.getAttribute('data-name') || '';
+        document.getElementById('f_titleid').value = opt.getAttribute('data-titleid') || '';
     });
 })();
 </script>

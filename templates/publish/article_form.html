@@ -38,31 +38,6 @@
                     <div class="pub-form-section">
                         <div class="pub-form-section-title">Основное</div>
                         <div class="pub-row">
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Заглавие (ru) *</label>
-                                <input type="text" name="title_ru" id="f_title_ru" class="pub-input" required
-                                       value="{{ article.title_ru if article else '' }}">
-                            </div>
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Заглавие (en)</label>
-                                <input type="text" name="title_en" id="f_title_en" class="pub-input"
-                                       value="{{ article.title_en if article else '' }}">
-                            </div>
-                            <div class="pub-field">
-                                <label class="pub-label">Раздел (ru)</label>
-                                <input type="text" name="section_ru" class="pub-input" placeholder="Введение"
-                                       value="{{ article.section_ru if article else '' }}">
-                            </div>
-                            <div class="pub-field">
-                                <label class="pub-label">Раздел (en)</label>
-                                <input type="text" name="section_en" class="pub-input"
-                                       value="{{ article.section_en if article else '' }}">
-                            </div>
-                            <div class="pub-field">
-                                <label class="pub-label">Страницы</label>
-                                <input type="text" name="pages" class="pub-input" placeholder="5-14"
-                                       value="{{ article.pages if article else '' }}">
-                            </div>
                             <div class="pub-field">
                                 <label class="pub-label">Тип статьи</label>
                                 <select name="art_type" class="pub-select">
@@ -87,77 +62,137 @@
                                        value="{{ article.price if article and article.price else '' }}">
                             </div>
                         </div>
+                        {% if issue.sections %}
+                        <div class="pub-row">
+                            <div class="pub-field">
+                                <label class="pub-label">Раздел выпуска</label>
+                                <select id="sectionSelect" class="pub-select">
+                                    <option value="">— выбрать —</option>
+                                    {% for s in issue.sections %}
+                                    <option value="{{ s.title_ru }}" data-en="{{ s.title_en }}"
+                                            {% if article and article.section_ru == s.title_ru %}selected{% endif %}>{{ s.title_ru }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="pub-row">
+                            <div class="pub-field">
+                                <label class="pub-label">Раздел (ru)</label>
+                                <input type="text" name="section_ru" id="f_section_ru" class="pub-input"
+                                       value="{{ article.section_ru if article else '' }}">
+                            </div>
+                            <div class="pub-field">
+                                <label class="pub-label">Раздел (en)</label>
+                                <input type="text" name="section_en" id="f_section_en" class="pub-input"
+                                       value="{{ article.section_en if article else '' }}">
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="pub-form-section">
-                        <div class="pub-form-section-title">Аннотация и ключевые слова</div>
+                    <div class="pub-form-section" style="border-top: 3px solid #5BA4B0; padding-top: 18px;">
+                        <div class="pub-form-section-title" style="font-size: 16px;">Русская версия</div>
+
                         <div class="pub-row">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Заглавие (ru) *</label>
+                                <input type="text" name="title_ru" id="f_title_ru" class="pub-input" required
+                                       value="{{ article.title_ru if article else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="pub-label" style="margin: 6px 0 10px;">Авторы</div>
+                        <div id="authorsContainerRU"></div>
+                        <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" onclick="addAuthorCard()">+ Добавить автора</button>
+                        <input type="hidden" name="pub_author_count" id="pubAuthorCount" value="0">
+
+                        <div class="pub-row" style="margin-top: 18px;">
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Аннотация (ru)</label>
-                                <textarea name="abstract_ru" id="f_abstract_ru" class="pub-textarea">{{ article.abstract_ru if article else '' }}</textarea>
+                                <textarea name="abstract_ru" id="f_abstract_ru" class="pub-textarea" style="min-height:150px;">{{ article.abstract_ru if article else '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
-                                <label class="pub-label">Аннотация (en)</label>
-                                <textarea name="abstract_en" id="f_abstract_en" class="pub-textarea">{{ article.abstract_en if article else '' }}</textarea>
-                            </div>
-                            <div class="pub-field">
                                 <label class="pub-label">Ключевые слова (ru) <span class="pub-hint">через запятую</span></label>
-                                <input type="text" name="keywords_ru" id="f_keywords_ru" class="pub-input"
-                                       value="{{ article.keywords_ru if article else '' }}">
-                            </div>
-                            <div class="pub-field">
-                                <label class="pub-label">Ключевые слова (en) <span class="pub-hint">через запятую</span></label>
-                                <input type="text" name="keywords_en" id="f_keywords_en" class="pub-input"
-                                       value="{{ article.keywords_en if article else '' }}">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pub-form-section">
-                        <div class="pub-form-section-title">Полный текст и источники</div>
-                        <div class="pub-row">
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Полный текст (ru) <span class="pub-hint">нужен для eLibrary</span></label>
-                                <textarea name="fulltext_ru" id="f_fulltext_ru" class="pub-textarea" style="min-height:180px;">{{ article.fulltext_ru if article else '' }}</textarea>
+                                <textarea name="keywords_ru" id="f_keywords_ru" class="pub-textarea" style="min-height:70px;">{{ article.keywords_ru if article else '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
-                                <label class="pub-label">Список источников <span class="pub-hint">по одной ссылке на строку</span></label>
-                                <textarea name="references_text" id="f_references_text" class="pub-textarea">{{ article.references_text if article else '' }}</textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="pub-form-section">
-                        <div class="pub-form-section-title">Финансирование и даты</div>
-                        <div class="pub-row">
-                            <div class="pub-field">
                                 <label class="pub-label">Финансирование (ru)</label>
                                 <input type="text" name="funding_ru" class="pub-input" value="{{ article.funding_ru if article else '' }}">
                             </div>
-                            <div class="pub-field">
-                                <label class="pub-label">Финансирование (en)</label>
-                                <input type="text" name="funding_en" class="pub-input" value="{{ article.funding_en if article else '' }}">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Для цитирования (ru)</label>
+                                <textarea name="citation_ru" id="f_citation_ru" class="pub-textarea" style="min-height:60px;">{{ article.citation_ru if article else '' }}</textarea>
                             </div>
                             <div class="pub-field">
-                                <label class="pub-label">Поступила</label>
+                                <label class="pub-label">Страницы</label>
+                                <input type="text" name="pages" class="pub-input" placeholder="5-14"
+                                       value="{{ article.pages if article else '' }}">
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Полный текст (ru) <span class="pub-hint">нужен для eLibrary</span></label>
+                                <textarea name="fulltext_ru" id="f_fulltext_ru" class="pub-textarea" style="min-height:220px;">{{ article.fulltext_ru if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Список источников (ru) <span class="pub-hint">по одной ссылке на строку</span></label>
+                                <textarea name="references_text" id="f_references_text" class="pub-textarea" style="min-height:140px;">{{ article.references_text if article else '' }}</textarea>
+                            </div>
+                        </div>
+
+                        <div class="pub-label" style="margin: 10px 0;">Коды авторов <span class="pub-hint">(SPIN, ORCID и т.п.)</span></div>
+                        <div id="authorCodesContainer"></div>
+
+                        <div class="pub-row" style="margin-top: 10px;">
+                            <div class="pub-field">
+                                <label class="pub-label">Дата поступления</label>
                                 <input type="text" name="date_received" id="f_date_received" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_received if article else '' }}">
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Одобрена после рецензирования</label>
-                                <input type="text" name="date_accepted" id="f_date_accepted" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_accepted if article else '' }}">
+                                <input type="text" name="date_approved" id="f_date_approved" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_approved if article else '' }}">
                             </div>
                             <div class="pub-field">
-                                <label class="pub-label">Опубликована</label>
-                                <input type="text" name="date_published" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_published if article else '' }}">
+                                <label class="pub-label">Принята к публикации</label>
+                                <input type="text" name="date_accepted" id="f_date_accepted" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_accepted if article else '' }}">
                             </div>
                         </div>
                     </div>
 
-                    <div class="pub-form-section">
-                        <div class="pub-form-section-title">Авторы</div>
-                        <div id="authorsContainer"></div>
-                        <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" onclick="addAuthorCard()">+ Добавить автора</button>
-                        <input type="hidden" name="pub_author_count" id="pubAuthorCount" value="0">
+                    <div class="pub-form-section" style="border-top: 3px solid var(--color-border-default); padding-top: 18px;">
+                        <div class="pub-form-section-title" style="font-size: 16px;">English version</div>
+
+                        <div class="pub-row">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Заглавие (en)</label>
+                                <input type="text" name="title_en" id="f_title_en" class="pub-input"
+                                       value="{{ article.title_en if article else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="pub-label" style="margin: 6px 0 10px;">Авторы (en)</div>
+                        <div id="authorsContainerEN"></div>
+
+                        <div class="pub-row" style="margin-top: 18px;">
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Аннотация (en)</label>
+                                <textarea name="abstract_en" id="f_abstract_en" class="pub-textarea" style="min-height:150px;">{{ article.abstract_en if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Ключевые слова (en) <span class="pub-hint">через запятую</span></label>
+                                <textarea name="keywords_en" id="f_keywords_en" class="pub-textarea" style="min-height:70px;">{{ article.keywords_en if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Финансирование (en)</label>
+                                <input type="text" name="funding_en" class="pub-input" value="{{ article.funding_en if article else '' }}">
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">For citation (en)</label>
+                                <textarea name="citation_en" id="f_citation_en" class="pub-textarea" style="min-height:60px;">{{ article.citation_en if article else '' }}</textarea>
+                            </div>
+                            <div class="pub-field pub-field-full">
+                                <label class="pub-label">Список источников (en) <span class="pub-hint">по одной ссылке на строку</span></label>
+                                <textarea name="references_en_text" id="f_references_en_text" class="pub-textarea" style="min-height:140px;">{{ article.references_en_text if article else '' }}</textarea>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="pub-actions">
@@ -181,47 +216,77 @@
 var authorIndex = 0;
 var existingAuthors = {{ existing_authors|tojson }};
 
-function authorFieldRow(idx, field, label, value, half) {
-    return '<div class="pub-field' + (half ? '' : ' pub-field-full') + '">' +
+function fieldHtml(idx, field, label, value) {
+    return '<div class="pub-field">' +
         '<label class="pub-label">' + label + '</label>' +
         '<input type="text" class="pub-input" name="pub_author_' + idx + '_' + field + '" value="' + (value || '').replace(/"/g, '&quot;') + '">' +
         '</div>';
 }
 
+function removeAuthor(idx) {
+    ['authorRU', 'authorEN', 'authorCodes'].forEach(function(prefix) {
+        var el = document.getElementById(prefix + idx);
+        if (el) el.remove();
+    });
+}
+
 function addAuthorCard(data) {
     data = data || {};
     var idx = authorIndex++;
-    var div = document.createElement('div');
-    div.className = 'pub-author-card';
-    div.id = 'authorCard' + idx;
-    div.innerHTML =
+    var num = idx + 1;
+
+    var ru = document.createElement('div');
+    ru.className = 'pub-author-card';
+    ru.id = 'authorRU' + idx;
+    ru.innerHTML =
         '<div class="pub-author-card-head">' +
-            '<span>Автор ' + (idx + 1) + '</span>' +
-            '<button type="button" class="pub-btn pub-btn-danger pub-btn-sm" onclick="document.getElementById(\'authorCard' + idx + '\').remove()">Удалить</button>' +
+            '<span>Автор ' + num + '</span>' +
+            '<button type="button" class="pub-btn pub-btn-danger pub-btn-sm" onclick="removeAuthor(' + idx + ')">Удалить</button>' +
         '</div>' +
         '<div class="pub-row">' +
-            authorFieldRow(idx, 'surname_ru', 'Фамилия (ru)', data.surname_ru, true) +
-            authorFieldRow(idx, 'initials_ru', 'Инициалы (ru)', data.initials_ru, true) +
-            authorFieldRow(idx, 'surname_en', 'Фамилия (en)', data.surname_en, true) +
-            authorFieldRow(idx, 'initials_en', 'Инициалы (en)', data.initials_en, true) +
-            authorFieldRow(idx, 'org_ru', 'Организация (ru)', data.org_ru, true) +
-            authorFieldRow(idx, 'org_en', 'Организация (en)', data.org_en, true) +
-            authorFieldRow(idx, 'town_ru', 'Город (ru)', data.town_ru, true) +
-            authorFieldRow(idx, 'town_en', 'Город (en)', data.town_en, true) +
-            authorFieldRow(idx, 'position_ru', 'Должность (ru)', data.position_ru, true) +
-            authorFieldRow(idx, 'position_en', 'Должность (en)', data.position_en, true) +
-            authorFieldRow(idx, 'email', 'E-mail', data.email, true) +
-            authorFieldRow(idx, 'spin', 'SPIN-код', data.spin, true) +
-            authorFieldRow(idx, 'orcid', 'ORCID', data.orcid, true) +
-            authorFieldRow(idx, 'researcherid', 'ResearcherID', data.researcherid, true) +
-            authorFieldRow(idx, 'scopusid', 'ScopusID', data.scopusid, true) +
+            fieldHtml(idx, 'surname_ru', 'Фамилия (ru)', data.surname_ru) +
+            fieldHtml(idx, 'initials_ru', 'Инициалы (ru)', data.initials_ru) +
+            fieldHtml(idx, 'org_ru', 'Организация (ru)', data.org_ru) +
+            fieldHtml(idx, 'town_ru', 'Город (ru)', data.town_ru) +
+            fieldHtml(idx, 'position_ru', 'Должность (ru)', data.position_ru) +
+            fieldHtml(idx, 'email', 'E-mail', data.email) +
         '</div>';
-    document.getElementById('authorsContainer').appendChild(div);
+    document.getElementById('authorsContainerRU').appendChild(ru);
+
+    var en = document.createElement('div');
+    en.className = 'pub-author-card';
+    en.id = 'authorEN' + idx;
+    en.innerHTML =
+        '<div class="pub-author-card-head"><span>Автор ' + num + '</span></div>' +
+        '<div class="pub-row">' +
+            fieldHtml(idx, 'surname_en', 'Фамилия (en)', data.surname_en) +
+            fieldHtml(idx, 'initials_en', 'Инициалы (en)', data.initials_en) +
+            fieldHtml(idx, 'org_en', 'Организация (en)', data.org_en) +
+            fieldHtml(idx, 'town_en', 'Город (en)', data.town_en) +
+            fieldHtml(idx, 'position_en', 'Должность (en)', data.position_en) +
+        '</div>';
+    document.getElementById('authorsContainerEN').appendChild(en);
+
+    var codes = document.createElement('div');
+    codes.className = 'pub-author-card';
+    codes.id = 'authorCodes' + idx;
+    codes.innerHTML =
+        '<div class="pub-author-card-head"><span>Автор ' + num + (data.surname_ru ? ' — ' + data.surname_ru : '') + '</span></div>' +
+        '<div class="pub-row">' +
+            fieldHtml(idx, 'spin', 'SPIN-код', data.spin) +
+            fieldHtml(idx, 'orcid', 'ORCID', data.orcid) +
+            fieldHtml(idx, 'researcherid', 'ResearcherID', data.researcherid) +
+            fieldHtml(idx, 'scopusid', 'ScopusID', data.scopusid) +
+        '</div>';
+    document.getElementById('authorCodesContainer').appendChild(codes);
+
     document.getElementById('pubAuthorCount').value = authorIndex;
 }
 
 function clearAuthors() {
-    document.getElementById('authorsContainer').innerHTML = '';
+    document.getElementById('authorsContainerRU').innerHTML = '';
+    document.getElementById('authorsContainerEN').innerHTML = '';
+    document.getElementById('authorCodesContainer').innerHTML = '';
     authorIndex = 0;
 }
 
@@ -232,6 +297,17 @@ function deleteArticle() {
         document.getElementById('deleteForm').submit();
     }
 }
+
+// ---- Выбор раздела из списка ----
+(function() {
+    var sel = document.getElementById('sectionSelect');
+    if (!sel) return;
+    sel.addEventListener('change', function() {
+        if (!sel.value) return;
+        document.getElementById('f_section_ru').value = sel.value;
+        document.getElementById('f_section_en').value = sel.options[sel.selectedIndex].getAttribute('data-en') || '';
+    });
+})();
 
 // ---- Автозаполнение по файлу ----
 (function() {
@@ -264,7 +340,11 @@ function deleteArticle() {
                 document.getElementById('f_keywords_ru').value = (p.keywords_ru || []).join(', ');
                 document.getElementById('f_keywords_en').value = (p.keywords_en || []).join(', ');
                 document.getElementById('f_references_text').value = (p.references || []).join('\n');
+                document.getElementById('f_references_en_text').value = (p.references_en || []).join('\n');
+                document.getElementById('f_citation_ru').value = p.citation_ru || '';
+                document.getElementById('f_citation_en').value = p.citation_en || '';
                 document.getElementById('f_date_received').value = (p.dates && p.dates.received) || '';
+                document.getElementById('f_date_approved').value = (p.dates && p.dates.approved) || '';
                 document.getElementById('f_date_accepted').value = (p.dates && p.dates.accepted) || '';
 
                 clearAuthors();

@@ -400,8 +400,27 @@ def parse_article_pdf(file_path):
 
 
 def _extract_text_from_doc(file_path):
-    """Извлекает текст из .doc (старый Word 97-2003) через antiword."""
+    """Извлекает текст из .doc (старый Word 97-2003).
+
+    Сначала пробует catdoc (-a — автоопределение кириллической кодировки,
+    -d utf-8 — гарантированный UTF-8 на выходе): antiword у части реальных .doc
+    (в частности, когда в файле нестандартно оформлена таблица шрифтов) выдаёт
+    вместо кириллицы буквальные '?' — это баг самого antiword, декодированием
+    после него такое уже не исправить. catdoc в этих случаях декодирует верно.
+    Если catdoc не установлен — откатывается на antiword + подбор кодировки."""
     import subprocess
+
+    try:
+        result = subprocess.run(
+            ['catdoc', '-a', '-d', 'utf-8', '-w', file_path],
+            capture_output=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout:
+            text = result.stdout.decode('utf-8', errors='replace').strip()
+            if text:
+                return text
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
 
     def _score_decoded_text(text):
         """Оценивает качество декодирования: чем выше, тем лучше."""

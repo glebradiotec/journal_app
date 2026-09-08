@@ -9,7 +9,7 @@ from flask import request, render_template, redirect, url_for, flash, jsonify, s
 from flask_login import current_user
 
 from models import db
-from models_publish import PubIssue, PubArticle, PubAuthor
+from models_publish import PubIssue, PubArticle, PubAuthor, PubSection
 from routes_admin import admin_required
 import pdf_parser
 import article_template_parser
@@ -17,6 +17,7 @@ import publish_config
 import publish_doi
 import publish_format_html
 import publish_sanitize
+import publish_titleid_store
 import site_db
 import export_crossref
 import export_elibrary
@@ -92,6 +93,7 @@ class _IssueView:
         self.part = issue.part or ''
         self.pages = issue.pages or ''
         self.elibrary_titleid = issue.elibrary_titleid or ''
+        self.volume = issue.volume or ''
         self.articles = [_ArticleView(a) for a in issue.articles]
 
 
@@ -124,7 +126,11 @@ def _safe_list_journals():
         engine = site_db.get_engine()
         with engine.connect() as conn:
             rows = site_db.list_journals(conn)
-        return [{'journ_id': r[0], 'name': r[1], 'issn': r[2]} for r in rows], None
+        known_titleids = publish_titleid_store.load()
+        return [
+            {'journ_id': r[0], 'name': r[1], 'issn': r[2], 'titleid': known_titleids.get(r[2] or '', '')}
+            for r in rows
+        ], None
     except Exception as e:
         return [], str(e)
 
@@ -146,9 +152,13 @@ def _apply_article_fields(article: PubArticle, form):
     article.keywords_ru = form.get('keywords_ru', '').strip()
     article.keywords_en = form.get('keywords_en', '').strip()
     article.references_text = form.get('references_text', '').strip()
+    article.references_en_text = form.get('references_en_text', '').strip()
     article.funding_ru = form.get('funding_ru', '').strip()
     article.funding_en = form.get('funding_en', '').strip()
+    article.citation_ru = form.get('citation_ru', '').strip()
+    article.citation_en = form.get('citation_en', '').strip()
     article.date_received = form.get('date_received', '').strip()
+    article.date_approved = form.get('date_approved', '').strip()
     article.date_accepted = form.get('date_accepted', '').strip()
     article.date_published = form.get('date_published', '').strip()
 
@@ -179,6 +189,7 @@ def register_publish_routes(app):
                 journal_name=request.form.get('journal_name', '').strip(),
                 year=int(year),
                 number=stored_number,
+                volume=request.form.get('volume', '').strip(),
                 alt_number=request.form.get('alt_number', '').strip(),
                 part=part,
                 pages=request.form.get('pages', '').strip(),
@@ -200,6 +211,20 @@ def register_publish_routes(app):
     def admin_publish_issue_detail(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         return render_template('publish/issue_detail.html', issue=issue)
+
+    @app.route('/admin/publish/issue/<int:issue_id>/section/add', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_add_section(issue_id):
+        issue = PubIssue.query.get_or_404(issue_id)
+        title_ru = request.form.get('title_ru', '').strip()
+        title_en = request.form.get('title_en', '').strip()
+        if not title_ru:
+            flash('Укажите название раздела (ru).', 'error')
+            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        db.session.add(PubSection(issue_id=issue.id, title_ru=title_ru, title_en=title_en))
+        db.session.commit()
+        flash(f'Раздел «{title_ru}» добавлен.', 'success')
+        return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
     @app.route('/admin/publish/parse-doc', methods=['POST'])
     @admin_required
@@ -394,17 +419,17 @@ def register_publish_routes(app):
                         'authors_eng': publish_format_html.format_authors_html(authors_en, 'en'),
                         'art_name_eng': art.title_en or '',
                         'descript_eng': publish_format_html.format_paragraphs_html(art.abstract_en),
-                        'literature_eng': '',
+                        'literature_eng': publish_format_html.format_references_html(art.references_en_list),
                         'keyword': publish_format_html.format_keywords(art.keywords_ru_list),
                         'keyword_eng': publish_format_html.format_keywords(art.keywords_en_list),
                         'article_type': ARTICLE_TYPE_CODE_TO_ID.get(art.art_type, 0),
                         'udk': art.udk or '',
                         'doi': doi,
-                        'citata': '',
+                        'citata': art.citation_ru or '',
                         'data_recieved': art.date_received or '',
-                        'data_approved': '',
+                        'data_approved': art.date_approved or '',
                         'data_accepted': art.date_accepted or '',
-                        'citata_eng': '',
+                        'citata_eng': art.citation_en or '',
                         'rubr_vak': '',
                         'article_text': '',
                         'file': '',

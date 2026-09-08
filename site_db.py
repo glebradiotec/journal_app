@@ -35,12 +35,11 @@ def get_journal_by_issn(conn, issn):
 
 
 def list_journals(conn):
-    """Все журналы сайта — для выпадающего списка в форме, чтобы не набирать ISSN руками."""
+    """Все журналы сайта — для выпадающего списка в форме, чтобы не набирать ISSN руками.
+    Порядок — по journ_id (порядок добавления), не по алфавиту: так журналы без ISSN
+    (например, «Спутниковые системы связи и вещания») можно осмысленно поставить в конец."""
     rows = conn.execute(
-        text(
-            "SELECT journ_id, menu_name, issn FROM journals "
-            "WHERE issn IS NOT NULL AND issn != '' ORDER BY menu_name"
-        )
+        text("SELECT journ_id, menu_name, issn FROM journals ORDER BY journ_id")
     ).fetchall()
     return rows
 

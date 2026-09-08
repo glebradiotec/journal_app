@@ -16,6 +16,7 @@ class PubIssue(db.Model):
     journal_name = db.Column(db.String(200))  # для удобства отображения, не источник истины
     year = db.Column(db.Integer, nullable=False)
     number = db.Column(db.String(20), nullable=False)  # "5" или "1(1)" — сайт допускает часть в скобках
+    volume = db.Column(db.String(20))  # Том (для CrossRef и цитирования, отдельно от номера)
     alt_number = db.Column(db.String(20))
     part = db.Column(db.String(20))
     pages = db.Column(db.String(50))
@@ -30,10 +31,21 @@ class PubIssue(db.Model):
 
     articles = db.relationship('PubArticle', backref='issue', cascade='all, delete-orphan',
                                 order_by='PubArticle.id')
+    sections = db.relationship('PubSection', backref='issue', cascade='all, delete-orphan',
+                                order_by='PubSection.id')
 
     @property
     def is_pushed(self):
         return self.pushed_at is not None
+
+
+class PubSection(db.Model):
+    """Раздел выпуска (например, «Введение», «Обзорные статьи») — задаётся один раз для
+    выпуска и затем выбирается из списка при добавлении каждой статьи."""
+    id = db.Column(db.Integer, primary_key=True)
+    issue_id = db.Column(db.Integer, db.ForeignKey('pub_issue.id'), nullable=False, index=True)
+    title_ru = db.Column(db.String(300), nullable=False)
+    title_en = db.Column(db.String(300))
 
 
 class PubArticle(db.Model):
@@ -56,12 +68,16 @@ class PubArticle(db.Model):
     fulltext_ru = db.Column(db.Text)
     keywords_ru = db.Column(db.Text)  # через запятую
     keywords_en = db.Column(db.Text)
-    references_text = db.Column(db.Text)  # по одной ссылке на строку
+    references_text = db.Column(db.Text)  # по одной ссылке на строку (ru)
+    references_en_text = db.Column(db.Text)  # по одной ссылке на строку (en)
     funding_ru = db.Column(db.Text)
     funding_en = db.Column(db.Text)
+    citation_ru = db.Column(db.Text)  # готовая строка «для цитирования» (ru)
+    citation_en = db.Column(db.Text)  # готовая строка «for citation» (en)
 
     date_received = db.Column(db.String(20))
-    date_accepted = db.Column(db.String(20))
+    date_approved = db.Column(db.String(20))  # одобрена после рецензирования
+    date_accepted = db.Column(db.String(20))  # принята к публикации
     date_published = db.Column(db.String(20))
 
     manuscript_file = db.Column(db.String(500))
@@ -90,6 +106,10 @@ class PubArticle(db.Model):
     @property
     def references_list(self):
         return [r.strip() for r in (self.references_text or '').split('\n') if r.strip()]
+
+    @property
+    def references_en_list(self):
+        return [r.strip() for r in (self.references_en_text or '').split('\n') if r.strip()]
 
 
 class PubAuthor(db.Model):

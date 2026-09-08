@@ -114,10 +114,43 @@ def _parse_authors_line(line):
     return authors, org, town, country
 
 
+def _parse_org_line(line):
+    """'1, 2 Организация (Город, Страна)' -> (org, town, country) — та же строка, что
+    в конце _parse_authors_line, но когда организация стоит отдельной строкой без имён."""
+    m = re.search(r"\(([^,()]+),\s*([^()]+)\)\s*$", line)
+    town, country = (m.group(1).strip(), m.group(2).strip()) if m else ("", "")
+    rest = line[: m.start()].strip() if m else line
+    org = re.sub(r"^[\d,\s]+", "", rest).strip()
+    return org, town, country
+
+
 def _parse_emails_line(line):
     """'1 basarab@bmstu.ru, 2 bobkovva@bmstu.ru' -> ['basarab@bmstu.ru', 'bobkovva@bmstu.ru']."""
     emails = re.findall(r"[\w.+-]+@[\w-]+\.[\w.-]+", line)
     return emails
+
+
+def _consume_title_lines(lines, start_idx, max_lines=6):
+    """Заглавие часто занимает несколько строк (перенос в Word) — читаем строки, пока
+    не встретим строку, похожую на «И.О. Фамилия...» (начало блока авторов), пустую
+    строку или предел max_lines. Возвращает (список строк заглавия, индекс первой строки
+    после заглавия)."""
+    title_lines = []
+    i = start_idx
+    while i < len(lines) and len(title_lines) < max_lines:
+        line = lines[i]
+        if not line.strip():
+            break
+        if AUTHOR_TOKEN_RE.search(line):
+            break
+        title_lines.append(line)
+        i += 1
+    if not title_lines:
+        # Не нашли ничего похожего на заглавие до строки авторов — берём как есть,
+        # чтобы не потерять индекс (страхуемся от пустого результата).
+        title_lines = [lines[start_idx]]
+        i = start_idx + 1
+    return title_lines, i
 
 
 def _parse_authors_block(lines, start_idx):
@@ -136,9 +169,17 @@ def _parse_authors_block(lines, start_idx):
         authors, org, town, country = _parse_authors_line(authors_part)
         return authors, org, town, country, emails, start_idx + 1
     authors, org, town, country = _parse_authors_line(line)
-    emails_line = lines[start_idx + 1] if start_idx + 1 < len(lines) else ""
+    next_idx = start_idx + 1
+    if not org and next_idx < len(lines) and "@" not in lines[next_idx]:
+        # Организация иногда стоит отдельной строкой (не приклеена к строке с именами) —
+        # тот же формат «1, 2 Организация (Город, Страна)», просто без имён впереди.
+        org2, town2, country2 = _parse_org_line(lines[next_idx])
+        if org2:
+            org, town, country = org2, town2, country2
+            next_idx += 1
+    emails_line = lines[next_idx] if next_idx < len(lines) else ""
     emails = _parse_emails_line(emails_line)
-    return authors, org, town, country, emails, start_idx + 2
+    return authors, org, town, country, emails, next_idx + 1
 
 
 def _match_author_info(fio_line, authors_ru):
@@ -178,7 +219,9 @@ def parse_article_text(text):
         "fulltext_ru": "",
         "keywords_ru": [], "keywords_en": [],
         "references": [],
-        "dates": {"received": "", "accepted": ""},
+        "references_en": [],
+        "citation_ru": "", "citation_en": "",
+        "dates": {"received": "", "approved": "", "accepted": ""},
     }
 
     i_udk = _find_startswith(lines, "УДК")
@@ -192,15 +235,17 @@ def parse_article_text(text):
         result["doi"] = re.sub(r"^DOI:?\s*(https?://doi\.org/)?", "", lines[i_doi], flags=re.I).strip()
 
     i_title_ru = i_doi + 1 if i_doi is not None else None
+    i_after_title_ru = None
     if i_title_ru is not None:
-        result["title_ru"] = lines[i_title_ru]
+        title_lines, i_after_title_ru = _consume_title_lines(lines, i_title_ru)
+        result["title_ru"] = " ".join(title_lines)
 
     authors_ru, org_ru, town_ru, country_ru = ([], "", "", "")
     emails = []
     i_after_authors_ru = None
-    if i_title_ru is not None:
+    if i_after_title_ru is not None:
         authors_ru, org_ru, town_ru, country_ru, emails, i_after_authors_ru = _parse_authors_block(
-            lines, i_title_ru + 1
+            lines, i_after_title_ru
         )
 
     i_annot = _find_eq(lines, "Аннотация", i_after_authors_ru or 0)
@@ -219,6 +264,12 @@ def parse_article_text(text):
     i_refs_h = _find_eq(lines, "Список источников", i_intro or 0) if i_intro is not None else None
     if i_intro is None:
         i_intro = _find_startswith(lines, "Введение", i_citation_h or 0) if i_citation_h is not None else None
+
+    if i_citation_h is not None and i_intro is not None:
+        i_brief = _find(lines, lambda l: l.lower().startswith("a brief version"), i_citation_h)
+        citation_end = i_brief if (i_brief is not None and i_brief < i_intro) else i_intro
+        result["citation_ru"] = _slice_text(lines, i_citation_h + 1, citation_end)
+
     if i_intro is not None and i_refs_h is not None:
         result["fulltext_ru"] = _slice_text(lines, i_intro, i_refs_h)
     else:
@@ -232,19 +283,37 @@ def parse_article_text(text):
     i_submitted = _find(lines, lambda l: l.startswith("Статья поступила"), i_authinfo_h or 0) if i_authinfo_h is not None else None
     if i_authinfo_h is not None and i_submitted is not None:
         info_text = lines[i_authinfo_h + 1:i_submitted]
-        for fio_line in info_text:
+        k = 0
+        while k < len(info_text):
+            fio_line = info_text[k]
             if not fio_line.strip():
+                k += 1
                 continue
             m = _match_author_info(fio_line, authors_ru)
             if m:
                 idx, position, spin = m
+                # SPIN иногда стоит отдельной строкой сразу после «ФИО – должность»,
+                # а не в ней самой.
+                if not spin and k + 1 < len(info_text):
+                    spin_m = re.search(r"SPIN[^:]*:\s*([\d\-]+|не представлен)", info_text[k + 1], re.I)
+                    if spin_m:
+                        spin = spin_m.group(1).strip()
+                        if spin.lower().startswith("не"):
+                            spin = ""
+                        k += 1
                 authors_ru[idx]["position"] = position
                 authors_ru[idx]["spin"] = spin
+            k += 1
 
     if i_submitted is not None:
         m = re.search(r"(\d{2}\.\d{2}\.\d{4})", lines[i_submitted])
         if m:
             result["dates"]["received"] = m.group(1)
+        i_approved = _find(lines, lambda l: l.startswith("Одобрена"), i_submitted)
+        if i_approved is not None:
+            m1 = re.search(r"(\d{2}\.\d{2}\.\d{4})", lines[i_approved])
+            if m1:
+                result["dates"]["approved"] = m1.group(1)
         i_accepted = _find(lines, lambda l: l.startswith("Принята"), i_submitted)
         if i_accepted is not None:
             m2 = re.search(r"(\d{2}\.\d{2}\.\d{4})", lines[i_accepted])
@@ -256,9 +325,10 @@ def parse_article_text(text):
     authors_en, org_en, town_en, country_en = ([], "", "", "")
     if i_orig is not None:
         i_title_en = i_orig + 1
-        result["title_en"] = lines[i_title_en]
+        title_lines_en, i_after_title_en = _consume_title_lines(lines, i_title_en)
+        result["title_en"] = " ".join(title_lines_en)
         authors_en, org_en, town_en, country_en, _emails_en, i_after_authors_en = _parse_authors_block(
-            lines, i_title_en + 1
+            lines, i_after_title_en
         )
 
         i_abstract_h = _find_eq(lines, "Abstract", i_after_authors_en)
@@ -271,11 +341,16 @@ def parse_article_text(text):
             kw_text = _slice_text(lines, i_keywords_en_h + 1, i_forcit_h)
             result["keywords_en"] = [k.strip() for k in kw_text.split(",") if k.strip()]
 
+        if i_forcit_h is not None:
+            i_refs_en_h_peek = _find_eq(lines, "References", i_forcit_h)
+            citation_end_en = i_refs_en_h_peek if i_refs_en_h_peek is not None else len(lines)
+            result["citation_en"] = _slice_text(lines, i_forcit_h + 1, citation_end_en)
+
         i_refs_en_h = _find_eq(lines, "References", i_forcit_h or 0) if i_forcit_h is not None else None
         i_authinfo_en_h = _find_startswith(lines, "Information about the author", i_refs_en_h or 0) if i_refs_en_h is not None else None
         if i_refs_en_h is not None and i_authinfo_en_h is not None:
             refs_text_en = _slice_text(lines, i_refs_en_h + 1, i_authinfo_en_h)
-            # RU-версия списка литературы приоритетнее для сайта; EN держим как запасной вариант
+            result["references_en"] = [r.strip() for r in refs_text_en.split("\n\n") if r.strip()]
 
         if i_authinfo_en_h is not None:
             i_stop = _find(lines, lambda l: l.startswith("The article was submitted"), i_authinfo_en_h)

@@ -48,6 +48,10 @@ def build_crossref_xml(issue, journal_row, dois_by_article):
     _el(jm, "full_title", journal_row[2] if journal_row else issue.issn)
     _el(jm, "issn", issue.issn, media_type="print")
 
+    if getattr(issue, "volume", ""):
+        jv = _el(journal, "journal_volume")
+        _el(jv, "volume", issue.volume)
+
     ji = _el(journal, "journal_issue")
     pub_date = _el(ji, "publication_date", media_type="online")
     _el(pub_date, "year", str(issue.year))
