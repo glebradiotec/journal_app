@@ -61,9 +61,11 @@ def build_crossref_xml(issue, journal_row, dois_by_article):
     for art, doi in zip(issue.articles, dois_by_article):
         ja = _el(journal, "journal_article", publication_type="full_text")
         titles = _el(ja, "titles")
-        _el(titles, "title", art.title_ru or art.title_en)
-        if art.title_en and art.title_ru:
-            _el(titles, "original_language_title", art.title_en, language="en")
+        # CrossRef — международная база, метаданные должны быть на английском;
+        # русское заглавие идёт вторым как original_language_title.
+        _el(titles, "title", art.title_en or art.title_ru)
+        if art.title_ru and art.title_en:
+            _el(titles, "original_language_title", art.title_ru, language="ru")
 
         contributors = _el(ja, "contributors")
         for i, a in enumerate(art.authors):
@@ -101,10 +103,19 @@ def build_crossref_xml(issue, journal_row, dois_by_article):
         doi_data = _el(ja, "doi_data")
         _el(doi_data, "doi", doi)
         journal_link = (journal_row[3] if journal_row and len(journal_row) > 3 else "") or ""
-        _el(
-            doi_data, "resource",
-            publish_config.ARTICLE_URL_TEMPLATE.format(journal_link=quote(journal_link, safe=""), doi=quote(doi, safe="")),
-        )
+        # Ссылка ведёт на английскую версию страницы статьи и требует её ID на сайте —
+        # он появляется только после реальной записи статьи в БД сайта, поэтому CrossRef XML
+        # можно корректно сформировать только для уже отправленного выпуска (см. routes_publish.py).
+        art_id = getattr(art, "site_art_id", None)
+        if art_id:
+            _el(
+                doi_data, "resource",
+                publish_config.ARTICLE_URL_TEMPLATE.format(
+                    journal_link=quote(journal_link, safe=""),
+                    year=issue.year, number=quote(str(issue.number), safe=""),
+                    art_id=art_id,
+                ),
+            )
 
         if art.references:
             citation_list = _el(ja, "citation_list")

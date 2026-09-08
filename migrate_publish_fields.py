@@ -9,11 +9,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 url = os.environ.get('DATABASE_URL', 'sqlite:///journal.db')
 m = re.match(r'sqlite:///(.+)', url)
 if not m:
     raise SystemExit(f'Эта миграция — только для SQLite. DATABASE_URL: {url}')
 db_path = m.group(1)
+if not os.path.isabs(db_path):
+    # Flask-SQLAlchemy резолвит относительный sqlite:/// путь относительно instance/,
+    # а не текущей рабочей директории — повторяем то же самое здесь.
+    db_path = os.path.join(BASE_DIR, 'instance', db_path)
 
 conn = sqlite3.connect(db_path)
 c = conn.cursor()

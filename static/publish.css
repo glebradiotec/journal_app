@@ -94,6 +94,13 @@
 .pub-list-title { font-size: 14px; font-weight: 600; color: var(--color-fg-default); }
 .pub-list-sub { font-size: 12px; color: var(--color-fg-muted); margin-top: 2px; }
 
+.pub-section-list { border: 1px solid var(--color-border-muted); border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+.pub-section-list-item { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--color-border-muted); }
+.pub-section-list-item:last-child { border-bottom: none; }
+.pub-section-list-num { font-size: 12px; font-weight: 700; color: var(--color-fg-muted); min-width: 18px; }
+.pub-section-list-title { font-size: 14px; font-weight: 600; color: var(--color-fg-default); }
+.pub-section-list-en { font-size: 13px; color: var(--color-fg-muted); }
+
 .pub-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .pub-badge-draft { background: rgba(154,103,0,0.12); color: #9a6700; }
 .pub-badge-pushed { background: rgba(26,127,55,0.12); color: #1a7f37; }

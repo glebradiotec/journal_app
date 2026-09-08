@@ -13,7 +13,8 @@ CROSSREF_DEPOSITOR_EMAIL = os.environ.get("CROSSREF_DEPOSITOR_EMAIL", "andrianov
 CROSSREF_REGISTRANT = os.environ.get("CROSSREF_REGISTRANT", "Radiotekhnika Publishing House")
 
 ARTICLE_URL_TEMPLATE = os.environ.get(
-    "ARTICLE_URL_TEMPLATE", "https://radiotec.ru/ru/journal/{journal_link}/article?doi={doi}"
+    "ARTICLE_URL_TEMPLATE",
+    "https://radiotec.ru/en/journal/{journal_link}/number/{year}-{number}/article/{art_id}",
 )
 
 DEFAULT_ARTICLE_PRICE = int(os.environ.get("DEFAULT_ARTICLE_PRICE", "350"))

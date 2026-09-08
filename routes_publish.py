@@ -81,6 +81,7 @@ class _ArticleView:
         self.art_type = art.art_type or 'RAR'
         self.section_ru = art.section_ru or ''
         self.section_en = art.section_en or ''
+        self.site_art_id = art.site_art_id
         self.authors = [_AuthorView(a) for a in art.authors]
 
 
@@ -363,10 +364,31 @@ def register_publish_routes(app):
             if not art.authors:
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: не указано ни одного автора.')
 
+        elibrary_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_elibrary.xml'))
+        crossref_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_crossref.xml'))
         return render_template(
             'publish/preview.html', issue=issue, journal_row=journal_row,
             computed_dois=computed_dois, warnings=warnings, production=production,
+            elibrary_ready=elibrary_ready, crossref_ready=crossref_ready,
         )
+
+    @app.route('/admin/publish/issue/<int:issue_id>/generate-elibrary', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_generate_elibrary(issue_id):
+        issue = PubIssue.query.get_or_404(issue_id)
+        if not issue.articles:
+            flash('В выпуске нет статей.', 'error')
+            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+        issue_view = _IssueView(issue)
+        try:
+            elibrary_xml = export_elibrary.build_elibrary_xml(issue_view, issue.journal_name or issue.issn)
+            with open(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_elibrary.xml'), 'wb') as f:
+                f.write(elibrary_xml)
+            flash('eLibrary XML сгенерирован — можно скачать ниже.', 'success')
+        except export_elibrary.ElibraryExportError as e:
+            flash(f'Не удалось сгенерировать eLibrary XML: {e}', 'error')
+        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/confirm', methods=['POST'])
     @admin_required

@@ -51,6 +51,24 @@
                     <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">← Назад к выпуску</a>
                 </div>
             </form>
+
+            <div class="pub-note-box">
+                <strong>CrossRef XML</strong> станет доступен только после отправки на сайт — ссылка на статью в нём
+                ведёт на английскую страницу по её внутреннему ID сайта, а этот ID появляется только после реальной
+                записи статьи в БД. eLibrary XML от этого не зависит — его можно собрать уже сейчас.
+            </div>
+            <div class="pub-actions">
+                {% if elibrary_ready %}
+                <a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='elibrary') }}" class="pub-btn pub-btn-secondary">Скачать eLibrary XML</a>
+                <form method="POST" action="{{ url_for('admin_publish_issue_generate_elibrary', issue_id=issue.id) }}" style="display:inline;">
+                    <button type="submit" class="pub-btn pub-btn-secondary pub-btn-sm">Пересобрать</button>
+                </form>
+                {% else %}
+                <form method="POST" action="{{ url_for('admin_publish_issue_generate_elibrary', issue_id=issue.id) }}">
+                    <button type="submit" class="pub-btn pub-btn-secondary">Сгенерировать eLibrary XML</button>
+                </form>
+                {% endif %}
+            </div>
         {% else %}
             <div class="pub-success-box">
                 <strong>Выпуск отправлен {{ issue.pushed_at.strftime('%d.%m.%Y %H:%M') if issue.pushed_at else '' }}.</strong>

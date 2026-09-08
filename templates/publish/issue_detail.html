@@ -35,9 +35,13 @@
             </div>
             <div class="adm-card-body">
                 {% if issue.sections %}
-                <div style="margin-bottom: 14px;">
+                <div class="pub-section-list">
                     {% for s in issue.sections %}
-                    <span class="pub-badge pub-badge-draft" style="margin: 0 6px 6px 0;">{{ s.title_ru }}{% if s.title_en %} / {{ s.title_en }}{% endif %}</span>
+                    <div class="pub-section-list-item">
+                        <span class="pub-section-list-num">{{ loop.index }}</span>
+                        <span class="pub-section-list-title">{{ s.title_ru }}</span>
+                        {% if s.title_en %}<span class="pub-section-list-en">{{ s.title_en }}</span>{% endif %}
+                    </div>
                     {% endfor %}
                 </div>
                 {% else %}
