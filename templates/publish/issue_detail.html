@@ -26,7 +26,7 @@
             {% if issue.articles %}
             <a href="{{ url_for('admin_publish_issue_preview', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">Предпросмотр и отправка на сайт</a>
             {% endif %}
-            <a href="{{ url_for('admin_publish_index') }}" class="pub-btn pub-btn-secondary">← Ко всем выпускам</a>
+            <a href="{{ url_for('admin_publish_journal_detail', issn=issue.issn) }}" class="pub-btn pub-btn-secondary">← Ко всем выпускам</a>
         </div>
 
         <div class="adm-card">

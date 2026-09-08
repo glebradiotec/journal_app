@@ -3,6 +3,7 @@
 (models.Article/Issue) — свои таблицы (models_publish.py), свои маршруты.
 """
 import os
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from flask import request, render_template, redirect, url_for, flash, jsonify, send_file
@@ -169,8 +170,47 @@ def register_publish_routes(app):
     @app.route('/admin/publish')
     @admin_required
     def admin_publish_index():
-        issues = PubIssue.query.order_by(PubIssue.created_at.desc()).all()
-        return render_template('publish/index.html', issues=issues)
+        known_journals, journals_error = _safe_list_journals()
+        by_issn = {j['issn']: j for j in known_journals if j['issn']}
+
+        # Считаем выпуски/статьи по ISSN, встречающимся в наших черновиках — включая те,
+        # которых нет в списке с сайта (например, ISSN введён вручную).
+        issue_rows = PubIssue.query.all()
+        stats = defaultdict(lambda: {'issues': 0, 'articles': 0, 'name': ''})
+        for iss in issue_rows:
+            s = stats[iss.issn]
+            s['issues'] += 1
+            s['articles'] += len(iss.articles)
+            if not s['name']:
+                s['name'] = iss.journal_name or (by_issn.get(iss.issn) or {}).get('name') or iss.issn
+
+        journals = []
+        seen_issn = set()
+        for j in known_journals:
+            issn = j['issn']
+            s = stats.get(issn, {'issues': 0, 'articles': 0})
+            journals.append({'issn': issn, 'name': j['name'], 'issues': s['issues'], 'articles': s['articles']})
+            seen_issn.add(issn)
+        for issn, s in stats.items():
+            if issn in seen_issn:
+                continue
+            journals.append({'issn': issn, 'name': s['name'], 'issues': s['issues'], 'articles': s['articles']})
+
+        return render_template('publish/index.html', journals=journals, journals_error=journals_error)
+
+    @app.route('/admin/publish/journal/<path:issn>')
+    @admin_required
+    def admin_publish_journal_detail(issn):
+        known_journals, _err = _safe_list_journals()
+        journal_name = next((j['name'] for j in known_journals if j['issn'] == issn), None)
+        issues = PubIssue.query.filter_by(issn=issn).order_by(PubIssue.year.desc(), PubIssue.number).all()
+        if not journal_name:
+            journal_name = issues[0].journal_name if issues else issn
+        years = sorted({iss.year for iss in issues}, reverse=True)
+        return render_template(
+            'publish/journal_detail.html', issn=issn, journal_name=journal_name,
+            issues=issues, years=years,
+        )
 
     @app.route('/admin/publish/issue/new', methods=['GET', 'POST'])
     @admin_required
@@ -205,6 +245,7 @@ def register_publish_routes(app):
         return render_template(
             'publish/issue_form.html', journals=journals, journals_error=journals_error,
             current_year=datetime.now(timezone.utc).year,
+            preselect_issn=request.args.get('issn', ''),
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>')

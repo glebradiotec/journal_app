@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ journal_name }} — публикация{% endblock %}
+{% block body_class %}adm-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        {% set mobile_title = journal_name %}
+        {% include "publish/_topbar.html" %}
+
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">{{ journal_name }}</h1>
+            <p class="adm-welcome-sub">ISSN {{ issn }}</p>
+        </div>
+
+        <div class="pub-actions">
+            <a href="{{ url_for('admin_publish_issue_new', issn=issn) }}" class="pub-btn pub-btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
+                Создать выпуск
+            </a>
+            <a href="{{ url_for('admin_publish_index') }}" class="pub-btn pub-btn-secondary">← Ко всем журналам</a>
+        </div>
+
+        {% if years|length > 1 %}
+        <div class="pub-year-tabs">
+            {% for y in years %}
+            <a href="#year-{{ y }}" class="pub-year-tab">{{ y }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% for y in years %}
+        <div class="adm-card" id="year-{{ y }}">
+            <div class="adm-card-header">
+                <h2 class="adm-card-title">{{ y }} <span class="pub-hint">({{ issues|selectattr('year', 'equalto', y)|list|length }} выпуск{{ (issues|selectattr('year', 'equalto', y)|list|length)|pluralize_ru('', 'а', 'ов') }})</span></h2>
+            </div>
+            <div>
+                {% for iss in issues if iss.year == y %}
+                <a href="{{ url_for('admin_publish_issue_detail', issue_id=iss.id) }}" class="pub-list-item">
+                    <div>
+                        <div class="pub-list-title">№{{ iss.number }}</div>
+                        <div class="pub-list-sub">{{ iss.articles|length }} стат{{ (iss.articles|length)|pluralize_ru('ья', 'ьи', 'ей') }}</div>
+                    </div>
+                    {% if iss.is_pushed %}
+                    <span class="pub-badge pub-badge-pushed">отправлен на сайт</span>
+                    {% else %}
+                    <span class="pub-badge pub-badge-draft">черновик</span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if not issues %}
+        <div class="adm-card"><div class="pub-empty">У этого журнала пока нет выпусков — создайте первый.</div></div>
+        {% endif %}
+    </div>
+</div>
+
+{% include "publish/_scripts.html" %}
+{% endblock %}

@@ -137,6 +137,18 @@
 
 .pub-success-box { background: rgba(26,127,55,0.08); border: 1px solid rgba(26,127,55,0.25); border-radius: 10px; padding: 18px; margin-bottom: 20px; }
 
+.pub-journal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.pub-journal-card { display: block; padding: 18px 20px; background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 12px; text-decoration: none; color: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+.pub-journal-card:hover { border-color: #5BA4B0; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+.pub-journal-card-name { font-size: 15px; font-weight: 700; color: var(--color-fg-default); margin-bottom: 4px; }
+.pub-journal-card-issn { font-size: 12px; color: var(--color-fg-muted); margin-bottom: 12px; }
+.pub-journal-card-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.pub-year-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.pub-year-tab { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--color-border-default); font-size: 13px; font-weight: 600; color: var(--color-fg-default); text-decoration: none; }
+.pub-year-tab:hover { background: var(--color-canvas-subtle); }
+
 @media (max-width: 768px) {
     .pub-row { grid-template-columns: 1fr; }
+    .pub-journal-grid { grid-template-columns: 1fr; }
 }

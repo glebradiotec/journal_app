@@ -23,7 +23,8 @@
                     <select id="journalSelect" class="pub-select">
                         <option value="">— выбрать из списка —</option>
                         {% for j in journals %}
-                        <option value="{{ j.issn }}" data-name="{{ j.name }}" data-titleid="{{ j.titleid }}">{{ j.name }}{% if j.issn %} ({{ j.issn }}){% endif %}</option>
+                        <option value="{{ j.issn }}" data-name="{{ j.name }}" data-titleid="{{ j.titleid }}"
+                                {% if preselect_issn and j.issn == preselect_issn %}selected{% endif %}>{{ j.name }}{% if j.issn %} ({{ j.issn }}){% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -79,7 +80,7 @@
                         </div>
                     </div>
                     <button type="submit" class="pub-btn pub-btn-primary">Создать выпуск</button>
-                    <a href="{{ url_for('admin_publish_index') }}" class="pub-btn pub-btn-secondary">Отмена</a>
+                    <a href="{{ url_for('admin_publish_journal_detail', issn=preselect_issn) if preselect_issn else url_for('admin_publish_index') }}" class="pub-btn pub-btn-secondary">Отмена</a>
                 </form>
             </div>
         </div>
@@ -92,13 +93,15 @@
 (function() {
     var sel = document.getElementById('journalSelect');
     if (!sel) return;
-    sel.addEventListener('change', function() {
+    function applySelection() {
         if (sel.selectedIndex === 0) return;  // плейсхолдер «— выбрать из списка —»
         var opt = sel.options[sel.selectedIndex];
         document.getElementById('f_issn').value = opt.value;
         document.getElementById('f_journal_name').value = opt.getAttribute('data-name') || '';
         document.getElementById('f_titleid').value = opt.getAttribute('data-titleid') || '';
-    });
+    }
+    sel.addEventListener('change', applySelection);
+    if ('{{ preselect_issn }}') applySelection();
 })();
 </script>
 {% endif %}
