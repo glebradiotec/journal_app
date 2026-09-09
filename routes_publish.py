@@ -23,6 +23,7 @@ import site_db
 import export_crossref
 import export_elibrary
 import export_metafora
+import publish_journal_abbr
 
 
 ARTICLE_TYPES = [
@@ -576,4 +577,6 @@ def register_publish_routes(app):
         if not os.path.exists(path):
             flash('Файл ещё не сгенерирован — сначала отправьте выпуск на сайт.', 'error')
             return redirect(url_for('admin_publish_issue_preview', issue_id=issue_id))
-        return send_file(path, as_attachment=True, download_name=fname_map[kind])
+        issue = PubIssue.query.get_or_404(issue_id)
+        download_name = publish_journal_abbr.export_filename(issue, kind)
+        return send_file(path, as_attachment=True, download_name=download_name)
