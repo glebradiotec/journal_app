@@ -22,6 +22,7 @@ import publish_titleid_store
 import site_db
 import export_crossref
 import export_elibrary
+import export_metafora
 
 
 ARTICLE_TYPES = [
@@ -407,10 +408,11 @@ def register_publish_routes(app):
 
         elibrary_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_elibrary.xml'))
         crossref_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_crossref.xml'))
+        metafora_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_metafora.xml'))
         return render_template(
             'publish/preview.html', issue=issue, journal_row=journal_row,
             computed_dois=computed_dois, warnings=warnings, production=production,
-            elibrary_ready=elibrary_ready, crossref_ready=crossref_ready,
+            elibrary_ready=elibrary_ready, crossref_ready=crossref_ready, metafora_ready=metafora_ready,
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>/generate-elibrary', methods=['POST'])
@@ -429,6 +431,21 @@ def register_publish_routes(app):
             flash('eLibrary XML сгенерирован — можно скачать ниже.', 'success')
         except export_elibrary.ElibraryExportError as e:
             flash(f'Не удалось сгенерировать eLibrary XML: {e}', 'error')
+        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+
+    @app.route('/admin/publish/issue/<int:issue_id>/generate-metafora', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_generate_metafora(issue_id):
+        issue = PubIssue.query.get_or_404(issue_id)
+        if not issue.articles:
+            flash('В выпуске нет статей.', 'error')
+            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+        issue_view = _IssueView(issue)
+        metafora_xml = export_metafora.build_metafora_xml(issue_view, issue.journal_name or issue.issn)
+        with open(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_metafora.xml'), 'wb') as f:
+            f.write(metafora_xml)
+        flash('XML для Метафоры сгенерирован — можно скачать ниже.', 'success')
         return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/confirm', methods=['POST'])
@@ -532,13 +549,26 @@ def register_publish_routes(app):
         except export_elibrary.ElibraryExportError as e:
             flash(f'Статьи записаны на сайт, но eLibrary XML не сгенерирован: {e}', 'warning')
 
+        try:
+            metafora_xml = export_metafora.build_metafora_xml(
+                issue_view, journal_row[2] if journal_row else issue.issn
+            )
+            with open(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_metafora.xml'), 'wb') as f:
+                f.write(metafora_xml)
+        except Exception as e:
+            flash(f'Статьи записаны на сайт, но XML для Метафоры не сгенерирован: {e}', 'warning')
+
         flash(f'Выпуск {issue.year} №{issue.number} отправлен на сайт ({len(issue.articles)} стат.).', 'success')
         return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/download/<kind>')
     @admin_required
     def admin_publish_download(issue_id, kind):
-        fname_map = {'crossref': f'{issue_id}_crossref.xml', 'elibrary': f'{issue_id}_elibrary.xml'}
+        fname_map = {
+            'crossref': f'{issue_id}_crossref.xml',
+            'elibrary': f'{issue_id}_elibrary.xml',
+            'metafora': f'{issue_id}_metafora.xml',
+        }
         fname = fname_map.get(kind)
         if not fname:
             return 'unknown', 404
