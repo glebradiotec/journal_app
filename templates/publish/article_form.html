@@ -125,7 +125,7 @@
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Страницы</label>
-                                <input type="text" name="pages" class="pub-input" placeholder="5-14"
+                                <input type="text" name="pages" id="f_pages" class="pub-input" placeholder="5-14"
                                        value="{{ article.pages if article else '' }}">
                             </div>
                             <div class="pub-field pub-field-full">
@@ -346,6 +346,7 @@ function deleteArticle() {
                 document.getElementById('f_date_received').value = (p.dates && p.dates.received) || '';
                 document.getElementById('f_date_approved').value = (p.dates && p.dates.approved) || '';
                 document.getElementById('f_date_accepted').value = (p.dates && p.dates.accepted) || '';
+                document.getElementById('f_pages').value = p.pages || '';
 
                 clearAuthors();
                 (p.authors || []).forEach(function(a) { addAuthorCard(a); });

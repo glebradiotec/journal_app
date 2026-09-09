@@ -71,10 +71,32 @@ def _find_startswith(lines, prefix, start=0):
     return _find(lines, lambda l: l.startswith(prefix), start)
 
 
+def _find_ci_eq(lines, s, start=0):
+    """Как _find_eq, но без учёта регистра — часть журналов оформляет заголовки
+    капслоком (напр. «REFERENCES» вместо «References»)."""
+    return _find(lines, lambda l: l.strip().lower() == s.lower(), start)
+
+
+_SENTENCE_END_RE = re.compile(r'[.!?…»"\')]\s*$')
+
+
 def _slice_text(lines, start, end):
+    """Склеивает строки блока в абзацы. Word (через catdoc) иногда переносит одно
+    предложение на несколько «строк» текста (мягкий перенос/разрыв страницы посреди
+    абзаца) — если предыдущая строка не заканчивается концом предложения, считаем
+    следующую её продолжением (склеиваем пробелом), а не новым абзацем."""
     if start is None or end is None:
         return ""
-    return "\n\n".join(l for l in lines[start:end] if l.strip())
+    paragraphs = []
+    for l in lines[start:end]:
+        l = l.strip()
+        if not l:
+            continue
+        if paragraphs and not _SENTENCE_END_RE.search(paragraphs[-1]):
+            paragraphs[-1] = paragraphs[-1] + " " + l
+        else:
+            paragraphs.append(l)
+    return "\n\n".join(paragraphs)
 
 
 # Одно вхождение автора: "И.О. Фамилия<N>" (N — номер сноски на организацию, приклеен без пробела).
@@ -109,7 +131,7 @@ def _parse_authors_line(line):
     org = ""
     if matches:
         org_tail = rest[matches[-1].end():].strip()
-        org = re.sub(r"^[\d,\s]+", "", org_tail).strip()
+        org = re.sub(r"^[\d,\s\-–—−]+", "", org_tail).strip()
 
     return authors, org, town, country
 
@@ -129,19 +151,20 @@ def _looks_like_org_line(line):
         return False
     if re.search(r"\([^,()]+,\s*[^()]+\)\s*$", line):
         return True
-    if re.match(r"^\d+(\s*,\s*\d+)*\s+\S", line):
+    if re.match(r"^\d+(\s*[,\-–—−]\s*\d+)*\s+\S", line):
         return True
     return False
 
 
 def _parse_org_line(line):
-    """'1, 2 Организация (Город, Страна)' -> (org, town, country) — та же строка, что
+    """'1, 2 Организация (Город, Страна)' или '1–5 Организация (Город, Страна)'
+    (диапазон номеров сносок через тире) -> (org, town, country) — та же строка, что
     в конце _parse_authors_line, но когда организация стоит отдельной строкой без имён.
     Вызывающий код уже проверил _looks_like_org_line()."""
     m = re.search(r"\(([^,()]+),\s*([^()]+)\)\s*$", line)
     town, country = (m.group(1).strip(), m.group(2).strip()) if m else ("", "")
     rest = line[: m.start()].strip() if m else line
-    org = re.sub(r"^[\d,\s]+", "", rest).strip()
+    org = re.sub(r"^[\d,\s\-–—−]+", "", rest).strip()
     return org, town, country
 
 
@@ -206,6 +229,20 @@ def _parse_authors_block(lines, start_idx):
     return authors, org, town, country, emails, next_idx
 
 
+def _extract_pages(citation_text):
+    """Достаёт диапазон страниц из строки цитирования вида
+    'С.   PAGEREF УДК \\h  8 –15.' — Word подставляет туда код поля PAGEREF (не
+    вычисленный при экспорте в текст), а не просто число, так что ищем первые два
+    числа после маркера 'С.'/'P.', пропуская весь мусор между ними. Ищем только в
+    части после «//» (после названия журнала) — до неё «С.»/«P.» может быть началом
+    инициалов кого-то из авторов (напр. «Гаранин С.М.»)."""
+    part = citation_text.split("//", 1)[-1]
+    m = re.search(r"[СP]\.\s*\D*?(\d+)\D*?(\d+)", part)
+    if not m:
+        return ""
+    return f"{m.group(1)}-{m.group(2)}"
+
+
 def _match_author_info(fio_line, authors_ru):
     """'Михаил Алексеевич Басараб – ... SPIN-код: 9224-5685' -> (index в authors_ru, position, spin)."""
     parts = re.split(r"[–—−-]", fio_line, maxsplit=1)
@@ -246,6 +283,7 @@ def parse_article_text(text):
         "references_en": [],
         "citation_ru": "", "citation_en": "",
         "dates": {"received": "", "approved": "", "accepted": ""},
+        "pages": "",
     }
 
     i_udk = _find_startswith(lines, "УДК")
@@ -304,7 +342,10 @@ def parse_article_text(text):
         refs_text = _slice_text(lines, i_refs_h + 1, i_authinfo_h)
         result["references"] = [r.strip() for r in refs_text.split("\n\n") if r.strip()]
 
-    i_submitted = _find(lines, lambda l: l.startswith("Статья поступила"), i_authinfo_h or 0) if i_authinfo_h is not None else None
+    # «Статья поступила...» — в шаблоне; часть журналов пишет короче, «Поступила в редакцию...».
+    i_submitted = _find(
+        lines, lambda l: l.startswith("Статья поступила") or l.startswith("Поступила"), i_authinfo_h or 0
+    ) if i_authinfo_h is not None else None
     if i_authinfo_h is not None and i_submitted is not None:
         info_text = lines[i_authinfo_h + 1:i_submitted]
         k = 0
@@ -366,11 +407,12 @@ def parse_article_text(text):
             result["keywords_en"] = [k.strip() for k in kw_text.split(",") if k.strip()]
 
         if i_forcit_h is not None:
-            i_refs_en_h_peek = _find_eq(lines, "References", i_forcit_h)
+            i_refs_en_h_peek = _find_ci_eq(lines, "References", i_forcit_h)
             citation_end_en = i_refs_en_h_peek if i_refs_en_h_peek is not None else len(lines)
             result["citation_en"] = _slice_text(lines, i_forcit_h + 1, citation_end_en)
 
-        i_refs_en_h = _find_eq(lines, "References", i_forcit_h or 0) if i_forcit_h is not None else None
+        # Некоторые журналы пишут заголовок капслоком («REFERENCES») — ищем без учёта регистра.
+        i_refs_en_h = _find_ci_eq(lines, "References", i_forcit_h or 0) if i_forcit_h is not None else None
         i_authinfo_en_h = _find_startswith(lines, "Information about the author", i_refs_en_h or 0) if i_refs_en_h is not None else None
         if i_refs_en_h is not None and i_authinfo_en_h is not None:
             refs_text_en = _slice_text(lines, i_refs_en_h + 1, i_authinfo_en_h)
@@ -409,5 +451,9 @@ def parse_article_text(text):
             "spin": ru.get("spin", ""),
         })
     result["authors"] = authors
+
+    result["pages"] = _extract_pages(result["citation_ru"]) or _extract_pages(result["citation_en"])
+    if not result["pages"]:
+        warnings.append("Не удалось определить диапазон страниц по строке цитирования — заполните вручную.")
 
     return result, warnings
