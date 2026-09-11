@@ -2,7 +2,9 @@
 генерация CrossRef/eLibrary XML. Полностью отдельный рабочий процесс от учёта статей
 (models.Article/Issue) — свои таблицы (models_publish.py), свои маршруты.
 """
+import io
 import os
+import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -579,4 +581,13 @@ def register_publish_routes(app):
             return redirect(url_for('admin_publish_issue_preview', issue_id=issue_id))
         issue = PubIssue.query.get_or_404(issue_id)
         download_name = publish_journal_abbr.export_filename(issue, kind)
+
+        if kind == 'elibrary':
+            # Восстановление проекта в Articulus принимает только zip-архив с XML внутри.
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.write(path, arcname=download_name)
+            buf.seek(0)
+            return send_file(buf, as_attachment=True, download_name=f'{download_name}.zip', mimetype='application/zip')
+
         return send_file(path, as_attachment=True, download_name=download_name)
