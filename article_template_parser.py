@@ -78,6 +78,10 @@ def _find_ci_eq(lines, s, start=0):
 
 
 _SENTENCE_END_RE = re.compile(r'[.!?…»"\')]\s*$')
+# Ссылка (гиперссылка Word на URL/DOI), вынесенная catdoc на отдельную «строку» — почти
+# всегда продолжение той же ссылки на источник, а не отдельный источник сама по себе,
+# даже если строка перед ней случайно заканчивается точкой (см. _slice_text).
+_STARTS_WITH_URL_RE = re.compile(r'^(https?://|www\.)', re.I)
 
 
 def _slice_text(lines, start, end):
@@ -92,7 +96,8 @@ def _slice_text(lines, start, end):
         l = l.strip()
         if not l:
             continue
-        if paragraphs and not _SENTENCE_END_RE.search(paragraphs[-1]):
+        is_url_continuation = paragraphs and _STARTS_WITH_URL_RE.match(l)
+        if paragraphs and (is_url_continuation or not _SENTENCE_END_RE.search(paragraphs[-1])):
             paragraphs[-1] = paragraphs[-1] + " " + l
         else:
             paragraphs.append(l)
@@ -285,6 +290,7 @@ def parse_article_text(text):
         "keywords_ru": [], "keywords_en": [],
         "references": [],
         "references_en": [],
+        "funding_ru": "", "funding_en": "",
         "citation_ru": "", "citation_en": "",
         "dates": {"received": "", "approved": "", "accepted": ""},
         "pages": "",
@@ -329,8 +335,14 @@ def parse_article_text(text):
 
     i_citation_h = _find_eq(lines, "Для цитирования", i_keywords_h or 0) if i_keywords_h is not None else None
     if i_keywords_h is not None and i_citation_h is not None:
-        kw_text = _slice_text(lines, i_keywords_h + 1, i_citation_h)
-        result["keywords_ru"] = [k.strip() for k in kw_text.split(",") if k.strip()]
+        # Ключевые слова всегда одна строка (список через запятую) — не склеиваем через
+        # _slice_text: часть журналов вставляет следом абзац с благодарностью/финансированием
+        # без отдельного заголовка, а он не заканчивается на слово-ключевик точкой, из-за чего
+        # _slice_text считает его продолжением последнего ключевого слова.
+        kw_lines = [l for l in lines[i_keywords_h + 1:i_citation_h] if l.strip()]
+        if kw_lines:
+            result["keywords_ru"] = [k.strip() for k in kw_lines[0].split(",") if k.strip()]
+            result["funding_ru"] = " ".join(kw_lines[1:]).strip()
 
     i_intro = _find_eq(lines, "Введение", i_citation_h or 0) if i_citation_h is not None else None
     i_refs_h = _find_eq(lines, "Список источников", i_intro or 0) if i_intro is not None else None
@@ -413,8 +425,11 @@ def parse_article_text(text):
 
         i_forcit_h = _find_eq(lines, "For citation", i_keywords_en_h or 0) if i_keywords_en_h is not None else None
         if i_keywords_en_h is not None and i_forcit_h is not None:
-            kw_text = _slice_text(lines, i_keywords_en_h + 1, i_forcit_h)
-            result["keywords_en"] = [k.strip() for k in kw_text.split(",") if k.strip()]
+            # См. комментарий у русского блока ключевых слов выше — та же логика.
+            kw_lines_en = [l for l in lines[i_keywords_en_h + 1:i_forcit_h] if l.strip()]
+            if kw_lines_en:
+                result["keywords_en"] = [k.strip() for k in kw_lines_en[0].split(",") if k.strip()]
+                result["funding_en"] = " ".join(kw_lines_en[1:]).strip()
 
         if i_forcit_h is not None:
             i_refs_en_h_peek = _find_ci_eq(lines, "References", i_forcit_h)

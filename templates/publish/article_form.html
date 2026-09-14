@@ -117,7 +117,7 @@
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Финансирование (ru)</label>
-                                <input type="text" name="funding_ru" class="pub-input" value="{{ (article.funding_ru if article else '') or '' }}">
+                                <input type="text" name="funding_ru" id="f_funding_ru" class="pub-input" value="{{ (article.funding_ru if article else '') or '' }}">
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Для цитирования (ru)</label>
@@ -182,7 +182,7 @@
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Финансирование (en)</label>
-                                <input type="text" name="funding_en" class="pub-input" value="{{ (article.funding_en if article else '') or '' }}">
+                                <input type="text" name="funding_en" id="f_funding_en" class="pub-input" value="{{ (article.funding_en if article else '') or '' }}">
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">For citation (en)</label>
@@ -339,6 +339,8 @@ function deleteArticle() {
                 document.getElementById('f_fulltext_ru').value = p.fulltext_ru || '';
                 document.getElementById('f_keywords_ru').value = (p.keywords_ru || []).join(', ');
                 document.getElementById('f_keywords_en').value = (p.keywords_en || []).join(', ');
+                document.getElementById('f_funding_ru').value = p.funding_ru || '';
+                document.getElementById('f_funding_en').value = p.funding_en || '';
                 document.getElementById('f_references_text').value = (p.references || []).join('\n');
                 document.getElementById('f_references_en_text').value = (p.references_en || []).join('\n');
                 document.getElementById('f_citation_ru').value = p.citation_ru || '';
