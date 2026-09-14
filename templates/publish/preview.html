@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Предпросмотр — {{ issue.year }} №{{ issue.number }}{% endblock %}
+{% block title %}Предпросмотр — {{ issue.journal_name }}, {{ issue.year }} №{{ issue.number }}{% endblock %}
 {% block body_class %}adm-body{% endblock %}
 {% block content %}
 
@@ -11,7 +11,7 @@
         {% include "publish/_topbar.html" %}
 
         <div class="adm-welcome">
-            <h1 class="adm-welcome-title">Предпросмотр — {{ issue.year }} №{{ issue.number }}</h1>
+            <h1 class="adm-welcome-title">Предпросмотр — {{ issue.journal_name }}, {{ issue.year }} №{{ issue.number }}</h1>
             <p class="adm-welcome-sub">
                 {% if production %}Целевая БД: боевой сайт (SITE_DATABASE_URL задан).
                 {% else %}Целевая БД: локальная тестовая копия — реальная запись на сайт не произойдёт.{% endif %}
