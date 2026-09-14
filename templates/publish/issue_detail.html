@@ -47,6 +47,25 @@
                 {% else %}
                 <p class="pub-hint" style="margin: 0 0 14px;">Разделов пока нет — добавьте хотя бы один, чтобы выбирать его при добавлении статей.</p>
                 {% endif %}
+
+                <div class="pub-form-section" style="margin-bottom: 14px;">
+                    <div class="pub-form-section-title">Автозаполнение по титульному PDF выпуска</div>
+                    <p class="pub-hint" style="margin: 0 0 12px;">
+                        Загрузите титульный PDF выпуска (со страницами «Содержание» / «Contents») —
+                        разделы распознаются автоматически, останется только проверить и подтвердить.
+                    </p>
+                    <div class="pub-dropzone" id="sectionsDropzone" onclick="document.getElementById('sectionsPdfInput').click()">
+                        <input type="file" id="sectionsPdfInput" accept=".pdf">
+                        <span id="sectionsDropzoneText">Нажмите или перетащите PDF сюда</span>
+                    </div>
+                    <div id="sectionsParseWarnings"></div>
+                    <div id="sectionsPreview" style="display:none; margin-top: 14px;">
+                        <div class="pub-label" style="margin-bottom: 8px;">Найденные разделы — проверьте и уберите лишнее перед добавлением:</div>
+                        <div id="sectionsPreviewList"></div>
+                        <button type="button" class="pub-btn pub-btn-primary pub-btn-sm" id="sectionsConfirmBtn" style="margin-top: 10px;">Добавить отмеченные разделы</button>
+                    </div>
+                </div>
+
                 <form method="POST" action="{{ url_for('admin_publish_issue_add_section', issue_id=issue.id) }}">
                     <div class="pub-row" style="margin-bottom: 10px;">
                         <div class="pub-field">
@@ -94,4 +113,137 @@
 </div>
 
 {% include "publish/_scripts.html" %}
+<script>
+(function() {
+    var dropzone = document.getElementById('sectionsDropzone');
+    var input = document.getElementById('sectionsPdfInput');
+    var warningsBox = document.getElementById('sectionsParseWarnings');
+    var previewBox = document.getElementById('sectionsPreview');
+    var previewList = document.getElementById('sectionsPreviewList');
+    var confirmBtn = document.getElementById('sectionsConfirmBtn');
+    if (!dropzone) return;
+
+    function renderWarnings(warnings) {
+        warningsBox.innerHTML = '';
+        if (!warnings || !warnings.length) return;
+        var box = document.createElement('div');
+        box.className = 'pub-warning-box';
+        var ul = document.createElement('ul');
+        warnings.forEach(function(w) {
+            var li = document.createElement('li');
+            li.textContent = w;
+            ul.appendChild(li);
+        });
+        box.appendChild(ul);
+        warningsBox.appendChild(box);
+    }
+
+    function renderPreview(sections) {
+        previewList.innerHTML = '';
+        if (!sections || !sections.length) {
+            previewBox.style.display = 'none';
+            return;
+        }
+        sections.forEach(function(s, i) {
+            var row = document.createElement('div');
+            row.className = 'pub-section-list-item';
+            row.style.gap = '10px';
+
+            var check = document.createElement('input');
+            check.type = 'checkbox';
+            check.checked = true;
+            check.id = 'sec_chk_' + i;
+
+            var ru = document.createElement('input');
+            ru.type = 'text';
+            ru.className = 'pub-input';
+            ru.value = s.title_ru || '';
+            ru.style.flex = '1';
+
+            var en = document.createElement('input');
+            en.type = 'text';
+            en.className = 'pub-input';
+            en.value = s.title_en || '';
+            en.style.flex = '1';
+
+            row.appendChild(check);
+            row.appendChild(ru);
+            row.appendChild(en);
+            row.dataset.ruInput = '';
+            row._ruInput = ru;
+            row._enInput = en;
+            row._checkInput = check;
+            previewList.appendChild(row);
+        });
+        previewBox.style.display = '';
+    }
+
+    function handleFile(file) {
+        if (!file) return;
+        document.getElementById('sectionsDropzoneText').textContent = 'Разбираю «' + file.name + '»...';
+        warningsBox.innerHTML = '';
+        previewBox.style.display = 'none';
+        var fd = new FormData();
+        fd.append('pdf_file', file);
+        fetch('{{ url_for("admin_publish_issue_parse_sections", issue_id=issue.id) }}', { method: 'POST', body: fd })
+            .then(function(r) { return r.json().then(function(data) { return { ok: r.ok, data: data }; }); })
+            .then(function(res) {
+                document.getElementById('sectionsDropzoneText').textContent = 'Нажмите или перетащите PDF сюда';
+                if (!res.ok) {
+                    showToast(res.data.error || 'Ошибка разбора PDF', 'error');
+                    return;
+                }
+                renderWarnings(res.data.warnings);
+                renderPreview(res.data.sections);
+                if (res.data.sections && res.data.sections.length) {
+                    showToast('Найдено разделов: ' + res.data.sections.length + ' — проверьте перед добавлением', 'success');
+                } else {
+                    showToast('Разделы не найдены — добавьте вручную', 'error');
+                }
+            })
+            .catch(function() {
+                document.getElementById('sectionsDropzoneText').textContent = 'Нажмите или перетащите PDF сюда';
+                showToast('Не удалось отправить файл', 'error');
+            });
+    }
+
+    confirmBtn.addEventListener('click', function() {
+        var sections = [];
+        previewList.querySelectorAll('.pub-section-list-item').forEach(function(row) {
+            if (!row._checkInput.checked) return;
+            var title_ru = row._ruInput.value.trim();
+            if (!title_ru) return;
+            sections.push({ title_ru: title_ru, title_en: row._enInput.value.trim() });
+        });
+        if (!sections.length) {
+            showToast('Отметьте хотя бы один раздел', 'error');
+            return;
+        }
+        fetch('{{ url_for("admin_publish_issue_add_sections_bulk", issue_id=issue.id) }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sections: sections }),
+        })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.added) {
+                    showToast('Добавлено разделов: ' + data.added, 'success');
+                    window.location.reload();
+                } else {
+                    showToast('Ничего не добавлено', 'error');
+                }
+            })
+            .catch(function() { showToast('Не удалось сохранить разделы', 'error'); });
+    });
+
+    input.addEventListener('change', function() { handleFile(input.files[0]); });
+    dropzone.addEventListener('dragover', function(e) { e.preventDefault(); dropzone.classList.add('pub-dropzone-active'); });
+    dropzone.addEventListener('dragleave', function() { dropzone.classList.remove('pub-dropzone-active'); });
+    dropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropzone.classList.remove('pub-dropzone-active');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+})();
+</script>
 {% endblock %}

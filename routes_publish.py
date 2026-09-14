@@ -274,6 +274,42 @@ def register_publish_routes(app):
         flash(f'Раздел «{title_ru}» добавлен.', 'success')
         return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
+    @app.route('/admin/publish/issue/<int:issue_id>/sections/parse-pdf', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_parse_sections(issue_id):
+        PubIssue.query.get_or_404(issue_id)
+        pdf_file = request.files.get('pdf_file')
+        if not pdf_file or not pdf_file.filename:
+            return jsonify({'error': 'Нет файла'}), 400
+        os.makedirs(PUB_UPLOAD_FOLDER, exist_ok=True)
+        from werkzeug.utils import secure_filename
+        fname = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_') + secure_filename(pdf_file.filename)
+        fpath = os.path.join(PUB_UPLOAD_FOLDER, fname)
+        pdf_file.save(fpath)
+        try:
+            result = pdf_parser.extract_toc_sections(fpath)
+        except Exception as e:
+            return jsonify({'error': f'Не удалось разобрать PDF: {e}'}), 400
+        return jsonify(result)
+
+    @app.route('/admin/publish/issue/<int:issue_id>/sections/bulk-add', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_add_sections_bulk(issue_id):
+        issue = PubIssue.query.get_or_404(issue_id)
+        data = request.get_json(silent=True) or {}
+        sections = data.get('sections') or []
+        added = 0
+        for s in sections:
+            title_ru = (s.get('title_ru') or '').strip()
+            title_en = (s.get('title_en') or '').strip()
+            if not title_ru:
+                continue
+            db.session.add(PubSection(issue_id=issue.id, title_ru=title_ru, title_en=title_en))
+            added += 1
+        if added:
+            db.session.commit()
+        return jsonify({'added': added})
+
     @app.route('/admin/publish/parse-doc', methods=['POST'])
     @admin_required
     def admin_publish_parse_doc():

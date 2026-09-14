@@ -749,3 +749,112 @@ def extract_text_any(file_path):
             return rtf_to_text(f.read())
 
     raise RuntimeError(f"Неподдерживаемый формат файла: .{suffix}")
+
+
+# --- Разбор разделов (рубрик) выпуска по титульному PDF («Содержание»/«Contents») ---
+
+_RU_HEADING_RE = re.compile(r"^[А-ЯЁ0-9 ,.\-–—«»():'\"/№]+$")
+_EN_HEADING_RE = re.compile(r"^[A-Z0-9 ,.\-–—«»():'\"/№]+$")
+
+
+_TOC_STOPWORDS = (
+    'issn', 'issn ', '©', 'тираж', 'подписано', 'формат', 'печ.л', 'заказ',
+    'учредитель', 'редакция', 'http', 'e-mail', 'e mail', 'издательство',
+)
+
+
+def _looks_like_masthead(line):
+    """Отсекает строки колонтитула/выходных данных (ISSN, тираж, копирайт и т.п.),
+    которые тоже могут случайно оказаться набраны заглавными буквами."""
+    low = line.lower()
+    if any(w in low for w in _TOC_STOPWORDS):
+        return True
+    if re.search(r'\d{4}-\d{3,4}[\dXx]?', line):  # ISSN-подобный паттерн
+        return True
+    return False
+
+
+def _is_toc_heading(line, latin):
+    line = line.strip()
+    if len(line) < 6 or _looks_like_masthead(line):
+        return False
+    if latin:
+        if re.search(r'[a-z]', line) or not re.search(r'[A-Z]{3,}', line):
+            return False
+        return bool(_EN_HEADING_RE.match(line))
+    if re.search(r'[а-яё]', line) or not re.search(r'[А-ЯЁ]{3,}', line):
+        return False
+    return bool(_RU_HEADING_RE.match(line))
+
+
+def _find_toc_page(doc, needle):
+    """Ищет страницу, на которой встречается needle (напр. «содержание»/«contents»)."""
+    needle = needle.lower()
+    for i in range(doc.page_count):
+        text = doc[i].get_text("text")
+        if needle in text.lower():
+            return text
+    return None
+
+
+def _toc_headings(text, marker, latin):
+    """Собирает все ALL-CAPS строки на странице оглавления после строки-маркера
+    («Содержание»/«Contents») — по этой типографской эвристике разделы (рубрики)
+    в этих титульных PDF всегда набраны заглавными буквами, в отличие от названий
+    статей и ФИО авторов."""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    start = 0
+    for i, l in enumerate(lines):
+        if l.strip().lower() == marker:
+            start = i + 1
+            break
+    headings = []
+    for l in lines[start:]:
+        if _is_toc_heading(l, latin) and (not headings or headings[-1] != l):
+            headings.append(l)
+    return headings
+
+
+def extract_toc_sections(file_path):
+    """Извлекает список разделов (рубрик) выпуска из титульного PDF выпуска
+    (страницы «Содержание» на русском и «Contents» на английском).
+
+    Returns:
+        dict: {"sections": [{"title_ru": str, "title_en": str}, ...], "warnings": [str, ...]}
+    """
+    try:
+        doc = fitz.open(file_path)
+    except Exception as e:
+        return {"sections": [], "warnings": [f"Не удалось открыть PDF: {e}"]}
+
+    text_ru = _find_toc_page(doc, "содержание")
+    text_en = _find_toc_page(doc, "contents")
+    doc.close()
+
+    warnings = []
+    if text_ru is None:
+        return {"sections": [], "warnings": [
+            "Не нашёл страницу «Содержание» в этом PDF — убедитесь, что это титульный "
+            "файл выпуска (с оглавлением), а не отдельная статья."
+        ]}
+
+    ru_headings = _toc_headings(text_ru, "содержание", latin=False)
+    en_headings = _toc_headings(text_en, "contents", latin=True) if text_en else []
+
+    if not ru_headings:
+        warnings.append(
+            "На странице «Содержание» не нашлось разделов, набранных заглавными буквами — "
+            "возможно, в этом выпуске разделы не выделены отдельно, добавьте их вручную."
+        )
+    if en_headings and len(en_headings) != len(ru_headings):
+        warnings.append(
+            f"На английской странице найдено {len(en_headings)} разделов, а на русской — "
+            f"{len(ru_headings)}. Сопоставление может быть смещено — проверьте перед добавлением."
+        )
+
+    sections = []
+    for i, ru in enumerate(ru_headings):
+        en = en_headings[i] if i < len(en_headings) else ""
+        sections.append({"title_ru": ru.strip().capitalize(), "title_en": en.strip().capitalize()})
+
+    return {"sections": sections, "warnings": warnings}
