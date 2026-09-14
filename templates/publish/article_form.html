@@ -33,7 +33,7 @@
                 <form method="POST" id="articleForm"
                       action="{{ url_for('admin_publish_article_edit', article_id=article.id) if article else url_for('admin_publish_article_new', issue_id=issue.id) }}">
                     <input type="hidden" name="parsed_manuscript_filename" id="parsedManuscriptFilename"
-                           value="{{ article.manuscript_file if article else '' }}">
+                           value="{{ (article.manuscript_file if article else '') or '' }}">
 
                     <div class="pub-form-section">
                         <div class="pub-form-section-title">Основное</div>
@@ -49,12 +49,12 @@
                             <div class="pub-field">
                                 <label class="pub-label">УДК</label>
                                 <input type="text" name="udk" id="f_udk" class="pub-input"
-                                       value="{{ article.udk if article else '' }}">
+                                       value="{{ (article.udk if article else '') or '' }}">
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">DOI <span class="pub-hint">(пусто — посчитается автоматически)</span></label>
                                 <input type="text" name="doi" id="f_doi" class="pub-input"
-                                       value="{{ article.doi if article else '' }}">
+                                       value="{{ (article.doi if article else '') or '' }}">
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Цена <span class="pub-hint">(пусто — по умолчанию)</span></label>
@@ -80,12 +80,12 @@
                             <div class="pub-field">
                                 <label class="pub-label">Раздел (ru)</label>
                                 <input type="text" name="section_ru" id="f_section_ru" class="pub-input"
-                                       value="{{ article.section_ru if article else '' }}">
+                                       value="{{ (article.section_ru if article else '') or '' }}">
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Раздел (en)</label>
                                 <input type="text" name="section_en" id="f_section_en" class="pub-input"
-                                       value="{{ article.section_en if article else '' }}">
+                                       value="{{ (article.section_en if article else '') or '' }}">
                             </div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Заглавие (ru) *</label>
                                 <input type="text" name="title_ru" id="f_title_ru" class="pub-input" required
-                                       value="{{ article.title_ru if article else '' }}">
+                                       value="{{ (article.title_ru if article else '') or '' }}">
                             </div>
                         </div>
 
@@ -109,32 +109,32 @@
                         <div class="pub-row" style="margin-top: 18px;">
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Аннотация (ru)</label>
-                                <textarea name="abstract_ru" id="f_abstract_ru" class="pub-textarea" style="min-height:150px;">{{ article.abstract_ru if article else '' }}</textarea>
+                                <textarea name="abstract_ru" id="f_abstract_ru" class="pub-textarea" style="min-height:150px;">{{ (article.abstract_ru if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Ключевые слова (ru) <span class="pub-hint">через запятую</span></label>
-                                <textarea name="keywords_ru" id="f_keywords_ru" class="pub-textarea" style="min-height:70px;">{{ article.keywords_ru if article else '' }}</textarea>
+                                <textarea name="keywords_ru" id="f_keywords_ru" class="pub-textarea" style="min-height:70px;">{{ (article.keywords_ru if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Финансирование (ru)</label>
-                                <input type="text" name="funding_ru" class="pub-input" value="{{ article.funding_ru if article else '' }}">
+                                <input type="text" name="funding_ru" class="pub-input" value="{{ (article.funding_ru if article else '') or '' }}">
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Для цитирования (ru)</label>
-                                <textarea name="citation_ru" id="f_citation_ru" class="pub-textarea" style="min-height:60px;">{{ article.citation_ru if article else '' }}</textarea>
+                                <textarea name="citation_ru" id="f_citation_ru" class="pub-textarea" style="min-height:60px;">{{ (article.citation_ru if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Страницы</label>
                                 <input type="text" name="pages" id="f_pages" class="pub-input" placeholder="5-14"
-                                       value="{{ article.pages if article else '' }}">
+                                       value="{{ (article.pages if article else '') or '' }}">
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Полный текст (ru) <span class="pub-hint">нужен для eLibrary</span></label>
-                                <textarea name="fulltext_ru" id="f_fulltext_ru" class="pub-textarea" style="min-height:220px;">{{ article.fulltext_ru if article else '' }}</textarea>
+                                <textarea name="fulltext_ru" id="f_fulltext_ru" class="pub-textarea" style="min-height:220px;">{{ (article.fulltext_ru if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Список источников (ru) <span class="pub-hint">по одной ссылке на строку</span></label>
-                                <textarea name="references_text" id="f_references_text" class="pub-textarea" style="min-height:140px;">{{ article.references_text if article else '' }}</textarea>
+                                <textarea name="references_text" id="f_references_text" class="pub-textarea" style="min-height:140px;">{{ (article.references_text if article else '') or '' }}</textarea>
                             </div>
                         </div>
 
@@ -144,15 +144,15 @@
                         <div class="pub-row" style="margin-top: 10px;">
                             <div class="pub-field">
                                 <label class="pub-label">Дата поступления</label>
-                                <input type="text" name="date_received" id="f_date_received" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_received if article else '' }}">
+                                <input type="text" name="date_received" id="f_date_received" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ (article.date_received if article else '') or '' }}">
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Одобрена после рецензирования</label>
-                                <input type="text" name="date_approved" id="f_date_approved" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_approved if article else '' }}">
+                                <input type="text" name="date_approved" id="f_date_approved" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ (article.date_approved if article else '') or '' }}">
                             </div>
                             <div class="pub-field">
                                 <label class="pub-label">Принята к публикации</label>
-                                <input type="text" name="date_accepted" id="f_date_accepted" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ article.date_accepted if article else '' }}">
+                                <input type="text" name="date_accepted" id="f_date_accepted" class="pub-input" placeholder="ДД.ММ.ГГГГ" value="{{ (article.date_accepted if article else '') or '' }}">
                             </div>
                         </div>
                     </div>
@@ -164,7 +164,7 @@
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Заглавие (en)</label>
                                 <input type="text" name="title_en" id="f_title_en" class="pub-input"
-                                       value="{{ article.title_en if article else '' }}">
+                                       value="{{ (article.title_en if article else '') or '' }}">
                             </div>
                         </div>
 
@@ -174,23 +174,23 @@
                         <div class="pub-row" style="margin-top: 18px;">
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Аннотация (en)</label>
-                                <textarea name="abstract_en" id="f_abstract_en" class="pub-textarea" style="min-height:150px;">{{ article.abstract_en if article else '' }}</textarea>
+                                <textarea name="abstract_en" id="f_abstract_en" class="pub-textarea" style="min-height:150px;">{{ (article.abstract_en if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Ключевые слова (en) <span class="pub-hint">через запятую</span></label>
-                                <textarea name="keywords_en" id="f_keywords_en" class="pub-textarea" style="min-height:70px;">{{ article.keywords_en if article else '' }}</textarea>
+                                <textarea name="keywords_en" id="f_keywords_en" class="pub-textarea" style="min-height:70px;">{{ (article.keywords_en if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Финансирование (en)</label>
-                                <input type="text" name="funding_en" class="pub-input" value="{{ article.funding_en if article else '' }}">
+                                <input type="text" name="funding_en" class="pub-input" value="{{ (article.funding_en if article else '') or '' }}">
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">For citation (en)</label>
-                                <textarea name="citation_en" id="f_citation_en" class="pub-textarea" style="min-height:60px;">{{ article.citation_en if article else '' }}</textarea>
+                                <textarea name="citation_en" id="f_citation_en" class="pub-textarea" style="min-height:60px;">{{ (article.citation_en if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Список источников (en) <span class="pub-hint">по одной ссылке на строку</span></label>
-                                <textarea name="references_en_text" id="f_references_en_text" class="pub-textarea" style="min-height:140px;">{{ article.references_en_text if article else '' }}</textarea>
+                                <textarea name="references_en_text" id="f_references_en_text" class="pub-textarea" style="min-height:140px;">{{ (article.references_en_text if article else '') or '' }}</textarea>
                             </div>
                         </div>
                     </div>

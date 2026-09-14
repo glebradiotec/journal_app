@@ -7,7 +7,7 @@
 from lxml import etree
 
 import publish_titleid_store as titleid_store
-from export_elibrary import _el, _individ_info
+from export_elibrary import _el, _individ_info, _clean
 
 
 def build_metafora_xml(issue, journal_title_ru, journal_title_en=""):
@@ -120,11 +120,13 @@ def build_metafora_xml(issue, journal_title_ru, journal_title_en=""):
             if art.date_published:
                 _el(dates_el, "datePublication", art.date_published)
 
-        if art.funding_ru or art.funding_en:
+        funding_ru = _clean(art.funding_ru)
+        funding_en = _clean(art.funding_en)
+        if funding_ru or funding_en:
             fund_el = _el(a_el, "fundings")
-            if art.funding_ru:
-                _el(fund_el, "funding", art.funding_ru, lang="RUS")
-            if art.funding_en:
-                _el(fund_el, "funding", art.funding_en, lang="ENG")
+            if funding_ru:
+                _el(fund_el, "funding", funding_ru, lang="RUS")
+            if funding_en:
+                _el(fund_el, "funding", funding_en, lang="ENG")
 
     return etree.tostring(root, pretty_print=True, xml_declaration=True, encoding="UTF-8")

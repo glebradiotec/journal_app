@@ -159,8 +159,10 @@ def _apply_article_fields(article: PubArticle, form):
     article.keywords_en = form.get('keywords_en', '').strip()
     article.references_text = form.get('references_text', '').strip()
     article.references_en_text = form.get('references_en_text', '').strip()
-    article.funding_ru = form.get('funding_ru', '').strip()
-    article.funding_en = form.get('funding_en', '').strip()
+    funding_ru = form.get('funding_ru', '').strip()
+    funding_en = form.get('funding_en', '').strip()
+    article.funding_ru = '' if funding_ru.lower() == 'none' else funding_ru
+    article.funding_en = '' if funding_en.lower() == 'none' else funding_en
     article.citation_ru = form.get('citation_ru', '').strip()
     article.citation_en = form.get('citation_en', '').strip()
     article.date_received = form.get('date_received', '').strip()
