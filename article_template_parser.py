@@ -111,11 +111,12 @@ def _slice_text(lines, start, end):
     return "\n\n".join(paragraphs)
 
 
-# Одно вхождение автора: "И.О. Фамилия<N>" (N — номер сноски на организацию, приклеен без пробела).
+# Одно вхождение автора: "И.О. Фамилия<N>" (N — номер сноски на организацию; обычно приклеен
+# без пробела, но изредка встречается и с пробелом — "Фамилия N").
 # Инициал — заглавная буква + необязательные строчные (англ. транслитерация вида "Yu.", "Ya.").
 _INITIAL = r"[А-ЯЁA-Z][а-яёa-z]*\."
 AUTHOR_TOKEN_RE = re.compile(
-    rf"({_INITIAL}\s?{_INITIAL})\s*([А-Яа-яЁёA-Za-z\-]+)(\d*)"
+    rf"({_INITIAL}\s?{_INITIAL})\s*([А-Яа-яЁёA-Za-z\-]+)\s?(\d*)"
 )
 
 
@@ -182,7 +183,9 @@ def _looks_like_org_line(line):
 
 
 # Начало нового блока организации: список номеров сносок ("1, 2, 4 ", "3 ", "1–4 ").
-_CHUNK_START_RE = re.compile(r"(?:^|(?<=\s))(\d+(?:\s*[,\-–—−]\s*\d+)*)\s+")
+# Пробел перед названием организации не гарантирован — иногда список сносок (особенно
+# диапазон вида "1−3") приклеен к названию без пробела вообще, как и у самих авторов.
+_CHUNK_START_RE = re.compile(r"(?:^|(?<=\s)|(?<=\)))(\d+(?:\s*[,\-–—−]\s*\d+)*)\s*")
 
 
 def _split_org_tail(segment):
@@ -243,15 +246,24 @@ def _assign_orgs(authors, chunks):
         a["country"] = matched[0]["country"] if matched else ""
 
 
+_EMAIL_WITH_IDX_RE = re.compile(r"(?:(\d+(?:\s*[,\-–—−]\s*\d+)*)\s*)?([\w.+-]+@[\w-]+\.[\w.-]+)")
+
+
 def _parse_emails_line(line):
     """'1 basarab@bmstu.ru, 2 bobkovva@bmstu.ru' -> {1: 'basarab@bmstu.ru', 2: 'bobkovva@bmstu.ru'}.
+    Индекс перед email-ом часто приклеен без пробела ('1sweeper1808@mail.ru'), а иногда один
+    email общий сразу на диапазон авторов ('1−3vka@mil.ru' -> один email для 1, 2 и 3) — тот же
+    формат списка/диапазона номеров, что и у организаций (см. _parse_index_list).
     Без индексов ('basarab@bmstu.ru, bobkovva@bmstu.ru') -> {0: ..., 1: ...} (позиционно,
     ключ — порядковый номер email в строке, начиная с 0)."""
     result = {}
     pos = 0
-    for m in re.finditer(r"(?:(\d+)\s+)?([\w.+-]+@[\w-]+\.[\w.-]+)", line):
-        idx = int(m.group(1)) if m.group(1) else pos
-        result[idx] = m.group(2)
+    for m in _EMAIL_WITH_IDX_RE.finditer(line):
+        if m.group(1):
+            for idx in _parse_index_list(m.group(1)):
+                result[idx] = m.group(2)
+        else:
+            result[pos] = m.group(2)
         pos += 1
     return result
 
@@ -326,14 +338,18 @@ def _parse_authors_block(lines, start_idx):
         email_part = candidate_email
     _assign_orgs(authors, _split_org_chunks(" ".join(org_text_parts)))
 
-    # Строку с email-ами пропускаем, только если в ней реально есть "@" — иногда после
+    # Строки с email-ами пропускаем, только если в них реально есть "@" — иногда после
     # авторов (и организации, если она была) сразу идёт «Аннотация»/«Abstract» без каких-либо
     # контактов, и слепо съедать следующую строку в этом случае нельзя (см. _looks_like_org_line).
-    if not email_part and next_idx < len(lines) and "@" in lines[next_idx]:
-        email_part = lines[next_idx]
+    # Список email-ов при большом числе авторов иногда не помещается в одну строку — переносится
+    # на следующую (это уже настоящий перенос абзаца в Word, не мягкий, как раньше), поэтому
+    # продолжаем собирать, пока строки подряд похожи на email-а.
+    email_lines = [email_part] if email_part else []
+    while not email_part and next_idx < len(lines) and "@" in lines[next_idx]:
+        email_lines.append(lines[next_idx])
         next_idx += 1
 
-    emails_by_idx = _parse_emails_line(email_part) if email_part else {}
+    emails_by_idx = _parse_emails_line(" ".join(email_lines)) if email_lines else {}
     for pos, a in enumerate(authors):
         if a["index"] is not None and a["index"] in emails_by_idx:
             a["email"] = emails_by_idx[a["index"]]
