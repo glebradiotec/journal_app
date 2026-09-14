@@ -52,8 +52,15 @@
 import re
 
 
+# Word иногда форматирует номер сноски автора/организации верхним индексом — в некоторых
+# .doc такой символ так и попадает в текст как отдельный юникод-глиф надстрочной цифры,
+# а не как обычная цифра ("Большаков¹" вместо "Большаков1"). Приводим к обычным цифрам сразу,
+# иначе вся привязка автор↔организация по номеру сноски ломается.
+_SUPERSCRIPT_DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+
+
 def _lines(text):
-    return [l.strip() for l in text.split("\n")]
+    return [l.strip().translate(_SUPERSCRIPT_DIGITS) for l in text.split("\n")]
 
 
 def _find(lines, pred, start=0):
@@ -108,37 +115,48 @@ def _slice_text(lines, start, end):
 # Инициал — заглавная буква + необязательные строчные (англ. транслитерация вида "Yu.", "Ya.").
 _INITIAL = r"[А-ЯЁA-Z][а-яёa-z]*\."
 AUTHOR_TOKEN_RE = re.compile(
-    rf"({_INITIAL}\s?{_INITIAL})\s*([А-Яа-яЁёA-Za-z\-]+)\d*"
+    rf"({_INITIAL}\s?{_INITIAL})\s*([А-Яа-яЁёA-Za-z\-]+)(\d*)"
 )
+
+
+def _parse_index_list(s):
+    """'1, 2, 4' -> {1,2,4}; '1–3' (диапазон через тире/дефис) -> {1,2,3}."""
+    indices = set()
+    for part in s.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r"^(\d+)\s*[-–—−]\s*(\d+)$", part)
+        if m:
+            indices.update(range(int(m.group(1)), int(m.group(2)) + 1))
+        else:
+            indices.update(int(d) for d in re.findall(r"\d+", part))
+    return indices
 
 
 def _parse_authors_line(line):
     """'М.А. Басараб1, В.А. Бобков2 1, 2 Организация (Город, Страна)' ->
-    ([{'initials':..,'surname':..}], org, town, country).
-
-    Список авторов ищем по образцу «И.О. Фамилия», а всё, что остаётся после
-    последнего найденного автора (за вычетом ведущего списка номеров сносок),
-    считаем организацией — так неоднозначность с приклеенными номерами сносок
-    у фамилий не мешает разбору."""
-    m = re.search(r"\(([^,()]+),\s*([^()]+)\)\s*$", line)
-    town, country = (m.group(1).strip(), m.group(2).strip()) if m else ("", "")
-    rest = line[: m.start()].strip() if m else line
-
+    ([{'initials':.., 'surname':.., 'index': 1|None}], rest) — где rest — весь остаток
+    строки после последнего автора (номера сносок + одна или несколько организаций),
+    ещё не разобранный: сам разбор организаций общий для одной и нескольких строк,
+    см. _split_org_chunks."""
+    all_matches = list(AUTHOR_TOKEN_RE.finditer(line))
     # Реальные авторы разделены запятой; отсекаем ложные срабатывания вида "Н.Э." внутри
     # названия организации ("МГТУ им. Н.Э. Баумана"), которые запятой не предваряются.
-    all_matches = list(AUTHOR_TOKEN_RE.finditer(rest))
     matches = [
         mm for mm in all_matches
-        if mm.start() == 0 or rest[max(0, mm.start() - 2):mm.start()] == ", "
+        if mm.start() == 0 or line[max(0, mm.start() - 2):mm.start()] == ", "
     ]
-    authors = [{"initials": mm.group(1).replace(" ", ""), "surname": mm.group(2).strip()} for mm in matches]
-
-    org = ""
-    if matches:
-        org_tail = rest[matches[-1].end():].strip()
-        org = re.sub(r"^[\d,\s\-–—−]+", "", org_tail).strip()
-
-    return authors, org, town, country
+    authors = [
+        {
+            "initials": mm.group(1).replace(" ", ""),
+            "surname": mm.group(2).strip(),
+            "index": int(mm.group(3)) if mm.group(3) else None,
+        }
+        for mm in matches
+    ]
+    rest = line[matches[-1].end():].strip() if matches else line.strip()
+    return authors, rest
 
 
 _KNOWN_HEADINGS = {
@@ -148,35 +166,106 @@ _KNOWN_HEADINGS = {
 
 
 def _looks_like_org_line(line):
-    """Отличает «организация отдельной строкой» (напр. «1, 2 МГТУ им. Баумана (Москва, Россия)»)
-    от заголовка следующего блока (Аннотация/Abstract/...) — без этого организация-без-примет
-    ошибочно проглатывала «Аннотация» как своё название."""
+    """Отличает «организация отдельной строкой» (напр. «1, 2 МГТУ им. Баумана (Москва, Россия)»,
+    возможно несколько таких строк подряд — у статьи может быть несколько мест работы) от
+    заголовка следующего блока (Аннотация/Abstract/...) — без этого организация-без-примет
+    ошибочно проглатывала «Аннотация» как своё название. Ожидает, что email (если он был
+    приклеен к той же строке) уже отрезан вызывающим кодом."""
     line = line.strip()
     if not line or line in _KNOWN_HEADINGS:
         return False
-    if re.search(r"\([^,()]+,\s*[^()]+\)\s*$", line):
+    if re.search(r"\([^()]+,\s*[^()]+\)\s*$", line):
         return True
     if re.match(r"^\d+(\s*[,\-–—−]\s*\d+)*\s+\S", line):
         return True
     return False
 
 
-def _parse_org_line(line):
-    """'1, 2 Организация (Город, Страна)' или '1–5 Организация (Город, Страна)'
-    (диапазон номеров сносок через тире) -> (org, town, country) — та же строка, что
-    в конце _parse_authors_line, но когда организация стоит отдельной строкой без имён.
-    Вызывающий код уже проверил _looks_like_org_line()."""
-    m = re.search(r"\(([^,()]+),\s*([^()]+)\)\s*$", line)
-    town, country = (m.group(1).strip(), m.group(2).strip()) if m else ("", "")
-    rest = line[: m.start()].strip() if m else line
-    org = re.sub(r"^[\d,\s\-–—−]+", "", rest).strip()
-    return org, town, country
+# Начало нового блока организации: список номеров сносок ("1, 2, 4 ", "3 ", "1–4 ").
+_CHUNK_START_RE = re.compile(r"(?:^|(?<=\s))(\d+(?:\s*[,\-–—−]\s*\d+)*)\s+")
+
+
+def _split_org_tail(segment):
+    """'Организация (Город, Страна)' -> (org, town, country); поддерживает и «(Город,
+    Область, Страна)» — последняя запятая перед скобкой всегда отделяет страну, всё
+    остальное — город/область. Скобка без запятой внутри (уточнение вида «(национальный
+    исследовательский университет)») концом организации не считается и остаётся в её
+    названии — только конце строки с реальным «(Город, Страна)» так и разбираем."""
+    m = re.search(r"\(([^()]+)\)\s*$", segment)
+    if not m or "," not in m.group(1):
+        return segment.strip(), "", ""
+    org = segment[:m.start()].strip()
+    parts = [p.strip() for p in m.group(1).split(",")]
+    return org, ", ".join(parts[:-1]), parts[-1]
+
+
+def _split_org_chunks(text):
+    """Разбирает 'text' (всё после списка авторов — одна строка или несколько склеенных
+    через пробел) на отдельные организации, у каждой из которых свой набор номеров-сносок
+    авторов: '1, 2, 4 Орг1 (Город1, Страна1) 3 Орг2 (Город2, Страна2) 1, 4 Орг3 (Город3,
+    Страна3)' -> [{'indices': {1,2,4}, 'org': 'Орг1', 'town': 'Город1', 'country': 'Страна1'}, ...].
+
+    Границей чанка служит сам список номеров (а не «(Город, Страна)» в конце) — так корректно
+    разбираются и организации без города/страны вовсе (в паре реальных статей автор мирного
+    перевода забывал их указать для английской версии, не оставлять же организацию совсем
+    без имени из-за этого)."""
+    text = text.strip()
+    if not text:
+        return []
+    starts = list(_CHUNK_START_RE.finditer(text))
+    if not starts:
+        # Без номеров сносок вовсе — единственное место работы, общее для всех авторов.
+        org, town, country = _split_org_tail(text)
+        return [{"indices": set(), "org": org, "town": town, "country": country}] if org else []
+    chunks = []
+    for i, sm in enumerate(starts):
+        seg_end = starts[i + 1].start() if i + 1 < len(starts) else len(text)
+        segment = text[sm.end():seg_end].strip()
+        org, town, country = _split_org_tail(segment)
+        if org:
+            chunks.append({"indices": _parse_index_list(sm.group(1)), "org": org, "town": town, "country": country})
+    return chunks
+
+
+def _assign_orgs(authors, chunks):
+    """Проставляет каждому автору org/town/country по совпадению номера сноски с одним из
+    чанков _split_org_chunks. Автор может входить в несколько организаций сразу (индекс
+    встречается в нескольких чанках) — тогда они склеиваются через «; », город/страна берутся
+    от первой подходящей. Если сносок нет вовсе (журнал не нумерует авторов/организации,
+    обычно при единственном месте работы на всех) — всем достаётся единственная организация."""
+    no_indexed_chunks = chunks and all(not c["indices"] for c in chunks)
+    for a in authors:
+        matched = [c for c in chunks if a["index"] is not None and a["index"] in c["indices"]]
+        if not matched and (a["index"] is None or no_indexed_chunks):
+            matched = chunks
+        a["org"] = "; ".join(c["org"] for c in matched)
+        a["town"] = matched[0]["town"] if matched else ""
+        a["country"] = matched[0]["country"] if matched else ""
 
 
 def _parse_emails_line(line):
-    """'1 basarab@bmstu.ru, 2 bobkovva@bmstu.ru' -> ['basarab@bmstu.ru', 'bobkovva@bmstu.ru']."""
-    emails = re.findall(r"[\w.+-]+@[\w-]+\.[\w.-]+", line)
-    return emails
+    """'1 basarab@bmstu.ru, 2 bobkovva@bmstu.ru' -> {1: 'basarab@bmstu.ru', 2: 'bobkovva@bmstu.ru'}.
+    Без индексов ('basarab@bmstu.ru, bobkovva@bmstu.ru') -> {0: ..., 1: ...} (позиционно,
+    ключ — порядковый номер email в строке, начиная с 0)."""
+    result = {}
+    pos = 0
+    for m in re.finditer(r"(?:(\d+)\s+)?([\w.+-]+@[\w-]+\.[\w.-]+)", line):
+        idx = int(m.group(1)) if m.group(1) else pos
+        result[idx] = m.group(2)
+        pos += 1
+    return result
+
+
+def _strip_email(line):
+    """Отрезает от строки хвост с email-ами (иногда мягкий перенос строки в Word вместо
+    разрыва абзаца склеивает организацию/авторов с email-ами в одну строку).
+    Возвращает (текст без email-ов, отрезанный хвост или '')."""
+    if "@" not in line:
+        return line, ""
+    m = re.search(r"(?:\s\d+\s+)?[\w.+-]+@[\w-]+\.[\w.-]+", line)
+    if not m:
+        return line, ""
+    return line[:m.start()].strip(), line[m.start():]
 
 
 def _consume_title_lines(lines, start_idx, max_lines=6):
@@ -207,35 +296,53 @@ def _consume_title_lines(lines, start_idx, max_lines=6):
 
 
 def _parse_authors_block(lines, start_idx):
-    """Разбирает блок «авторы + место работы» начиная с lines[start_idx]. Обычно email-а —
-    следующая строка/абзац, но иногда (мягкий перенос строки в Word вместо разрыва абзаца)
-    всё склеено в одну строку — тогда email-а вычленяются из неё же.
-    Возвращает (authors, org, town, country, emails, next_idx)."""
+    """Разбирает блок «авторы + место(-а) работы [+ email-а]» начиная с lines[start_idx].
+    Мест работы может быть несколько, и не все авторы работают во всех сразу — у каждого
+    автора и каждой организации есть номер сноски, по которому и сопоставляем (см.
+    _split_org_chunks/_assign_orgs). Обычно email-а — следующая строка/абзац, но иногда
+    (мягкий перенос строки в Word вместо разрыва абзаца) всё склеено в одну строку — тогда
+    email-а вычленяются из неё же.
+    Возвращает (authors, next_idx), где authors — список словарей с surname/initials/index/
+    org/town/country/email."""
     if start_idx >= len(lines):
-        return [], "", "", "", [], start_idx
-    line = lines[start_idx]
-    if "@" in line:
-        m = re.search(r"\s\d+\s+[\w.+-]+@", line)
-        authors_part = line[: m.start()] if m else line
-        emails_part = line[m.start():] if m else line
-        emails = _parse_emails_line(emails_part)
-        authors, org, town, country = _parse_authors_line(authors_part)
-        return authors, org, town, country, emails, start_idx + 1
-    authors, org, town, country = _parse_authors_line(line)
+        return [], start_idx
+
+    line, email_part = _strip_email(lines[start_idx])
+
+    authors, rest = _parse_authors_line(line)
     next_idx = start_idx + 1
-    if not org and next_idx < len(lines) and _looks_like_org_line(lines[next_idx]):
-        # Организация иногда стоит отдельной строкой (не приклеена к строке с именами) —
-        # тот же формат «1, 2 Организация (Город, Страна)», просто без имён впереди.
-        org, town, country = _parse_org_line(lines[next_idx])
+
+    # Организация(-и) может идти сразу за именами на той же строке (rest) и/или занимать
+    # одну или несколько следующих строк — конкатенируем всё и разбираем как единый текст.
+    # Email иногда приклеен (мягкий перенос строки Word) прямо к последней такой строке —
+    # отрезаем его так же, как от строки с именами, до проверки _looks_like_org_line.
+    org_text_parts = [rest] if rest else []
+    while not email_part and next_idx < len(lines):
+        candidate, candidate_email = _strip_email(lines[next_idx])
+        if not candidate or not _looks_like_org_line(candidate):
+            break
+        org_text_parts.append(candidate)
         next_idx += 1
+        email_part = candidate_email
+    _assign_orgs(authors, _split_org_chunks(" ".join(org_text_parts)))
+
     # Строку с email-ами пропускаем, только если в ней реально есть "@" — иногда после
     # авторов (и организации, если она была) сразу идёт «Аннотация»/«Abstract» без каких-либо
-    # контактов, и блёндно съедать следующую строку в этом случае нельзя (см. _looks_like_org_line).
-    emails = []
-    if next_idx < len(lines) and "@" in lines[next_idx]:
-        emails = _parse_emails_line(lines[next_idx])
+    # контактов, и слепо съедать следующую строку в этом случае нельзя (см. _looks_like_org_line).
+    if not email_part and next_idx < len(lines) and "@" in lines[next_idx]:
+        email_part = lines[next_idx]
         next_idx += 1
-    return authors, org, town, country, emails, next_idx
+
+    emails_by_idx = _parse_emails_line(email_part) if email_part else {}
+    for pos, a in enumerate(authors):
+        if a["index"] is not None and a["index"] in emails_by_idx:
+            a["email"] = emails_by_idx[a["index"]]
+        elif a["index"] is None and pos in emails_by_idx:
+            a["email"] = emails_by_idx[pos]
+        else:
+            a["email"] = ""
+
+    return authors, next_idx
 
 
 def _extract_pages(citation_text):
@@ -318,13 +425,10 @@ def parse_article_text(text):
         title_lines, i_after_title_ru = _consume_title_lines(lines, i_title_ru)
         result["title_ru"] = " ".join(title_lines)
 
-    authors_ru, org_ru, town_ru, country_ru = ([], "", "", "")
-    emails = []
+    authors_ru = []
     i_after_authors_ru = None
     if i_after_title_ru is not None:
-        authors_ru, org_ru, town_ru, country_ru, emails, i_after_authors_ru = _parse_authors_block(
-            lines, i_after_title_ru
-        )
+        authors_ru, i_after_authors_ru = _parse_authors_block(lines, i_after_title_ru)
 
     i_annot = _find_eq(lines, "Аннотация", i_after_authors_ru or 0)
     i_keywords_h = _find_eq(lines, "Ключевые слова", i_annot or 0) if i_annot is not None else None
@@ -409,14 +513,12 @@ def parse_article_text(text):
 
     # --- English mirror ---
     i_orig = _find_eq(lines, "Original article", i_submitted or 0) if i_submitted is not None else _find_eq(lines, "Original article")
-    authors_en, org_en, town_en, country_en = ([], "", "", "")
+    authors_en = []
     if i_orig is not None:
         i_title_en = i_orig + 1
         title_lines_en, i_after_title_en = _consume_title_lines(lines, i_title_en)
         result["title_en"] = " ".join(title_lines_en)
-        authors_en, org_en, town_en, country_en, _emails_en, i_after_authors_en = _parse_authors_block(
-            lines, i_after_title_en
-        )
+        authors_en, i_after_authors_en = _parse_authors_block(lines, i_after_title_en)
 
         i_abstract_h = _find_eq(lines, "Abstract", i_after_authors_en)
         i_keywords_en_h = _find_eq(lines, "Keywords", i_abstract_h or 0) if i_abstract_h is not None else None
@@ -469,10 +571,10 @@ def parse_article_text(text):
         authors.append({
             "surname_ru": ru.get("surname", ""), "initials_ru": ru.get("initials", ""),
             "surname_en": en.get("surname", ""), "initials_en": en.get("initials", ""),
-            "org_ru": org_ru, "org_en": org_en,
-            "town_ru": town_ru, "town_en": town_en,
+            "org_ru": ru.get("org", ""), "org_en": en.get("org", ""),
+            "town_ru": ru.get("town", ""), "town_en": en.get("town", ""),
             "position_ru": ru.get("position", ""), "position_en": en.get("position", ""),
-            "email": emails[i] if i < len(emails) else "",
+            "email": ru.get("email", "") or en.get("email", ""),
             "spin": ru.get("spin", ""),
         })
     result["authors"] = authors
