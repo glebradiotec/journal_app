@@ -181,6 +181,10 @@ def _consume_title_lines(lines, start_idx, max_lines=6):
     после заглавия)."""
     title_lines = []
     i = start_idx
+    # Пропускаем пустые строки перед самим заглавием — часть журналов оставляет пустой
+    # абзац между маркером («Original article», копирайтом) и текстом названия.
+    while i < len(lines) and not lines[i].strip():
+        i += 1
     while i < len(lines) and len(title_lines) < max_lines:
         line = lines[i]
         if not line.strip():
@@ -288,7 +292,7 @@ def parse_article_text(text):
 
     i_udk = _find_startswith(lines, "УДК")
     if i_udk is not None:
-        result["udk"] = lines[i_udk][3:].strip()
+        result["udk"] = lines[i_udk][3:].strip().lstrip(":").strip()
     else:
         warnings.append("Не нашёл строку «УДК» — проверьте вручную.")
 
@@ -299,6 +303,12 @@ def parse_article_text(text):
     i_title_ru = i_doi + 1 if i_doi is not None else None
     i_after_title_ru = None
     if i_title_ru is not None:
+        # Некоторые журналы вставляют между DOI и заглавием строку копирайта
+        # («© Фамилия И.О., ..., Год») — пропускаем её, иначе копирайт принимается за
+        # заглавие и всё дальнейшее (авторы, организация) съезжает. Пустую строку после
+        # неё (если есть) пропустит сам _consume_title_lines.
+        if i_title_ru < len(lines) and lines[i_title_ru].strip().startswith("©"):
+            i_title_ru += 1
         title_lines, i_after_title_ru = _consume_title_lines(lines, i_title_ru)
         result["title_ru"] = " ".join(title_lines)
 
