@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from datetime import timedelta
 from pathlib import Path
 
@@ -121,7 +122,11 @@ from sqlalchemy.engine import Engine
 
 @event.listens_for(Engine, "connect")
 def _sqlite_unicode_lower(dbapi_connection, connection_record):
-    dbapi_connection.create_function("lower", 1, lambda s: s.lower() if s else s)
+    # Слушатель висит на классе Engine, то есть срабатывает на любом подключении в процессе,
+    # включая БД сайта (MySQL) из модуля публикации. У драйвера MySQL нет create_function,
+    # так что без этой проверки падает любое обращение к сайту.
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        dbapi_connection.create_function("lower", 1, lambda s: s.lower() if s else s)
 # Blueprint автора регистрируем до публичных маршрутов, чтобы /author/ и /author/new не перехватывались маршрутом /author/<path:author_name>
 app.register_blueprint(author_bp)
 register_public_routes(app)

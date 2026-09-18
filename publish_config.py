@@ -17,7 +17,7 @@ ARTICLE_URL_TEMPLATE = os.environ.get(
     "https://radiotec.ru/en/journal/{journal_link}/number/{year}-{number}/article/{art_id}",
 )
 
-DEFAULT_ARTICLE_PRICE = int(os.environ.get("DEFAULT_ARTICLE_PRICE", "350"))
+DEFAULT_ARTICLE_PRICE = int(os.environ.get("DEFAULT_ARTICLE_PRICE", "500"))
 
 SITE_UPLOADS_DIR = os.environ.get(
     "SITE_UPLOADS_DIR", os.path.join(os.path.dirname(__file__), "uploads", "publish_manuscripts")

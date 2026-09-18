@@ -141,6 +141,13 @@ def _safe_list_journals():
         return [], str(e)
 
 
+def _journal_name_en(journal_row):
+    """Английского названия журнала в таблице journals нет, но есть поле link — это оно же
+    со словами через подчёркивание ('Information-measuring_and_Control_Systems'). Сайт и в
+    ручных строках цитирования использует именно его."""
+    return (journal_row[3] or '').replace('_', ' ') if journal_row else ''
+
+
 def _apply_article_fields(article: PubArticle, form):
     article.section_ru = form.get('section_ru', '').strip()
     article.section_en = form.get('section_en', '').strip()
@@ -439,6 +446,26 @@ def register_publish_routes(app):
             except Exception:
                 pass
 
+        if journal_row is not None:
+            try:
+                with engine.connect() as conn:
+                    limits = site_db.column_limits(conn)
+                for i, (art, doi) in enumerate(zip(issue.articles, computed_dois), start=1):
+                    citata = publish_format_html.format_citation_html(
+                        [{'surname': a.surname_ru, 'initials': a.initials_ru} for a in art.authors],
+                        art.title_ru, journal_row[1], issue.year, issue.volume, issue.number,
+                        art.pages, doi, lang='ru')
+                    for col, value in (('citata', citata), ('art_name', art.title_ru or ''),
+                                       ('art_page', art.pages or ''), ('udk', art.udk or '')):
+                        limit = limits.get(col)
+                        if limit and len(value) > limit:
+                            warnings.append(
+                                f'Статья №{i} «{art.title_ru[:60]}»: поле {col} длиннее, чем '
+                                f'допускает сайт ({len(value)} из {limit}) — отправка будет отклонена.'
+                            )
+            except Exception:
+                pass
+
         for i, art in enumerate(issue.articles):
             if not art.fulltext_ru:
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: нет полного текста — для eLibrary будет временно подставлена аннотация.')
@@ -513,6 +540,7 @@ def register_publish_routes(app):
                 num_id, _created = site_db.find_or_create_nomera(conn, jr_num, issue.year, issue.number)
                 seq_start = site_db.count_articles_in_issue(conn, num_id)
 
+                prepared = []
                 for i, art in enumerate(issue.articles, start=1):
                     razd_id, _ = site_db.find_or_create_section(
                         conn, num_id, art.section_ru or 'Без раздела', art.section_en or ''
@@ -521,12 +549,14 @@ def register_publish_routes(app):
 
                     authors_ru = [
                         {'surname': a.surname_ru, 'initials': a.initials_ru, 'org': a.org_ru,
-                         'town': a.town_ru, 'position': a.position_ru, 'email': a.email}
+                         'town': a.town_ru, 'country': a.country_ru,
+                         'position': a.position_ru, 'email': a.email}
                         for a in art.authors
                     ]
                     authors_en = [
                         {'surname': a.surname_en, 'initials': a.initials_en, 'org': a.org_en,
-                         'town': a.town_en, 'position': a.position_en, 'email': a.email}
+                         'town': a.town_en, 'country': a.country_en,
+                         'position': a.position_en, 'email': a.email}
                         for a in art.authors
                     ]
 
@@ -545,21 +575,50 @@ def register_publish_routes(app):
                         'keyword_eng': publish_format_html.format_keywords(art.keywords_en_list),
                         'article_type': ARTICLE_TYPE_CODE_TO_ID.get(art.art_type, 0),
                         'udk': art.udk or '',
-                        'doi': doi,
-                        'citata': art.citation_ru or '',
+                        # На сайте DOI хранится ссылкой целиком (так и заносят руками),
+                        # а у нас в PubArticle — «голый» DOI.
+                        'doi': f'https://doi.org/{doi}',
+                        'citata': publish_format_html.format_citation_html(
+                            authors_ru, art.title_ru, journal_row[1], issue.year,
+                            issue.volume, issue.number, art.pages, doi, lang='ru'),
                         'data_recieved': art.date_received or '',
                         'data_approved': art.date_approved or '',
                         'data_accepted': art.date_accepted or '',
-                        'citata_eng': art.citation_en or '',
+                        'citata_eng': publish_format_html.format_citation_html(
+                            authors_en, art.title_en, _journal_name_en(journal_row), issue.year,
+                            issue.volume, issue.number, art.pages, doi, lang='en'),
                         'rubr_vak': '',
                         'article_text': '',
                         'file': '',
                         'price': art.price or publish_config.DEFAULT_ARTICLE_PRICE,
                     }
-                    site_art_id = site_db.insert_article(conn, fields)
-                    art.doi = doi
-                    art.site_art_id = site_art_id
-                    art.pushed_at = datetime.now(timezone.utc)
+                    prepared.append((art, doi, fields))
+
+                # Таблицы сайта — MyISAM, транзакций на них нет, поэтому сначала проверяем все
+                # статьи целиком и только потом пишем: иначе ошибка на середине выпуска оставит
+                # часть статей на сайте без возможности отката.
+                limits = site_db.column_limits(conn)
+                for i, (art, _doi, fields) in enumerate(prepared, start=1):
+                    too_long = site_db.check_field_lengths(limits, fields)
+                    if too_long:
+                        details = ', '.join(f'{col} ({length} символов при пределе {limit})'
+                                            for col, length, limit in too_long)
+                        flash(f'Статья №{i} «{art.title_ru[:60]}»: не влезает в поля сайта — '
+                              f'{details}. Ничего не отправлено, сократите текст.', 'error')
+                        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+
+                inserted_ids = []
+                try:
+                    for art, doi, fields in prepared:
+                        site_art_id = site_db.insert_article(conn, fields)
+                        inserted_ids.append(site_art_id)
+                        art.doi = doi
+                        art.site_art_id = site_art_id
+                        art.pushed_at = datetime.now(timezone.utc)
+                except Exception:
+                    # Ручная компенсация вместо ROLLBACK (см. выше про MyISAM).
+                    site_db.delete_articles(conn, inserted_ids)
+                    raise
 
                 issue.site_num_id = num_id
         except Exception as e:

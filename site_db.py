@@ -153,5 +153,44 @@ def insert_article(conn, fields):
 
 
 def existing_doi(conn, doi):
-    row = conn.execute(text("SELECT art_id FROM articles WHERE doi = :doi"), {"doi": doi}).fetchone()
+    """Ищет статью по DOI. Проверяем обе формы записи: на сайте DOI хранится и ссылкой
+    (https://doi.org/10.18127/...), и «голым» — в разные годы заносили по-разному."""
+    row = conn.execute(
+        text("SELECT art_id FROM articles WHERE doi = :doi OR doi = :url"),
+        {"doi": doi, "url": f"https://doi.org/{doi}"},
+    ).fetchone()
     return row[0] if row else None
+
+
+def column_limits(conn, table="articles"):
+    """{колонка: максимальная длина} для строковых колонок таблицы сайта.
+
+    Нужно, чтобы проверить длины ДО первой вставки: таблицы сайта — MyISAM, транзакций там нет,
+    и упавшая на середине отправка оставляет часть статей на сайте (см. insert_articles)."""
+    if conn.engine.dialect.name == "sqlite":
+        return {}
+    rows = conn.execute(
+        text(
+            "SELECT column_name, character_maximum_length FROM information_schema.columns "
+            "WHERE table_schema = DATABASE() AND table_name = :t AND character_maximum_length IS NOT NULL"
+        ),
+        {"t": table},
+    ).fetchall()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def check_field_lengths(limits, fields):
+    """Список ('колонка', длина, предел) для значений, которые не влезут в колонку."""
+    too_long = []
+    for col, value in fields.items():
+        limit = limits.get(col)
+        if limit and isinstance(value, str) and len(value) > limit:
+            too_long.append((col, len(value), limit))
+    return too_long
+
+
+def delete_articles(conn, art_ids):
+    """Удаляет статьи по списку art_id — ручная компенсация вместо отката транзакции
+    (таблицы сайта MyISAM, ROLLBACK на них не работает)."""
+    for art_id in art_ids:
+        conn.execute(text("DELETE FROM articles WHERE art_id = :id"), {"id": art_id})
