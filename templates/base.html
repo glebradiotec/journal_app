@@ -568,6 +568,17 @@
                 // Определяем: текущая страница — админка?
                 var curAdmMain = mainEl.querySelector('.adm-main');
                 var targetPath = fullUrl.replace(location.origin, '').split('?')[0];
+
+                // «Публикация на сайте» — отдельный модуль со своей боковой панелью и своим
+                // publish.css (подключён в той же панели). Частичная замена ниже оставляет старую
+                // панель и убирает <style> прошлой страницы, так что на стыке модулей страница
+                // остаётся вовсе без стилей. Между модулями — только полная загрузка.
+                var inPublish = function(p) { return p.indexOf('/admin/publish') === 0; };
+                if (curAdmMain && inPublish(location.pathname) !== inPublish(targetPath)) {
+                    window.location.href = fullUrl;
+                    return;
+                }
+
                 var admToAdm = curAdmMain && targetPath.startsWith('/admin');
                 
                 // Fade-out: для admin→admin только правую часть, иначе всё
