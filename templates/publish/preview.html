@@ -93,6 +93,7 @@
                 <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">← Назад к выпуску</a>
             </div>
         {% endif %}
+        {% if metafora_ready %}{% include "publish/_metafora_panel.html" %}{% endif %}
     </div>
 </div>
 

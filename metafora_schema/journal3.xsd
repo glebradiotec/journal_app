@@ -1,0 +1,645 @@
+<xsd:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <xsd:element name="journal">
+    <xsd:complexType>
+      <xsd:choice maxOccurs="unbounded" minOccurs="0">
+        <xsd:element name="operCard">
+          <xsd:complexType>
+            <xsd:all>
+              <xsd:element type="xsd:string" name="date" minOccurs="0"/>
+              <xsd:element type="xsd:byte" name="cntArticle" minOccurs="0"/>
+              <xsd:element type="xsd:byte" name="cs" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="operator" minOccurs="0"/>
+            </xsd:all>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:element type="xsd:string" name="titleid" minOccurs="0"/>
+        <xsd:element type="xsd:string" name="issn" minOccurs="0"/>
+        <xsd:element type="xsd:string" name="eissn" minOccurs="0"/>
+        <xsd:element type="xsd:string" name="codeNEB" minOccurs="0"/>
+        <xsd:element name="journalInfo">
+          <xsd:complexType>
+            <xsd:all>
+              <xsd:element type="xsd:string" name="title" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="Title" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="abbrTitle" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="publ" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="placePubl" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="address" minOccurs="0"/>
+            </xsd:all>
+            <xsd:attribute type="xsd:string" name="lang" use="optional"/>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:element name="issue">
+          <xsd:complexType>
+            <xsd:all>
+              <xsd:element type="xsd:string" name="volume" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="number" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="altNumber" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="dateUni" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="part" minOccurs="0"/>
+              <xsd:element type="xsd:string" name="pages" minOccurs="0"/>
+              <xsd:element minOccurs="0" name="issTitle">
+                <xsd:complexType>
+                  <xsd:simpleContent>
+                    <xsd:extension base="xsd:string">
+                      <xsd:attribute name="lang" type="xsd:string" use="optional"/>
+                    </xsd:extension>
+                  </xsd:simpleContent>
+                </xsd:complexType>
+              </xsd:element>
+              <xsd:element minOccurs="0" maxOccurs="1" name="codes">
+                <xsd:complexType>
+                  <xsd:sequence>
+                    <xsd:choice maxOccurs="unbounded">
+                      <xsd:element minOccurs="0" maxOccurs="1" name="doi" type="xsd:string">
+                      </xsd:element>
+                      <xsd:element minOccurs="0" maxOccurs="1" name="edn" type="xsd:string">
+                      </xsd:element>
+                    </xsd:choice>
+                  </xsd:sequence>
+                </xsd:complexType>
+              </xsd:element>
+              <xsd:element name="files" minOccurs="0">
+                <xsd:complexType>
+                  <xsd:sequence>
+                    <xsd:element name="file" maxOccurs="unbounded" minOccurs="0">
+                      <xsd:complexType>
+                        <xsd:simpleContent>
+                          <xsd:extension base="xsd:string">
+                            <xsd:attribute type="xsd:string" name="desc" use="optional"/>
+                            <xsd:attribute type="xsd:string" name="fullText" use="optional"/>
+                          </xsd:extension>
+                        </xsd:simpleContent>
+                      </xsd:complexType>
+                    </xsd:element>
+                  </xsd:sequence>
+                </xsd:complexType>
+              </xsd:element>
+              <xsd:element name="articles">
+                <xsd:complexType>
+                  <xsd:choice maxOccurs="unbounded" minOccurs="0">
+                    <xsd:element name="section">
+                      <xsd:complexType>
+                        <xsd:sequence>
+                            <xsd:element maxOccurs="unbounded" name="secTitle">
+                              <xsd:complexType mixed="true">
+                                <xsd:choice maxOccurs="unbounded">
+                                  <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                </xsd:choice>
+                                <xsd:attribute name="lang" type="xsd:string" use="optional">
+                                </xsd:attribute>
+                              </xsd:complexType>
+                            </xsd:element>
+                        </xsd:sequence>
+                      </xsd:complexType>
+                    </xsd:element>
+                    <xsd:element name="article">
+                      <xsd:complexType>
+                        <xsd:choice maxOccurs="unbounded" minOccurs="0">
+                          <xsd:element type="xsd:string" name="langPubl" minOccurs="0"/>
+                          <xsd:element type="xsd:string" name="pages" minOccurs="0"/>
+                          <xsd:element type="xsd:string" name="artType" minOccurs="0"/>
+                            <xsd:element minOccurs="0" maxOccurs="1" name="codes">
+                              <xsd:complexType>
+                                <xsd:sequence>
+                                  <xsd:choice maxOccurs="unbounded">
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="doi" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="edn" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="udk" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="bbk" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="vak" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="vak21" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="jel" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="msc" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="pacs" type="xsd:string"/>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="anycode" type="xsd:string"/>
+                                  </xsd:choice>
+                                </xsd:sequence>
+                              </xsd:complexType>
+                            </xsd:element>
+                          <xsd:element name="authors" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:sequence>
+                                <xsd:element name="author" maxOccurs="unbounded" minOccurs="0">
+                                  <xsd:complexType>
+                                    <xsd:choice maxOccurs="unbounded" minOccurs="0">
+                                      <xsd:element type="xsd:string" name="role" minOccurs="0"/>
+                                      <xsd:element type="xsd:string" name="correspondent" minOccurs="0"/>
+                                          <xsd:element minOccurs="1" maxOccurs="3" name="individInfo">
+                                            <xsd:complexType>
+                                              <xsd:all>
+                                                <xsd:element minOccurs="1" maxOccurs="1" name="surname">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="initials">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="bio">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="address">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="town">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="country">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="otherInfo">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:sequence minOccurs="0" maxOccurs="unbounded">
+                                                      <xsd:choice maxOccurs="unbounded">
+                                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                      </xsd:choice>
+                                                    </xsd:sequence>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="comment">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:choice maxOccurs="unbounded">
+                                                      <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                    </xsd:choice>
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="commentDate" type="xsd:string">
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="orgName">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:choice maxOccurs="unbounded">
+                                                      <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                    </xsd:choice>
+                                                    <xsd:attribute name="notAuthentic" type="xsd:string" use="optional" />
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                                <xsd:element minOccurs="0" maxOccurs="1" name="email">
+                                                  <xsd:complexType mixed="true">
+                                                    <xsd:choice maxOccurs="unbounded">
+                                                      <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                    </xsd:choice>
+                                                    <xsd:attribute name="notAuthentic" type="xsd:string" use="optional" />
+                                                  </xsd:complexType>
+                                                </xsd:element>
+                                              </xsd:all>
+                                              <xsd:attribute name="lang" type="xsd:string" use="required">
+                                              </xsd:attribute>
+                                            </xsd:complexType>
+                                          </xsd:element>
+                                      <xsd:element name="authorCodes" minOccurs="0">
+                                        <xsd:complexType>
+                                          <xsd:all>
+                                            <xsd:element type="xsd:string" name="scopusid" minOccurs="0"/>
+                                            <xsd:element type="xsd:string" name="researcherid" minOccurs="0"/>
+                                            <xsd:element type="xsd:string" name="orcid" minOccurs="0"/>
+                                            <xsd:element type="xsd:string" name="spin" minOccurs="0"/>
+                                          </xsd:all>
+                                        </xsd:complexType>
+                                      </xsd:element>
+                                     <xsd:element type="xsd:string" name="country" minOccurs="0"/>
+									 </xsd:choice>
+                                    <xsd:attribute type="xsd:byte" name="num" use="optional"/>
+                                    <xsd:attribute type="xsd:string" name="id" use="optional"/>
+                                  </xsd:complexType>
+                                </xsd:element>
+                              </xsd:sequence>
+                            </xsd:complexType>
+                          </xsd:element>
+                          <xsd:element name="artTitles" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:sequence>
+                            <xsd:element maxOccurs="unbounded" name="artTitle">
+                              <xsd:complexType mixed="true">
+                                <xsd:choice maxOccurs="unbounded">
+                                  <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                </xsd:choice>
+                                <xsd:attribute name="lang" type="xsd:string" use="optional">
+                                </xsd:attribute>
+                              </xsd:complexType>
+                            </xsd:element>
+                              </xsd:sequence>
+                            </xsd:complexType>
+                          </xsd:element>
+                          <xsd:element name="abstracts" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:sequence>
+                                  <xsd:element minOccurs="0" maxOccurs="unbounded" name="abstract">
+                                    <xsd:complexType mixed="true">
+                                      <xsd:choice maxOccurs="unbounded">
+                                        <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                      </xsd:choice>
+                                      <xsd:attribute name="lang" type="xsd:string" use="required"/>
+                                    </xsd:complexType>
+                                  </xsd:element>
+                              </xsd:sequence>
+                            </xsd:complexType>
+                          </xsd:element>
+                          <xsd:element name="text" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:simpleContent>
+                                <xsd:extension base="xsd:string">
+                                  <xsd:attribute type="xsd:string" name="lang"/>
+                                </xsd:extension>
+                              </xsd:simpleContent>
+                            </xsd:complexType>
+                          </xsd:element>
+                          <xsd:element name="keywords" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:sequence>
+                                <xsd:element name="kwdGroup" maxOccurs="unbounded" minOccurs="0">
+                                  <xsd:complexType>
+                                    <xsd:sequence>
+                                      <xsd:element name="keyword" maxOccurs="unbounded" minOccurs="0">
+                                        <xsd:complexType mixed="true">
+                                          <xsd:choice maxOccurs="unbounded">
+                                            <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                          </xsd:choice>
+                                        </xsd:complexType>
+									  </xsd:element>
+                                    </xsd:sequence>
+                                    <xsd:attribute type="xsd:string" name="lang" use="optional"/>
+                                  </xsd:complexType>
+                                </xsd:element>
+                              </xsd:sequence>
+                            </xsd:complexType>
+                          </xsd:element>
+                            <xsd:element minOccurs="0" maxOccurs="1" name="rubrics">
+                              <xsd:complexType>
+                                <xsd:sequence>
+                                  <xsd:element maxOccurs="unbounded" name="rubric" type="xsd:string">
+                                  </xsd:element>
+                                </xsd:sequence>
+                              </xsd:complexType>
+                            </xsd:element>
+                            <xsd:element minOccurs="0" maxOccurs="1" name="dates">
+                              <xsd:complexType>
+                                <xsd:sequence>
+                                  <xsd:choice maxOccurs="unbounded">
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="dateReceived" type="xsd:string">
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="dateAccepted" type="xsd:string">
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" maxOccurs="1" name="datePublication" type="xsd:string">
+                                    </xsd:element>
+                                  </xsd:choice>
+                                </xsd:sequence>
+                              </xsd:complexType>
+                            </xsd:element>
+                            <xsd:element minOccurs="0" maxOccurs="1" name="references">
+                              <xsd:complexType>
+                                <xsd:sequence>
+                                  <xsd:element minOccurs="0" maxOccurs="unbounded" name="reference">
+                                    <xsd:complexType mixed="true">
+                                      <xsd:sequence>
+                                        <xsd:element minOccurs="0" maxOccurs="unbounded" name="refInfo">
+                                          <xsd:complexType>
+                                            <xsd:sequence>
+                                              <xsd:element minOccurs="1" maxOccurs="1" name="text">
+                                                <xsd:complexType mixed="true">
+                                                  <xsd:sequence maxOccurs="unbounded">
+                                                    <xsd:choice maxOccurs="unbounded">
+                                                      <xsd:any processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+                                                    </xsd:choice>
+                                                  </xsd:sequence>
+                                                </xsd:complexType>
+                                              </xsd:element>
+                                              <xsd:element name="elements" minOccurs="0">
+                                                <xsd:complexType>
+                                                  <xsd:sequence>
+                                                    <xsd:element maxOccurs="unbounded" name="element">
+                                                      <xsd:complexType mixed="true">
+                                                        <xsd:choice maxOccurs="unbounded">
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="br">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="I">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="b">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="B">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="tex">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="TEX">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                          <xsd:element minOccurs="0" maxOccurs="unbounded" name="i">
+                                                            <xsd:complexType mixed="true">
+                                                              <xsd:sequence maxOccurs="unbounded">
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="i" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="I" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sup" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUP" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="sub" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="SUB" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="br" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="BR" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="b" type="xsd:string" />
+                                                                <xsd:element minOccurs="0" maxOccurs="unbounded" name="B" type="xsd:string" />
+                                                              </xsd:sequence>
+                                                            </xsd:complexType>
+                                                          </xsd:element>
+                                                        </xsd:choice>
+                                                        <xsd:attribute name="field" type="xsd:string" use="required">
+                                                        </xsd:attribute>
+                                                      </xsd:complexType>
+                                                    </xsd:element>
+                                                  </xsd:sequence>
+                                                </xsd:complexType>
+                                              </xsd:element>
+                                            </xsd:sequence>
+                                            <xsd:attribute name="lang" type="xsd:string" use="required">
+                                            </xsd:attribute>
+                                          </xsd:complexType>
+                                        </xsd:element>
+                                      </xsd:sequence>
+                                    </xsd:complexType>
+                                  </xsd:element>
+                                </xsd:sequence>
+                              </xsd:complexType>
+                            </xsd:element>
+                            <xsd:element minOccurs="0" maxOccurs="1" name="files">
+                              <xsd:complexType>
+                                <xsd:sequence>
+                                  <xsd:choice maxOccurs="unbounded">
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="file">
+                                      <xsd:complexType>
+                                        <xsd:simpleContent>
+                                          <xsd:extension base="xsd:string">
+                                            <xsd:attribute name="desc" type="xsd:string" use="optional">
+                                            </xsd:attribute>
+                                            <xsd:attribute name="lang" type="xsd:string" use="optional">
+                                            </xsd:attribute>
+                                          </xsd:extension>
+                                        </xsd:simpleContent>
+                                      </xsd:complexType>
+                                    </xsd:element>
+                                    <xsd:element minOccurs="0" maxOccurs="unbounded" name="furl">
+                                      <xsd:complexType>
+                                        <xsd:simpleContent>
+                                          <xsd:extension base="xsd:string">
+                                            <xsd:attribute name="lang" type="xsd:string" use="optional">
+                                            </xsd:attribute>
+                                            <xsd:attribute name="desc" type="xsd:string" use="optional">
+                                            </xsd:attribute>
+                                            <xsd:attribute name="location" type="xsd:string" use="optional">
+                                            </xsd:attribute>
+                                            <xsd:attribute name="version" type="xsd:string" use="optional">
+                                            </xsd:attribute>
+                                          </xsd:extension>
+                                        </xsd:simpleContent>
+                                      </xsd:complexType>
+                                    </xsd:element>
+                                  </xsd:choice>
+                                </xsd:sequence>
+                              </xsd:complexType>
+                            </xsd:element>
+                          <xsd:element name="fundings" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:sequence>
+                                <xsd:element name="funding" maxOccurs="unbounded" minOccurs="0">
+                                  <xsd:complexType>
+                                    <xsd:simpleContent>
+                                      <xsd:extension base="xsd:string">
+                                        <xsd:attribute type="xsd:string" name="lang" use="optional"/>
+                                      </xsd:extension>
+                                    </xsd:simpleContent>
+                                  </xsd:complexType>
+                                </xsd:element>
+                              </xsd:sequence>
+                            </xsd:complexType>
+                          </xsd:element>
+                          <xsd:element name="artFunding" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:sequence>
+                                <xsd:element name="funding" maxOccurs="unbounded" minOccurs="0">
+                                  <xsd:complexType>
+                                    <xsd:simpleContent>
+                                      <xsd:extension base="xsd:string">
+                                        <xsd:attribute type="xsd:string" name="lang" use="optional"/>
+                                      </xsd:extension>
+                                    </xsd:simpleContent>
+                                  </xsd:complexType>
+                                </xsd:element>
+                              </xsd:sequence>
+                            </xsd:complexType>
+                          </xsd:element>
+                          <xsd:element name="secTitle" minOccurs="0">
+                            <xsd:complexType>
+                              <xsd:simpleContent>
+                                <xsd:extension base="xsd:string">
+                                  <xsd:attribute type="xsd:string" name="lang"/>
+                                </xsd:extension>
+                              </xsd:simpleContent>
+                            </xsd:complexType>
+                          </xsd:element>
+                        </xsd:choice>
+                      </xsd:complexType>
+                    </xsd:element>
+                  </xsd:choice>
+                </xsd:complexType>
+              </xsd:element>
+            </xsd:all>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:choice>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>

@@ -3,6 +3,7 @@
 (models.Article/Issue) — свои таблицы (models_publish.py), свои маршруты.
 """
 import io
+import json
 import os
 import zipfile
 from collections import defaultdict
@@ -25,6 +26,7 @@ import site_db
 import export_crossref
 import export_elibrary
 import export_metafora
+import metafora_api
 import publish_journal_abbr
 
 
@@ -481,6 +483,7 @@ def register_publish_routes(app):
             'publish/preview.html', issue=issue, journal_row=journal_row,
             computed_dois=computed_dois, warnings=warnings, production=production,
             elibrary_ready=elibrary_ready, crossref_ready=crossref_ready, metafora_ready=metafora_ready,
+            mf_state=_mf_load_state(issue.id), mf_key_set=bool(os.environ.get('METAFORA_API_KEY', '').strip()),
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>/generate-elibrary', methods=['POST'])
@@ -515,6 +518,124 @@ def register_publish_routes(app):
             f.write(metafora_xml)
         flash('XML для Метафоры сгенерирован — можно скачать ниже.', 'success')
         return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+
+    # ---- Метафора: отправка по API ----
+    # Состояние отправки (file_uid, uid статей) хранится рядом с XML, в БД ничего не добавляем.
+
+    def _mf_state_path(issue_id):
+        return os.path.join(PUB_EXPORTS_FOLDER, f'{issue_id}_metafora_state.json')
+
+    def _mf_load_state(issue_id):
+        try:
+            with open(_mf_state_path(issue_id), encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def _mf_save_state(issue_id, state):
+        os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+        with open(_mf_state_path(issue_id), 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+
+    def _mf_xml(issue_id):
+        path = os.path.join(PUB_EXPORTS_FOLDER, f'{issue_id}_metafora.xml')
+        if not os.path.exists(path):
+            return None
+        with open(path, 'rb') as f:
+            return f.read()
+
+    def _mf_redirect(issue_id):
+        return redirect(url_for('admin_publish_issue_preview', issue_id=issue_id))
+
+    @app.route('/admin/publish/issue/<int:issue_id>/metafora/check', methods=['POST'])
+    @admin_required
+    def admin_publish_metafora_check(issue_id):
+        PubIssue.query.get_or_404(issue_id)
+        xml = _mf_xml(issue_id)
+        if xml is None:
+            flash('Сначала сгенерируйте XML для Метафоры.', 'error')
+            return _mf_redirect(issue_id)
+        problems = metafora_api.validate_journal_xml(xml)
+        if problems:
+            for p in problems:
+                flash(f'Метафора: {p}', 'error')
+        else:
+            flash('XML проходит проверку по схеме Метафоры — можно отправлять.', 'success')
+        return _mf_redirect(issue_id)
+
+    @app.route('/admin/publish/issue/<int:issue_id>/metafora/send', methods=['POST'])
+    @admin_required
+    def admin_publish_metafora_send(issue_id):
+        PubIssue.query.get_or_404(issue_id)
+        xml = _mf_xml(issue_id)
+        if xml is None:
+            flash('Сначала сгенерируйте XML для Метафоры.', 'error')
+            return _mf_redirect(issue_id)
+        problems = metafora_api.validate_journal_xml(xml)
+        if problems:
+            for p in problems:
+                flash(f'Метафора: {p}', 'error')
+            flash('Отправка отменена: исправьте проблемы выше и пересоберите XML.', 'error')
+            return _mf_redirect(issue_id)
+        try:
+            file_uid = metafora_api.upload_journal_xml(xml, filename=f'{issue_id}_metafora.xml')
+        except metafora_api.MetaforaError as e:
+            flash(str(e), 'error')
+            return _mf_redirect(issue_id)
+        _mf_save_state(issue_id, {
+            'file_uid': file_uid,
+            'sent_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        })
+        flash('Выпуск отправлен в Метафору. Нажмите «Проверить статус», чтобы увидеть результат обработки.', 'success')
+        return _mf_redirect(issue_id)
+
+    @app.route('/admin/publish/issue/<int:issue_id>/metafora/status', methods=['POST'])
+    @admin_required
+    def admin_publish_metafora_status(issue_id):
+        PubIssue.query.get_or_404(issue_id)
+        state = _mf_load_state(issue_id)
+        if not state.get('file_uid'):
+            flash('Выпуск ещё не отправлялся в Метафору.', 'error')
+            return _mf_redirect(issue_id)
+        try:
+            st = metafora_api.file_status(state['file_uid'])
+            signed = metafora_api.publications_status(st['articles'])
+        except metafora_api.MetaforaError as e:
+            flash(str(e), 'error')
+            return _mf_redirect(issue_id)
+        state.update({
+            'status_code': st['code'], 'status_text': st['text'],
+            'articles': [{'uid': u, 'signed_at': signed.get(u)} for u in st['articles']],
+            'checked_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+        })
+        _mf_save_state(issue_id, state)
+        flash(f'Метафора: файл {st["text"]}; статей — {len(st["articles"])}.',
+              'error' if st['code'] == 4 else 'success')
+        return _mf_redirect(issue_id)
+
+    @app.route('/admin/publish/issue/<int:issue_id>/metafora/sign', methods=['POST'])
+    @admin_required
+    def admin_publish_metafora_sign(issue_id):
+        PubIssue.query.get_or_404(issue_id)
+        state = _mf_load_state(issue_id)
+        if state.get('status_code') != 3 or not state.get('articles'):
+            flash('Подписывать можно только после успешной обработки: нажмите «Проверить статус».', 'error')
+            return _mf_redirect(issue_id)
+        done, failed = 0, []
+        for a in state['articles']:
+            if a.get('signed_at'):
+                continue
+            try:
+                metafora_api.sign_publication(a['uid'])
+                done += 1
+            except metafora_api.MetaforaError as e:
+                failed.append(str(e))
+                break
+        if failed:
+            flash(f'Подписано {done}, затем ошибка: {failed[0]}', 'error')
+        else:
+            flash(f'Подписано публикаций: {done}.', 'success')
+        return redirect(url_for('admin_publish_metafora_status', issue_id=issue_id), code=307)
 
     @app.route('/admin/publish/issue/<int:issue_id>/confirm', methods=['POST'])
     @admin_required

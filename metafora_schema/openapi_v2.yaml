@@ -1,0 +1,1401 @@
+openapi: 3.0.3
+info:
+  title: Metafora API v2
+  description: |
+    API для работы с ИС "Метафора".
+
+    ## Аутентификация
+    Все запросы требуют наличия API-ключа в заголовке `Api-Key`.
+
+    ## Форматы файлов
+    - **JATS** - Journal Article Tag Suite (архивный формат OASIS)
+    - **Journal** - пользовательский формат журнала
+
+  version: 2.0.2
+  contact:
+    name: API Support
+
+tags:
+  - name: files
+    description: Операции с файлами статей
+  - name: publications
+    description: Операции с публикациями
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /api/v2/files/jats/xml/:
+    post:
+      tags:
+        - files
+      summary: Загрузка JATS XML файла
+      description: |
+        Загружает XML файл в формате JATS для обработки.
+        Файл проходит валидацию по схеме JATS-archive-oasis-article1-4.xsd.
+
+        **Требования:**
+        - XML должен содержать корневой элемент, отличный от `<journal>`
+        - Файл должен быть валидным по схеме JATS
+        - ISSN из XML должен соответствовать журналам организации
+        - Организация должна иметь права на публикацию в журнале
+
+      operationId: uploadJatsXml
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - xml
+              properties:
+                xml:
+                  type: string
+                  format: binary
+                  description: XML файл в формате JATS
+                platform:
+                  type: string
+                  description: Издательская платформа (опционально)
+                  example: "some_platform"
+            encoding:
+              xml:
+                contentType: application/xml, text/xml
+      responses:
+        '200':
+          description: Файл успешно загружен и принят к обработке
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSuccessResponse'
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа (невалидный API-ключ или нет прав на журнал)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Журналы не найдены для организации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт - файл уже существует или проблемы с правами
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: XML file already exists
+                error: XML_ALREADY_EXISTS
+                data:
+                  exists_file_uid: "550e8400-e29b-41d4-a716-446655440000"
+        '400':
+          description: Ошибка сохранения файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: Save file error
+                error: FILE_SAVE_ERROR
+                data: {}
+        '422':
+          description: Ошибка валидации (FormRequest, схема XSD или бизнес-валидация JATS)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                form_request:
+                  summary: Ошибка FormRequest
+                  value:
+                    message: The xml field is required.
+                    errors:
+                      xml:
+                        - The xml field is required.
+                schema_error:
+                  summary: Ошибка XSD-схемы
+                  value:
+                    message: Schema error
+                    error: SCHEMA_ERROR
+                    data:
+                      description: |
+                        Error! String 45: Element 'article-title': This element is not expected.
+                        Warning! String 102: Missing optional element 'abstract'
+                jats_validation:
+                  summary: Ошибка обязательных данных JATS
+                  value:
+                    message: Missing required data
+                    error: MISSING_REQUIRED_DATA
+                    data:
+                      errors:
+                        - article-title is required
+                        - author surname is required
+
+  /api/v2/files/jats/xml_pdf/:
+    post:
+      tags:
+        - files
+      summary: Загрузка JATS XML и PDF файлов
+      description: |
+        Загружает XML файл в формате JATS вместе с PDF файлом статьи.
+        Оба файла загружаются одновременно в одном запросе.
+
+        **Требования:**
+        - Все требования для XML из `/files/jats/xml`
+        - PDF файл должен быть валидным (MIME type: application/pdf)
+        - Расширение файла должно быть `.pdf`
+
+      operationId: uploadJatsXmlPdf
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - xml
+                - pdf
+              properties:
+                xml:
+                  type: string
+                  format: binary
+                  description: XML файл в формате JATS
+                pdf:
+                  type: string
+                  format: binary
+                  description: PDF файл статьи
+                platform:
+                  type: string
+                  description: Издательская платформа (опционально)
+                  example: "some_platform"
+            encoding:
+              xml:
+                contentType: application/xml, text/xml
+              pdf:
+                contentType: application/pdf
+      responses:
+        '200':
+          description: Файлы успешно загружены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadXmlPdfSuccessResponse'
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Журналы не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт — XML с таким содержимым уже загружен для организации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Ошибка сохранения файлов или записи в БД
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации (FormRequest, схема XSD или бизнес-валидация JATS)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                form_request:
+                  summary: Ошибка FormRequest (нет xml или pdf)
+                  value:
+                    message: The xml field is required.
+                    errors:
+                      xml:
+                        - The xml field is required.
+                schema_error:
+                  summary: Ошибка XSD-схемы
+                  value:
+                    message: Schema error
+                    error: SCHEMA_ERROR
+                    data:
+                      description: |
+                        Error! String 45: Element 'article-title': This element is not expected.
+                jats_validation:
+                  summary: Ошибка обязательных данных JATS
+                  value:
+                    message: Missing required data
+                    error: MISSING_REQUIRED_DATA
+                    data:
+                      errors:
+                        - article-title is required
+
+  /api/v2/files/journal/:
+    post:
+      tags:
+        - files
+      summary: Загрузка Journal XML файла
+      description: |
+        Загружает XML файл в пользовательском формате Journal.
+        Файл проходит валидацию по схеме journal3.xsd и бизнес-валидацию (обязательные поля для импорта).
+
+        **Требования:**
+        - Файл должен быть валидным по схеме journal3.xsd
+        - ISSN/EISSN и наименование из XML должны соответствовать журналам организации
+
+      operationId: uploadJournalXml
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - xml
+              properties:
+                xml:
+                  type: string
+                  format: binary
+                  description: XML файл в формате Journal
+                platform:
+                  type: string
+                  description: Издательская платформа (опционально)
+                  example: "some_platform"
+            encoding:
+              xml:
+                contentType: application/xml, text/xml
+      responses:
+        '200':
+          description: Файл успешно загружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadSuccessResponse'
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Журналы не найдены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт — файл с таким содержимым уже загружен для организации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: XML file already exists
+                error: XML_ALREADY_EXISTS
+                data:
+                  exists_file_uid: "550e8400-e29b-41d4-a716-446655440000"
+        '400':
+          description: Ошибка сохранения файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: Save file error
+                error: FILE_SAVE_ERROR
+                data: {}
+        '422':
+          description: Ошибка валидации (FormRequest, схема XSD или бизнес-валидация Journal)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                form_request:
+                  summary: Ошибка FormRequest
+                  value:
+                    message: The xml field is required.
+                    errors:
+                      xml:
+                        - The xml field is required.
+                schema_error:
+                  summary: Ошибка XSD-схемы
+                  value:
+                    message: Schema error
+                    error: SCHEMA_ERROR
+                    data:
+                      description: |
+                        Error! String 12: Element 'issue': This element is not expected.
+                journal_validation:
+                  summary: Ошибка обязательных данных Journal
+                  value:
+                    message: Missing required data
+                    error: MISSING_REQUIRED_DATA
+                    data:
+                      errors:
+                        - 'Публикация «Test»: необходимо указать диапазон страниц (элемент <pages>).'
+
+  /api/v2/files/pdf/:
+    post:
+      tags:
+        - files
+      summary: Загрузка PDF файла к существующему XML
+      description: |
+        Загружает PDF файл для ранее загруженного XML файла.
+      operationId: uploadPdf
+      parameters:
+        - name: file_uid
+          in: query
+          required: true
+          description: Уникальный идентификатор ранее загруженного XML файла
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - pdf
+              properties:
+                pdf:
+                  type: string
+                  format: binary
+                  description: PDF файл статьи
+            encoding:
+              pdf:
+                contentType: application/pdf
+      responses:
+        '200':
+          description: PDF успешно загружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadPdfSuccessResponse'
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Файл не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: PDF уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                form_request:
+                  summary: Нет file_uid или pdf
+                  value:
+                    message: The file uid field is required.
+                    errors:
+                      file_uid:
+                        - The file uid field is required.
+                multiple_articles:
+                  summary: Несколько статей на один XML
+                  value:
+                    message: Для файла найдено более одной публикации
+                    error: MULTIPLE_PUBLICATIONS_FOR_XML
+                    data: {}
+
+  /api/v2/files/status/:
+    get:
+      tags:
+        - files
+      summary: Получение статуса обработки файла
+      description: |
+        Возвращает информацию о статусе обработки загруженного XML файла,
+        наличии PDF и список связанных статей (article_uid).
+
+      operationId: getFileStatus
+      parameters:
+        - name: file_uid
+          in: query
+          required: true
+          description: Уникальный идентификатор файла
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Статус файла успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileStatusResponse'
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Файл не найден для организации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/files/{file_uid}:
+    delete:
+      tags:
+        - files
+      summary: Удаление файла
+      description: |
+        Удаляет загруженный XML файл и все связанные с ним публикации
+        **Требования:**
+        - Файл должен принадлежать организации пользователя
+        - Файл должен иметь статус "Processed" (код 3)
+        - У файла не должно быть подписанных публикаций
+      operationId: deleteFile
+      parameters:
+        - name: file_uid
+          in: path
+          required: true
+          description: Уникальный идентификатор файла
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '204':
+          description: Файл успешно удален
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Файл не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Конфликт - файл содержит подписанные публикации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Файл не обработан или обработан с ошибкой
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/publications/{article_uid}:
+    get:
+      tags:
+        - publications
+      summary: Полные данные публикации
+      description: |
+        Возвращает полные метаданные публикации по `article_uid`
+        Доступны только публикации организации, к которой привязан API-ключ.
+      operationId: getPublicationByUid
+      parameters:
+        - name: article_uid
+          in: path
+          required: true
+          description: Уникальный идентификатор публикации
+          schema:
+            type: string
+            format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+      responses:
+        '200':
+          description: Данные публикации успешно получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationFullResponse'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Публикация недоступна для организации API-ключа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/publications/status/batch:
+    post:
+      tags:
+        - publications
+      summary: Получение статусов подписания для множества публикаций
+      description: |
+        Возвращает статусы подписания (signed_at) и отзыва подписи (unsigned_at) для списка публикаций по их article_uid.
+        Возвращает только публикации, которые найдены и доступны для организации, к которой привязан API-ключ.
+        Публикации, которые не найдены или недоступны, не включаются в ответ.
+
+      operationId: getPublicationStatusBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - article_uids
+              properties:
+                article_uids:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  description: Массив уникальных идентификаторов публикаций
+                  items:
+                    type: string
+                  example: ["660e8400-e29b-41d4-a716-446655440001", "660e8400-e29b-41d4-a716-446655440002"]
+      responses:
+        '200':
+          description: Статусы успешно получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationStatusBatchResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/publications/{article_uid}/sign/:
+    put:
+      tags:
+        - publications
+      summary: Подписание публикации
+      description: |
+        Подписывает публикацию для организации, к которой привязан API-ключ.
+        В случае успеха возвращает идентификатор публикации и время подписания.
+      operationId: signPublication
+      parameters:
+        - name: article_uid
+          in: path
+          required: true
+          description: Уникальный идентификатор публикации
+          schema:
+            type: string
+          example: "660e8400-e29b-41d4-a716-446655440001"
+      responses:
+        '200':
+          description: Публикация успешно подписана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationResponse'
+        '400':
+          description: Ошибка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ресурс не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Публикация уже подписана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/publications/{article_uid}/unsign/:
+    put:
+      tags:
+        - publications
+      summary: Отзыв подписи у публикации
+      description: |
+        Отзывает подпись у публикации для организации, к которой привязан API-ключ.
+        В случае успеха возвращает идентификатор публикации и время отзыва подписи.
+      operationId: unsignPublication
+      parameters:
+        - name: article_uid
+          in: path
+          required: true
+          description: Уникальный идентификатор публикации
+          schema:
+            type: string
+          example: "660e8400-e29b-41d4-a716-446655440001"
+      responses:
+        '200':
+          description: Подпись успешно отозвана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationResponse'
+        '400':
+          description: Ошибка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Ресурс не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Публикация не подписана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/publications/{article_uid}/pdf/:
+    post:
+      tags:
+        - publications
+      summary: Загрузка PDF файла для публикации
+      description: |
+        Загружает PDF файл для конкретной публикации по её article_uid.
+      operationId: uploadPdfToPublication
+      parameters:
+        - name: article_uid
+          in: path
+          required: true
+          description: Уникальный идентификатор публикации
+          schema:
+            type: string
+            format: uuid
+          example: "660e8400-e29b-41d4-a716-446655440001"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - pdf
+              properties:
+                pdf:
+                  type: string
+                  format: binary
+                  description: PDF файл публикации
+            encoding:
+              pdf:
+                contentType: application/pdf
+      responses:
+        '200':
+          description: PDF успешно загружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationResponse'
+              example:
+                message: Success
+                data:
+                  article_uid: "660e8400-e29b-41d4-a716-446655440001"
+                  has_pdf: true
+                  signed_at: null
+                  file_uid: "550e8400-e29b-41d4-a716-446655440000"
+                  created_at: "2025-01-10T08:15:00+03:00"
+        '400':
+          description: Ошибка загрузки или базы данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неавторизован (неактивный API-ключ)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа к публикации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Публикация уже подписана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '500':
+          description: Ошибка при сохранении файла
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v2/publications/doi/{doi}:
+    get:
+      tags:
+        - publications
+      summary: Поиск публикации по DOI
+      description: |
+        Находит публикацию по DOI (Digital Object Identifier).
+        По умолчанию возвращает только публикации, доступные для организации, к которой привязан API-ключ.
+        Если установлен параметр `public=true`, поиск выполняется по всем публикациям без учета организации.
+      operationId: findPublicationByDoi
+      parameters:
+        - name: doi
+          in: path
+          required: true
+          description: DOI публикации (может содержать слэши, будет автоматически декодирован из URL)
+          schema:
+            type: string
+          example: "10.1234/example.doi"
+        - name: public
+          in: query
+          required: false
+          description: Если true, поиск выполняется по всем публикациям без учета организации. По умолчанию false.
+          schema:
+            type: boolean
+            default: false
+          example: false
+      responses:
+        '200':
+          description: Публикация успешно найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationResponse'
+        '400':
+          description: Ошибка запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неавторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Нет доступа
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Публикация не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Api-Key
+      description: API ключ для аутентификации. Получите его в личном кабинете.
+
+  schemas:
+    UploadSuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+          properties:
+            file_uid:
+              type: string
+              format: uuid
+              description: Уникальный идентификатор загруженного файла
+              example: "550e8400-e29b-41d4-a716-446655440000"
+
+    UploadXmlPdfSuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+          properties:
+            file_uid:
+              type: string
+              format: uuid
+              description: Уникальный идентификатор загруженного файла
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            xml:
+              type: object
+              properties:
+                status:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 1
+                      description: |
+                        Код статуса XML:
+                        - 1: Uploaded (загружен)
+                        - 2: Processing (обрабатывается)
+                        - 3: Processed (обработан успешно)
+                        - 4: Failed (ошибка обработки)
+                    status_text:
+                      type: string
+                      example: Uploaded
+            pdf:
+              type: object
+              properties:
+                status:
+                  type: object
+                  properties:
+                    uploaded:
+                      type: boolean
+                      description: Наличие PDF файла на сервере
+                      example: true
+
+    UploadPdfSuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+          properties:
+            file_uid:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            xml:
+              type: object
+              properties:
+                status:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 1
+                    status_text:
+                      type: string
+                      example: Uploaded
+            pdf:
+              type: object
+              properties:
+                status:
+                  type: object
+                  properties:
+                    uploaded:
+                      type: boolean
+                      example: true
+
+    FileStatusResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+          properties:
+            file_uid:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            xml:
+              type: object
+              properties:
+                status:
+                  type: object
+                  properties:
+                    code:
+                      type: integer
+                      example: 3
+                      description: |
+                        Код статуса обработки XML:
+                        - 1: Uploaded (загружен, ожидает обработки)
+                        - 2: Processing (в процессе обработки)
+                        - 3: Processed (обработан успешно)
+                        - 4: Failed (ошибка при обработке)
+                    status_text:
+                      type: string
+                      example: Processed
+            pdf:
+              type: object
+              properties:
+                status:
+                  type: object
+                  properties:
+                    uploaded:
+                      type: boolean
+                      description: Загружен ли PDF файл
+                      example: true
+            articles:
+              type: array
+              nullable: true
+              description: Список уникальных идентификаторов статей, созданных из загруженного XML файла. Отсутствует, если статей нет.
+              items:
+                type: string
+                format: uuid
+                description: Уникальный идентификатор статьи
+              example: ["660e8400-e29b-41d4-a716-446655440001", "660e8400-e29b-41d4-a716-446655440002"]
+
+    PublicationFullResponse:
+      type: object
+      description: |
+        Полные метаданные публикации. Ключ `article` — карта локалей.
+      required:
+        - article
+      properties:
+        article:
+          type: object
+          description: |
+            Карта локалей публикации. Ключ — код языка (`RUS`, `ENG`, …).
+          additionalProperties:
+            $ref: '#/components/schemas/PublicationFullLocale'
+
+    PublicationFullLocale:
+      type: object
+      description: Данные публикации в конкретной локали.
+      properties:
+        article_uid:
+          type: string
+          format: uuid
+          description: Уникальный идентификатор публикации
+        title:
+          type: string
+          nullable: true
+          description: Заголовок публикации
+        abstract:
+          type: string
+          nullable: true
+          description: Аннотация. Пустая строка передаётся как есть.
+        doi:
+          type: string
+          nullable: true
+          example: "10.1000/example"
+        edn:
+          type: string
+          nullable: true
+          description: eLibrary Document Number
+        elibrary_id:
+          type: string
+          nullable: true
+          description: ID eLibrary
+        year:
+          type: integer
+          nullable: true
+          description: Год публикации
+        volume:
+          type: string
+          nullable: true
+        issue:
+          type: string
+          nullable: true
+        fpage:
+          type: integer
+          nullable: true
+          description: Начальная страница
+        lpage:
+          type: integer
+          nullable: true
+          description: Конечная страница
+        elocation_id:
+          type: string
+          nullable: true
+          description: eLocation-Id
+        pub_type:
+          type: string
+          nullable: true
+          description: |
+            Человекочитаемый тип публикации.
+        language:
+          type: string
+          description: Код языка локали
+          example: "RUS"
+        udk:
+          type: array
+          description: Коды УДК
+          items:
+            type: string
+          example: ["517.9"]
+        date_received:
+          type: string
+          nullable: true
+          description: Дата поступления статьи
+        date_accepted:
+          type: string
+          nullable: true
+          description: Дата принятия
+        date_publication:
+          type: string
+          nullable: true
+          description: Дата публикации
+        funding:
+          type: array
+          description: |
+            Записи о финансировании в локали.
+          items:
+            $ref: '#/components/schemas/PublicationFullFunding'
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Дата создания записи (ISO 8601)
+          example: "2025-01-10T08:15:00+03:00"
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Дата последнего обновления записи (ISO 8601)
+          example: "2025-01-15T09:30:00+03:00"
+        references:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicationFullReference'
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicationFullAuthor'
+        keywords:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicationFullKeyword'
+
+    PublicationFullFunding:
+      type: object
+      properties:
+        info:
+          type: string
+          nullable: true
+          description: Текст благодарности/финансирования в локали
+
+    PublicationFullReference:
+      type: object
+      properties:
+        text:
+          type: string
+          nullable: true
+          description: Текст ссылки
+
+    PublicationFullAuthor:
+      type: object
+      properties:
+        surname:
+          type: string
+          nullable: true
+          description: Фамилия в локали
+        given_names:
+          type: string
+          nullable: true
+          description: Имя/отчество в локали
+        role:
+          type: string
+          nullable: true
+          description: Роль автора
+        orcid:
+          type: string
+          nullable: true
+        scopusid:
+          type: string
+          nullable: true
+        researcherid:
+          type: string
+          nullable: true
+        spin:
+          type: string
+          nullable: true
+        aff:
+          type: array
+          description: |
+            Аффилиации автора в локали.
+          items:
+            $ref: '#/components/schemas/PublicationFullAuthorAffiliation'
+
+    PublicationFullAuthorAffiliation:
+      type: object
+      description: |
+        Структурированная аффилиация автора. В ответе присутствуют только непустые поля.
+      properties:
+        institution:
+          type: string
+          description: Организация
+        institution_wrap:
+          type: string
+          description: Обёрнутая организация (institution-wrap)
+        addr_line:
+          type: string
+          description: Адресная строка
+        city:
+          type: string
+          description: Город
+        state:
+          type: string
+          description: Регион / область
+        postal_code:
+          type: string
+          description: Почтовый индекс
+        country:
+          type: string
+          description: Страна
+        phone:
+          type: string
+          description: Телефон
+        fax:
+          type: string
+          description: Факс
+        email:
+          type: string
+          description: Email организации
+        orgid:
+          type: string
+          description: Идентификатор организации
+        aff:
+          type: string
+          description: Текст аффилиации (legacy, если заполнено отдельно от institution)
+
+    PublicationFullKeyword:
+      type: object
+      properties:
+        value:
+          type: string
+          description: Текст ключевого слова в локали
+
+    PublicationResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+          properties:
+            article_uid:
+              type: string
+              description: Уникальный идентификатор публикации
+              example: "660e8400-e29b-41d4-a716-446655440001"
+            has_pdf:
+              type: boolean
+              description: Наличие PDF файла у публикации
+              example: true
+            signed_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Время подписания публикации (ISO 8601)
+              example: "2025-01-15T09:30:00+03:00"
+            file_uid:
+              type: string
+              format: uuid
+              nullable: true
+              description: Уникальный идентификатор XML файла, из которого создана публикация
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            created_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Дата и время создания публикации (ISO 8601)
+              example: "2025-01-10T08:15:00+03:00"
+
+    PublicationStatusBatchResponse:
+      type: array
+      description: |
+        Массив статусов подписания публикаций. 
+        Содержит только найденные и доступные для организации публикации.
+        Если публикация не найдена или недоступна, она не включается в ответ.
+      items:
+        type: object
+        properties:
+          article_uid:
+            type: string
+            description: Уникальный идентификатор публикации
+            example: "660e8400-e29b-41d4-a716-446655440001"
+          signed_at:
+            type: string
+            format: date-time
+            nullable: true
+            description: |
+              Время подписания публикации (ISO 8601). 
+              null, если публикация не подписана
+            example: "2025-01-15T09:30:00+03:00"
+          unsigned_at:
+            type: string
+            format: date-time
+            nullable: true
+            description: |
+              Время отзыва подписи у публикации (ISO 8601). 
+              null, если подпись не была отозвана
+            example: "2025-01-16T10:45:00+03:00"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Описание ошибки для пользователя
+          example: Invalid API key
+        error:
+          type: string
+          description: Код ошибки для программной обработки
+          example: INVALID_API_KEY
+        data:
+          type: object
+          description: Дополнительные данные об ошибке
+          nullable: true
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Общее описание ошибки валидации
+          example: "Schema error"
+        errors:
+          type: object
+          description: Объект с ошибками валидации по полям
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            field_name:
+              - "The field is required."
+              - "The field must be string"
+            another_field_name:
+              - "The field must be true or false."
+        description:
+          type: string
+          description: Детальное описание ошибок валидации (если применимо)
+          example: |
+            Error! String 45: Element 'article-title': This element is not expected.
+            Warning! String 102: Missing optional element 'abstract'
+
