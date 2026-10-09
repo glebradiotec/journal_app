@@ -7,7 +7,7 @@ import.html и issue_detail.html), чтобы долгие операции шл
 import json
 import os
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import flash, jsonify, redirect, render_template, request, url_for
@@ -101,8 +101,20 @@ def _publish_css_version():
         return 0
 
 
+def _mf_time(iso):
+    """'2026-10-09T12:56:15+00:00' -> '09.10.2026 15:56' (московское время)."""
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
+        return iso or ''
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone(timedelta(hours=3))).strftime('%d.%m.%Y %H:%M')
+
+
 def register_publish_hub_routes(app):
     app.jinja_env.globals['publish_css_version'] = _publish_css_version
+    app.jinja_env.filters['mf_time'] = _mf_time
 
     # ============================================================ загрузка выпуска целиком
 
