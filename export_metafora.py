@@ -6,6 +6,8 @@
 """
 from lxml import etree
 
+import export_refs
+
 import publish_titleid_store as titleid_store
 from export_elibrary import _el, _individ_info, _clean
 
@@ -104,12 +106,16 @@ def build_metafora_xml(issue, journal_title_ru, journal_title_en=""):
                 for k in art.keywords_en:
                     _el(grp, "keyword", k)
 
-        if art.references:
+        if art.references or getattr(art, "references_en", None):
             refs_el = _el(a_el, "references")
-            for ref in art.references:
+            for ru, en in export_refs.pair_references(art.references, getattr(art, "references_en", [])):
                 ref_el = _el(refs_el, "reference")
-                info_el = _el(ref_el, "refInfo", lang="RUS")
-                _el(info_el, "text", ref)
+                if ru:
+                    info_el = _el(ref_el, "refInfo", lang="RUS")
+                    _el(info_el, "text", ru)
+                if en:
+                    info_el = _el(ref_el, "refInfo", lang="ENG")
+                    _el(info_el, "text", en)
 
         if art.date_received or art.date_accepted or art.date_published:
             dates_el = _el(a_el, "dates")

@@ -77,6 +77,7 @@ class _ArticleView:
         self.keywords_ru = art.keywords_ru_list
         self.keywords_en = art.keywords_en_list
         self.references = art.references_list
+        self.references_en = art.references_en_list
         self.funding_ru = art.funding_ru or ''
         self.funding_en = art.funding_en or ''
         self.date_received = art.date_received or ''

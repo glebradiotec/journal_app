@@ -59,6 +59,14 @@ def validate_journal_xml(xml_bytes):
             problems.append(f"{label}: нет авторов.")
         if not title:
             problems.append(f"{label}: нет названия.")
+        refs = art.findall("references/reference")
+        en_only = [n for n, r in enumerate(refs, start=1)
+                   if r.find("refInfo[@lang='RUS']") is None and r.find("refInfo[@lang='ENG']") is not None]
+        if en_only and len(en_only) < len(refs):
+            problems.append(
+                f"{label}: ссылки №{', '.join(map(str, en_only))} есть только на английском — в Метафоре "
+                "русская версия окажется пустой. Сверьте русский и английский списки литературы."
+            )
     return problems
 
 
@@ -154,6 +162,17 @@ def publications_status(article_uids):
     if isinstance(items, dict):
         items = items.get("data") or []
     return {it["article_uid"]: it.get("signed_at") for it in items}
+
+
+def get_publication(article_uid):
+    """Метаданные публикации: {'RUS': {...title, doi, ...}, 'ENG': {...}}."""
+    return _request("GET", f"/api/v2/publications/{article_uid}").json()["article"]
+
+
+def upload_publication_pdf(article_uid, pdf_bytes, filename="article.pdf"):
+    """Загружает PDF статьи. Для подписанной публикации Метафора ответит 409 — сначала снимите подпись."""
+    return _request("POST", f"/api/v2/publications/{article_uid}/pdf/",
+                    files={"pdf": (filename, pdf_bytes, "application/pdf")}).json()
 
 
 def sign_publication(article_uid):

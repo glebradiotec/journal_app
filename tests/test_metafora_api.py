@@ -116,3 +116,52 @@ def test_publications_status_maps_signed(monkeypatch, key):
             {"article_uid": "a2", "signed_at": None, "unsigned_at": None}]
     monkeypatch.setattr(metafora_api.requests, "request", lambda *a, **k: FakeResp(200, body))
     assert metafora_api.publications_status(["a1", "a2"]) == {"a1": "2026-10-09T10:00:00+03:00", "a2": None}
+
+
+# ---------- связывание русской и английской литературы ----------
+import export_refs
+
+
+def test_equal_lists_are_paired_in_order():
+    ru = ["Иванов И.И. Основы теории. М.: Наука, 2010.", "Петров П.П. Методы расчёта. СПб.: Питер, 2015."]
+    en = ["Ivanov I.I. Osnovy teorii. M.: Nauka, 2010.", "Petrov P.P. Metody raschyota. SPb.: Piter, 2015."]
+    assert export_refs.pair_references(ru, en) == list(zip(ru, en))
+
+
+def test_extra_english_item_stays_separate_and_order_kept():
+    ru = ["Иванов И.И. Основы теории. М.: Наука, 2010.", "Петров П.П. Методы расчёта. СПб.: Питер, 2015."]
+    en = ["Ivanov I.I. Osnovy teorii. M.: Nauka, 2010.", "Sidorov S.S. Lishnyaya ssylka. M., 2001.",
+          "Petrov P.P. Metody raschyota. SPb.: Piter, 2015."]
+    pairs = export_refs.pair_references(ru, en)
+    assert (ru[0], en[0]) in pairs and (ru[1], en[2]) in pairs and (None, en[1]) in pairs
+    assert len(pairs) == 3
+
+
+def test_same_doi_pairs_even_if_text_differs():
+    ru = ["Статья без латиницы. DOI: 10.1000/abc.123"]
+    en = ["Totally different words. DOI: 10.1000/abc.123"]
+    assert export_refs.pair_references(ru, en) == [(ru[0], en[0])]
+
+
+def test_no_english_list_keeps_russian_only():
+    assert export_refs.pair_references(["Иванов. Книга."], []) == [("Иванов. Книга.", None)]
+
+
+def test_metafora_xml_contains_english_references():
+    from lxml import etree
+    issue = _issue()
+    issue.articles[0].references = ["Иванов И.И. Основы теории. М.: Наука, 2010."]
+    issue.articles[0].references_en = ["Ivanov I.I. Osnovy teorii. M.: Nauka, 2010."]
+    doc = etree.fromstring(export_metafora.build_metafora_xml(issue, "Нелинейный мир"))
+    ref = doc.find(".//reference")
+    assert ref.find("refInfo[@lang='RUS']/text").text.startswith("Иванов")
+    assert ref.find("refInfo[@lang='ENG']/text").text.startswith("Ivanov")
+    assert metafora_api.validate_journal_xml(etree.tostring(doc)) == []
+
+
+def test_english_only_reference_is_reported():
+    issue = _issue()
+    issue.articles[0].references = ["Иванов И.И. Основы теории. М.: Наука, 2010."]
+    issue.articles[0].references_en = ["Ivanov I.I. Osnovy teorii. M.: Nauka, 2010.", "Sidorov S.S. Lishnyaya ssylka. M., 2001."]
+    problems = metafora_api.validate_journal_xml(export_metafora.build_metafora_xml(issue, "Нелинейный мир"))
+    assert any("только на английском" in p for p in problems)
