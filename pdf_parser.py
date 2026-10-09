@@ -722,6 +722,45 @@ def parse_article_docx(file_path):
     }
 
 
+def _extract_doc_text_for_publish(file_path):
+    """Текст .doc для модуля «Публикация на сайте» (и только для него — учёт статей читает
+    .doc прежним _extract_text_from_doc, его поведение не меняем).
+
+    Основной способ — собственный разбор формата (doc_text): в отличие от catdoc он отличает
+    мягкий перенос строки от конца абзаца (от этого зависит разбивка списка литературы), убирает
+    коды полей Word и расшифровывает знаки, вставленные через «Вставка → Символ». Строка после
+    мягкого переноса начинается знаком U+2028, такая же метка стоит в самом конце текста —
+    по ним article_template_parser понимает, что переносы размечены (обычный strip() метку
+    снимает, остальной разбор её не видит).
+
+    Запасные способы, если документ прочитать не удалось: на macOS штатный textutil (с теми же
+    метками), дальше — прежняя цепочка catdoc/antiword."""
+    import subprocess
+    import sys
+
+    try:
+        import doc_text
+        return doc_text.extract_text(file_path)
+    except Exception:  # noqa: BLE001 — любой сбой разбора не должен мешать запасным способам
+        pass
+
+    if sys.platform == "darwin":
+        try:
+            result = subprocess.run(
+                ['/usr/bin/textutil', '-convert', 'txt', '-encoding', 'UTF-8', '-stdout', file_path],
+                capture_output=True, timeout=60
+            )
+            text = result.stdout.decode('utf-8', errors='replace').strip() if result.returncode == 0 else ''
+            # textutil иногда «читает» .doc как простой текст и отдаёт двоичный мусор
+            if text and '\x00' not in text[:3000]:
+                text = text.replace('\x0b', '\u2028').replace('\u2029', '\n')
+                return text.replace('\u2028', '\n\u2028') + '\n\u2028'
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+    return _extract_text_from_doc(file_path)
+
+
 def extract_text_any(file_path):
     """Извлекает обычный текст из .doc/.docx/.rtf — для модуля «Публикация на сайте»
     (нужен полный текст статьи для разбора по article_template_parser, а не только
@@ -733,7 +772,7 @@ def extract_text_any(file_path):
     suffix = file_path.lower().rsplit('.', 1)[-1] if '.' in file_path else ''
 
     if suffix == 'doc':
-        text = _extract_text_from_doc(file_path)
+        text = _extract_doc_text_for_publish(file_path)
         if not text:
             raise RuntimeError("Не удалось прочитать .doc файл (antiword). Попробуйте сохранить как .docx")
         return text

@@ -111,13 +111,141 @@ def _slice_text(lines, start, end):
     return "\n\n".join(paragraphs)
 
 
+# --- Список литературы ---
+# Абзац в списке = одна ссылка, но Word (через catdoc) отдаёт и мягкий перенос ВНУТРИ ссылки
+# как новую строку («…2020. V. 82.» / «P. 103985.»), так что строка — ещё не ссылка. По точке в
+# конце строки это не различить: обрывок выше кончается точкой, а полноценная ссылка может
+# кончаться без неё (DOI, год). Поэтому смотрим на НАЧАЛО строки.
+_REF_NUMBER_RE = re.compile(r"^\[?\d{1,3}[.)\]]\s+")
+# Хвост предыдущей ссылки: страницы/том/номер («P. 103985.», «V. 78.», «№ 13.», «256 с.»),
+# адрес, «(In Russian)».
+_REF_TAIL_RE = re.compile(
+    r"^(?:(?:P{1,2}|pp?|V|Vol|С|S|Т|T|Вып|Iss|Ч|Ch|No|N)\.?\s*[A-Z]?\d|№\s*\d|\d+\s*[сcps]\.|"
+    r"DOI\b|EDN\b|https?://|www\.|\(|In:?\s)",
+    re.I,
+)
+# Строка «URL: …» в хвосты намеренно не входит: по 150 статьям шести журналов она всегда
+# оказывалась самостоятельным источником (ссылка на страницу без автора и названия).
+_REF_APPENDIX_RE = re.compile(r"^(?:ПРИЛОЖЕНИЕ|Приложение|APPENDIX|Appendix)\b")
+# Начало новой ссылки: до трёх слов с заглавной и инициал («Гельфман Т.Э.», «Kudrolli, Gollub J.P.»)
+# либо инициалы перед фамилией («S.P. Ong»).
+_REF_START_RE = re.compile(
+    r"^(?:[A-ZА-ЯЁ][^\s.,]*(?:,?\s+[A-ZА-ЯЁ][^\s.,]*){0,2},?\s+[A-ZА-ЯЁ][a-zа-яё]?\.|"
+    r"[A-ZА-ЯЁ]\.\s?(?:[A-ZА-ЯЁ]\.\s?)?[A-ZА-ЯЁ][a-zа-яё]+)"
+)
+# Ссылка оборвана на DOI/адресе без точки в конце (с точкой — обычный конец предложения).
+_ENDS_WITH_LINK_RE = re.compile(r"(?:https?://\S*[^\s.]|10\.\d{4,9}/\S*[^\s.])$")
+_PLAIN_WORD_RE = re.compile(r"^[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’ʼ-]*$")
+
+
+# Ссылка явно не кончилась: запятая/двоеточие, « /» (перед перечнем авторов — но не «/» в конце
+# адреса), тире, перенос слова.
+_ENDS_UNFINISHED_RE = re.compile(r"(?:[,:;]|\s[/–—-]|[A-Za-zА-Яа-яЁё]-)$")
+SOFT_BREAK_MARK = "\u2028"
+
+
+def _split_references(lines, soft=None):
+    """Строки блока «Список источников»/«References» -> список ссылок.
+
+    soft — если известно точно (текст получен через textutil, см. pdf_parser), список флагов
+    «эта строка — продолжение предыдущей после мягкого переноса». Тогда ничего не угадываем:
+    абзац = ссылка. Иначе (catdoc) решаем по виду строки."""
+    refs = []
+    for k, raw in enumerate(lines):
+        l = re.sub(r"\s+", " ", raw).strip()
+        if not l:
+            continue
+        numbered = bool(_REF_NUMBER_RE.match(l))
+        l = _REF_NUMBER_RE.sub("", l)
+        if not refs or numbered:
+            refs.append(l)
+            continue
+        prev = refs[-1]
+        if soft is not None:
+            is_tail = bool(soft[k])
+        elif _REF_TAIL_RE.match(l) or _ENDS_UNFINISHED_RE.search(prev):
+            # «…/ А.Г. Сайбель,» + «П.А. Сидоров. 2008.» — после запятой или косой черты ссылка
+            # не кончилась, даже если продолжение выглядит как «И.О. Фамилия».
+            is_tail = True
+        elif _REF_START_RE.match(l):
+            is_tail = False
+        elif _ENDS_WITH_LINK_RE.search(prev):
+            # После DOI/адреса без точки новая ссылка начинается с обычного слова; обрывок самого
+            # адреса («…/DI_FedorVirin_» + «SellersnMarketplaces_2024 (дата обращения…)») — нет.
+            is_tail = not _PLAIN_WORD_RE.match(l.split()[0].rstrip(".,:"))
+        else:
+            is_tail = not _SENTENCE_END_RE.search(prev)
+        if is_tail:
+            refs[-1] = prev + " " + l
+        else:
+            refs.append(l)
+    return refs
+
+
+def _refs_end(lines, start, end):
+    """Конец списка литературы: «Информация об авторах» либо раньше — заголовок приложения,
+    которое часть журналов ставит после списка (иначе формулы приложения станут «источниками»)."""
+    for k in range(start, end):
+        if _REF_APPENDIX_RE.match(lines[k]):
+            return k
+    return end
+
+
+def _reconcile_reference_lists(ru, en):
+    """Русский и английский списки в журнале одной длины. Если после разбивки длины разошлись,
+    значит, в более длинном осталась оторванная часть ссылки: находим позицию, которой нет
+    пары во втором списке, и приклеиваем её к предыдущей ссылке."""
+    import export_refs
+    ru, en = list(ru), list(en)
+    for _ in range(abs(len(ru) - len(en))):
+        longer, is_ru = (ru, True) if len(ru) > len(en) else (en, False)
+        pairs = export_refs.pair_references(ru, en)
+        orphans = [(r if is_ru else e) for r, e in pairs if (e if is_ru else r) is None]
+        idx = next((longer.index(o) for o in orphans if longer.index(o) > 0), None)
+        if idx is None:
+            break
+        longer[idx - 1] = longer[idx - 1] + " " + longer[idx]
+        del longer[idx]
+    return ru, en
+
+
+# Коды полей Word, которые catdoc/textutil выводят как текст: «HYPERLINK "mailto:a@b.ru" \h a@b.ru»,
+# «SHAPE \* MERGEFORMAT». Убираем сам код, видимый текст поля остаётся. Перевод строки не трогаем —
+# иначе следующий заголовок («Abstract») приклеится к строке с email-ами.
+_FIELD_HYPERLINK_RE = re.compile(r'[ \t]*HYPERLINK(?:[ \t]+(?:\\[a-zA-Z]+|"[^"\n]*"))+[ \t]*')
+_FIELD_MERGEFORMAT_RE = re.compile(r"\b[A-Z]{3,}(?:[ \t]+[^\s\\]+)?[ \t]+\\\*[ \t]+MERGEFORMAT[ \t]*")
+
+
+def _strip_field_codes(text):
+    text = _FIELD_HYPERLINK_RE.sub(" ", text)
+    return _FIELD_MERGEFORMAT_RE.sub("", text)
+
+
+_CITATION_NAME_RE = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁ]\.\s?(?:[А-ЯЁ]\.)?")  # и «Маслов. И.В.»
+
+
+def _count_citation_authors(citation, title):
+    """Сколько авторов перечислено в «Для цитирования» (до начала заглавия) — независимая
+    проверка для списка авторов из шапки статьи."""
+    head = citation
+    first_word = title.split()[0] if title.split() else ""
+    if first_word and first_word in citation:
+        head = citation.split(first_word, 1)[0]
+    return len(_CITATION_NAME_RE.findall(head))
+
+
 # Одно вхождение автора: "И.О. Фамилия<N>" (N — номер сноски на организацию; обычно приклеен
 # без пробела, но изредка встречается и с пробелом — "Фамилия N").
 # Инициал — заглавная буква + необязательные строчные (англ. транслитерация вида "Yu.", "Ya.").
 _INITIAL = r"[А-ЯЁA-Z][а-яёa-z]*\."
+# Инициалов обычно два («А.А. Скрылев»), но бывает и один («Б. Балбашио» — у иностранных
+# авторов отчества нет). Один инициал даёт больше ложных срабатываний на сокращениях
+# («Univ. named»), поэтому для него действуют доп. условия — см. _parse_authors_line.
+# Второй инициал иногда без точки — опечатка «Н.А Волков» (тогда за ним обязателен пробел).
 AUTHOR_TOKEN_RE = re.compile(
-    rf"({_INITIAL}\s?{_INITIAL})\s*([А-Яа-яЁёA-Za-z\-]+)\s?(\d*)"
+    rf"({_INITIAL}(?:\s?{_INITIAL}|\s?[А-ЯЁA-Z](?=\s))?)\s*([А-Яа-яЁёA-Za-z\-]+)\s?(\d*)"
 )
+_TWO_INITIALS_RE = re.compile(rf"^{_INITIAL}\s?{_INITIAL}$")
 
 
 def _parse_index_list(s):
@@ -148,9 +276,17 @@ def _parse_authors_line(line):
         mm for mm in all_matches
         if mm.start() == 0 or line[max(0, mm.start() - 2):mm.start()] == ", "
     ]
+    # Одиночный инициал принимаем, только если фамилия с заглавной буквы и сразу за ней
+    # номер сноски, запятая или конец строки — так «И. Ньютона» из названия организации
+    # или «Fig. shape» из заглавия автором не станут.
+    matches = [
+        mm for mm in matches
+        if _TWO_INITIALS_RE.match(mm.group(1).strip())
+        or (mm.group(2)[:1].isupper() and (mm.group(3) or re.match(r"\s*(,|$)", line[mm.end():])))
+    ]
     authors = [
         {
-            "initials": mm.group(1).replace(" ", ""),
+            "initials": re.sub(r"([^.])$", r"\1.", mm.group(1).replace(" ", "")),
             "surname": mm.group(2).strip(),
             "index": int(mm.group(3)) if mm.group(3) else None,
         }
@@ -160,10 +296,24 @@ def _parse_authors_line(line):
     return authors, rest
 
 
+def _is_authors_line(line):
+    """Строка списка авторов: начинается с «И.О. Фамилия». Проверяем именно начало строки —
+    инициалы с фамилией внутри заглавия («К 100-летию А.А. Харкевича») заглавие не обрывают."""
+    line = line.strip()
+    mm = AUTHOR_TOKEN_RE.match(line)
+    if not mm:
+        return False
+    authors, _ = _parse_authors_line(line)
+    return bool(authors)
+
+
 _KNOWN_HEADINGS = {
     "Аннотация", "Ключевые слова", "Для цитирования", "Введение",
     "Abstract", "Keywords", "For citation",
 }
+
+
+_MAX_ORG_LINES = 12
 
 
 def _looks_like_org_line(line):
@@ -258,6 +408,8 @@ def _parse_emails_line(line):
     ключ — порядковый номер email в строке, начиная с 0)."""
     result = {}
     pos = 0
+    # Опечатка «kiyashko@ ipfran.ru» — пробел после «@» встречается в реальных статьях.
+    line = re.sub(r"@\s+(?=[\w-]+\.)", "@", line)
     for m in _EMAIL_WITH_IDX_RE.finditer(line):
         if m.group(1):
             for idx in _parse_index_list(m.group(1)):
@@ -274,7 +426,9 @@ def _strip_email(line):
     Возвращает (текст без email-ов, отрезанный хвост или '')."""
     if "@" not in line:
         return line, ""
-    m = re.search(r"(?:\s\d+\s+)?[\w.+-]+@[\w-]+\.[\w.-]+", line)
+    line = re.sub(r"@\s+(?=[\w-]+\.)", "@", line)
+    # Хвост начинается с номера сноски или диапазона перед адресом («1 a@b.ru», «1−3vka@mil.ru»).
+    m = re.search(r"(?:(?<!\S)\d+(?:\s*[,\-–—−]\s*\d+)*\s*)?[\w.+-]+@[\w-]+\.[\w.-]+", line)
     if not m:
         return line, ""
     return line[:m.start()].strip(), line[m.start():]
@@ -295,7 +449,7 @@ def _consume_title_lines(lines, start_idx, max_lines=6):
         line = lines[i]
         if not line.strip():
             break
-        if AUTHOR_TOKEN_RE.search(line):
+        if _is_authors_line(line):
             break
         title_lines.append(line)
         i += 1
@@ -307,7 +461,7 @@ def _consume_title_lines(lines, start_idx, max_lines=6):
     return title_lines, i
 
 
-def _parse_authors_block(lines, start_idx):
+def _parse_authors_block(lines, start_idx, notes=None):
     """Разбирает блок «авторы + место(-а) работы [+ email-а]» начиная с lines[start_idx].
     Мест работы может быть несколько, и не все авторы работают во всех сразу — у каждого
     автора и каждой организации есть номер сноски, по которому и сопоставляем (см.
@@ -320,18 +474,38 @@ def _parse_authors_block(lines, start_idx):
         return [], start_idx
 
     line, email_part = _strip_email(lines[start_idx])
+    next_idx = start_idx + 1
+
+    # Длинный список авторов не помещается в одну строку: «…, И.А. Клещарь5,» + «Л.Д. Щербаков6».
+    # Признак продолжения — запятая в конце и следующая строка снова начинается с автора.
+    while not email_part and line.rstrip().endswith(",") and next_idx < len(lines):
+        cont, cont_email = _strip_email(lines[next_idx])
+        if not _is_authors_line(cont):
+            break
+        line = line.rstrip() + " " + cont.strip()
+        email_part = cont_email
+        next_idx += 1
 
     authors, rest = _parse_authors_line(line)
-    next_idx = start_idx + 1
 
     # Организация(-и) может идти сразу за именами на той же строке (rest) и/или занимать
     # одну или несколько следующих строк — конкатенируем всё и разбираем как единый текст.
     # Email иногда приклеен (мягкий перенос строки Word) прямо к последней такой строке —
     # отрезаем его так же, как от строки с именами, до проверки _looks_like_org_line.
     org_text_parts = [rest] if rest else []
+    # Название организации бывает длиной в несколько строк, и средние из них ничем на
+    # организацию не похожи («А.А. Леонова – Филиал федерального ГБОУ ВО «МИИГАиК»). Поэтому
+    # сначала ищем, где блок кончается наверняка — строка с email-ами или заголовок
+    # «Аннотация»/«Abstract», — и всё до неё считаем организациями.
+    block_end = None
+    for j in range(next_idx, min(next_idx + _MAX_ORG_LINES, len(lines))):
+        if "@" in lines[j] or lines[j].strip() in _KNOWN_HEADINGS:
+            block_end = j
+            break
     while not email_part and next_idx < len(lines):
         candidate, candidate_email = _strip_email(lines[next_idx])
-        if not candidate or not _looks_like_org_line(candidate):
+        inside_block = block_end is not None and next_idx < block_end
+        if not candidate or not (inside_block or _looks_like_org_line(candidate)):
             break
         org_text_parts.append(candidate)
         next_idx += 1
@@ -349,9 +523,25 @@ def _parse_authors_block(lines, start_idx):
         email_lines.append(lines[next_idx])
         next_idx += 1
 
-    emails_by_idx = _parse_emails_line(" ".join(email_lines)) if email_lines else {}
+    email_text = " ".join(email_lines)
+    emails_by_idx = _parse_emails_line(email_text) if email_lines else {}
+    # Email-ы без номеров сносок («leon@gmail.com» у единственного автора «Л.А. Калуцкий1») —
+    # тогда ключи в emails_by_idx позиционные (с нуля) и к номеру сноски автора не привязаны.
+    # Опечатка в номерах сносок («1a@…, 2b@…, 2c@…» вместо «…, 3c@…»): номер повторился, и второй
+    # адрес затёр бы первый — автор получил бы чужую почту. Если адресов столько же, сколько
+    # авторов, раздаём их по порядку.
+    found = [m for m in _EMAIL_WITH_IDX_RE.finditer(re.sub(r"@\s+(?=[\w-]+\.)", "@", email_text))]
+    emails_unindexed = not any(m.group(1) for m in found)
+    used = [i for m in found if m.group(1) for i in _parse_index_list(m.group(1))]
+    if not emails_unindexed and len(used) != len(set(used)) and len(found) == len(authors):
+        emails_by_idx = {pos: m.group(2) for pos, m in enumerate(found)}
+        emails_unindexed = True
+        if notes is not None:
+            notes.append("В строке e-mail повторяется номер сноски — адреса розданы авторам по порядку, проверьте.")
     for pos, a in enumerate(authors):
-        if a["index"] is not None and a["index"] in emails_by_idx:
+        if emails_unindexed:
+            a["email"] = emails_by_idx.get(pos, "")
+        elif a["index"] is not None and a["index"] in emails_by_idx:
             a["email"] = emails_by_idx[a["index"]]
         elif a["index"] is None and pos in emails_by_idx:
             a["email"] = emails_by_idx[pos]
@@ -375,34 +565,93 @@ def _extract_pages(citation_text):
     return f"{m.group(1)}-{m.group(2)}"
 
 
-def _match_author_info(fio_line, authors_ru):
-    """'Михаил Алексеевич Басараб – ... SPIN-код: 9224-5685' -> (index в authors_ru, position, spin)."""
-    parts = re.split(r"[–—−-]", fio_line, maxsplit=1)
+# ORCID — четыре группы по четыре знака; SPIN — две. Ищем по самому виду кода, а не по подписи
+# рядом: подписи в статьях стоят как попало («ORCID SPIN-код: не представлен; 0009-0005-…»).
+_ORCID_RE = re.compile(r"(?<![\d-])(\d{4}-\d{4}-\d{4}-\d{3}[\dXx])(?![\d-])")
+_SPIN_RE = re.compile(r"(?<![\d-])(\d{4}-\d{4})(?![\d-])")
+
+
+def _extract_author_codes(text):
+    """-> (orcid, spin) из строки/строк «Информации об авторах»; чего нет — пустая строка."""
+    orcid_m = _ORCID_RE.search(text)
+    spin_m = _SPIN_RE.search(_ORCID_RE.sub(" ", text))
+    return (orcid_m.group(1).upper() if orcid_m else ""), (spin_m.group(1) if spin_m else "")
+
+
+def _split_fio_line(fio_line):
+    """'Имя Отчество Фамилия – должность…' -> (fio, rest) или None. Делим по тире с пробелами
+    вокруг — иначе двойная фамилия («Римский-Корсаков») режется по своему дефису."""
+    parts = re.split(r"\s+[–—−-]\s*", fio_line, maxsplit=1)
+    if len(parts) != 2:
+        parts = re.split(r"[–—−]", fio_line, maxsplit=1)
     if len(parts) != 2:
         return None
-    fio, rest = parts[0].strip(), parts[1].strip()
+    return parts[0].strip(), parts[1].strip()
+
+
+def _match_author_info(fio_line, authors_ru):
+    """'Михаил Алексеевич Басараб – ... SPIN-код: 9224-5685' -> (index в authors_ru, position)."""
+    split = _split_fio_line(fio_line)
+    if not split:
+        return None
+    fio, rest = split
     surname = fio.split()[-1] if fio.split() else ""
-    spin_m = re.search(r"SPIN[^:]*:\s*([\d\-]+|не представлен)", rest, re.I)
-    spin = spin_m.group(1).strip() if spin_m else ""
-    if spin.lower().startswith("не"):
-        spin = ""
-    position = rest[: spin_m.start()].strip(" ,") if spin_m else rest.strip()
+    codes_m = re.search(r"(SPIN|ORCID)", rest, re.I)
+    position = rest[: codes_m.start()].strip(" ,;") if codes_m else rest.strip()
+    key = surname.lower().replace("ё", "е")
     for i, a in enumerate(authors_ru):
-        if a["surname"].lower() == surname.lower():
-            return i, position, spin
+        if a["surname"].lower().replace("ё", "е") == key:
+            return i, position
     return None
 
 
 def _match_author_info_en(fio_line):
-    parts = re.split(r"[–—−-]", fio_line, maxsplit=1)
-    if len(parts) != 2:
+    split = _split_fio_line(fio_line)
+    if not split:
         return None, None
-    fio, position = parts[0].strip(), parts[1].strip()
+    fio, position = split
     surname = fio.split()[-1] if fio.split() else ""
     return surname, position
 
 
+# Английская часть открывается строкой с типом статьи: обычно «Original article», у обзоров —
+# «Review article», у кратких сообщений — «Short communication».
+_EN_MARKER_RE = re.compile(
+    r"^(?:Original|Review|Research|Scientific|Short|Brief)\s+(?:article|paper|communication|report)\s*$", re.I)
+# Первая строка статьи -> код типа публикации (как в routes_publish.ARTICLE_TYPES).
+_ART_TYPES = (("обзорн", "REV"), ("кратк", "SCO"), ("редакц", "EDI"), ("рецензи", "BRV"), ("научн", "RAR"))
+
+
+def _art_type(lines):
+    for l in lines[:5]:
+        low = l.lower()
+        if "стать" in low or "сообщени" in low or "обзор" in low:
+            for key, code in _ART_TYPES:
+                if key in low:
+                    return code
+    return "RAR"
+
+
+def _pair_authors(authors_ru, authors_en):
+    """Сопоставляет русских авторов с английскими. Если у всех есть номер сноски и номера в
+    каждом списке не повторяются — по номеру: тогда пропуск одного автора в одном из списков
+    не сдвигает остальных на чужие фамилии. Иначе по порядку."""
+    def by_index(lst):
+        idx = [a.get("index") for a in lst]
+        return {a["index"]: a for a in lst} if lst and None not in idx and len(set(idx)) == len(idx) else None
+
+    ru_map, en_map = by_index(authors_ru), by_index(authors_en)
+    if ru_map is not None and en_map is not None:
+        return [(ru_map.get(i, {}), en_map.get(i, {})) for i in sorted(set(ru_map) | set(en_map))]
+    n = max(len(authors_ru), len(authors_en))
+    return [(authors_ru[i] if i < len(authors_ru) else {}, authors_en[i] if i < len(authors_en) else {})
+            for i in range(n)]
+
+
 def parse_article_text(text):
+    text = _strip_field_codes(text)
+    # Метки мягких переносов (ставит pdf_parser при чтении через textutil) — см. _split_references.
+    soft = [l.startswith(SOFT_BREAK_MARK) for l in text.split("\n")] if SOFT_BREAK_MARK in text else None
     lines = _lines(text)
     warnings = []
     result = {
@@ -417,6 +666,7 @@ def parse_article_text(text):
         "citation_ru": "", "citation_en": "",
         "dates": {"received": "", "approved": "", "accepted": ""},
         "pages": "",
+        "art_type": _art_type(lines),
     }
 
     i_udk = _find_startswith(lines, "УДК")
@@ -444,7 +694,7 @@ def parse_article_text(text):
     authors_ru = []
     i_after_authors_ru = None
     if i_after_title_ru is not None:
-        authors_ru, i_after_authors_ru = _parse_authors_block(lines, i_after_title_ru)
+        authors_ru, i_after_authors_ru = _parse_authors_block(lines, i_after_title_ru, warnings)
 
     i_annot = _find_eq(lines, "Аннотация", i_after_authors_ru or 0)
     i_keywords_h = _find_eq(lines, "Ключевые слова", i_annot or 0) if i_annot is not None else None
@@ -481,8 +731,9 @@ def parse_article_text(text):
 
     i_authinfo_h = _find_startswith(lines, "Информация об автор", i_refs_h or 0) if i_refs_h is not None else None
     if i_refs_h is not None and i_authinfo_h is not None:
-        refs_text = _slice_text(lines, i_refs_h + 1, i_authinfo_h)
-        result["references"] = [r.strip() for r in refs_text.split("\n\n") if r.strip()]
+        i_refs_end = _refs_end(lines, i_refs_h + 1, i_authinfo_h)
+        result["references"] = _split_references(
+            lines[i_refs_h + 1:i_refs_end], soft[i_refs_h + 1:i_refs_end] if soft else None)
 
     # «Статья поступила...» — в шаблоне; часть журналов пишет короче, «Поступила в редакцию...».
     i_submitted = _find(
@@ -498,19 +749,34 @@ def parse_article_text(text):
                 continue
             m = _match_author_info(fio_line, authors_ru)
             if m:
-                idx, position, spin = m
-                # SPIN иногда стоит отдельной строкой сразу после «ФИО – должность»,
-                # а не в ней самой.
-                if not spin and k + 1 < len(info_text):
-                    spin_m = re.search(r"SPIN[^:]*:\s*([\d\-]+|не представлен)", info_text[k + 1], re.I)
-                    if spin_m:
-                        spin = spin_m.group(1).strip()
-                        if spin.lower().startswith("не"):
-                            spin = ""
-                        k += 1
+                idx, position = m
+                # Коды (SPIN, ORCID) стоят либо в самой строке «ФИО – должность», либо
+                # отдельной строкой сразу под ней — берём всё до строки следующего автора.
+                codes_text = fio_line
+                while k + 1 < len(info_text) and not _match_author_info(info_text[k + 1], authors_ru):
+                    if not info_text[k + 1].strip():
+                        break
+                    codes_text += " " + info_text[k + 1]
+                    k += 1
+                orcid, spin = _extract_author_codes(codes_text)
                 authors_ru[idx]["position"] = position
                 authors_ru[idx]["spin"] = spin
+                authors_ru[idx]["orcid"] = orcid
             k += 1
+        # Один и тот же ORCID у двух авторов — ошибка в статье (скопировали строку). Чей он,
+        # по тексту не понять, а чужой ORCID хуже пустого — не записываем никому.
+        seen = {}
+        for a in authors_ru:
+            if a.get("orcid"):
+                seen.setdefault(a["orcid"], []).append(a)
+        for code, owners in seen.items():
+            if len(owners) > 1:
+                for a in owners:
+                    a["orcid"] = ""
+                warnings.append(
+                    f"ORCID {code} указан сразу у нескольких авторов ({', '.join(a['surname'] for a in owners)}) "
+                    "— не записан никому, уточните у автора."
+                )
 
     if i_submitted is not None:
         m = re.search(r"(\d{2}\.\d{2}\.\d{4})", lines[i_submitted])
@@ -528,7 +794,8 @@ def parse_article_text(text):
                 result["dates"]["accepted"] = m2.group(1)
 
     # --- English mirror ---
-    i_orig = _find_eq(lines, "Original article", i_submitted or 0) if i_submitted is not None else _find_eq(lines, "Original article")
+    is_en_marker = lambda l: bool(_EN_MARKER_RE.match(l))  # noqa: E731
+    i_orig = _find(lines, is_en_marker, i_submitted or 0) if i_submitted is not None else _find(lines, is_en_marker)
     authors_en = []
     if i_orig is not None:
         i_title_en = i_orig + 1
@@ -558,8 +825,9 @@ def parse_article_text(text):
         i_refs_en_h = _find_ci_eq(lines, "References", i_forcit_h or 0) if i_forcit_h is not None else None
         i_authinfo_en_h = _find_startswith(lines, "Information about the author", i_refs_en_h or 0) if i_refs_en_h is not None else None
         if i_refs_en_h is not None and i_authinfo_en_h is not None:
-            refs_text_en = _slice_text(lines, i_refs_en_h + 1, i_authinfo_en_h)
-            result["references_en"] = [r.strip() for r in refs_text_en.split("\n\n") if r.strip()]
+            i_refs_en_end = _refs_end(lines, i_refs_en_h + 1, i_authinfo_en_h)
+            result["references_en"] = _split_references(
+                lines[i_refs_en_h + 1:i_refs_en_end], soft[i_refs_en_h + 1:i_refs_en_end] if soft else None)
 
         if i_authinfo_en_h is not None:
             i_stop = _find(lines, lambda l: l.startswith("The article was submitted"), i_authinfo_en_h)
@@ -579,11 +847,8 @@ def parse_article_text(text):
         warnings.append("Не нашёл английскую часть («Original article») — EN-поля не заполнены.")
 
     # --- склейка авторов RU + EN + email + org ---
-    n = max(len(authors_ru), len(authors_en))
     authors = []
-    for i in range(n):
-        ru = authors_ru[i] if i < len(authors_ru) else {}
-        en = authors_en[i] if i < len(authors_en) else {}
+    for ru, en in _pair_authors(authors_ru, authors_en):
         authors.append({
             "surname_ru": ru.get("surname", ""), "initials_ru": ru.get("initials", ""),
             "surname_en": en.get("surname", ""), "initials_en": en.get("initials", ""),
@@ -592,8 +857,29 @@ def parse_article_text(text):
             "position_ru": ru.get("position", ""), "position_en": en.get("position", ""),
             "email": ru.get("email", "") or en.get("email", ""),
             "spin": ru.get("spin", ""),
+            "orcid": ru.get("orcid", ""),
         })
     result["authors"] = authors
+
+    # Самопроверки: расхождения здесь почти всегда значат, что разбор где-то ошибся.
+    n_cit = _count_citation_authors(result["citation_ru"], result["title_ru"])
+    if n_cit and authors_ru and n_cit != len(authors_ru):
+        warnings.append(
+            f"Авторов в шапке статьи разобрано {len(authors_ru)}, а в «Для цитирования» их {n_cit} — проверьте список авторов."
+        )
+    if authors_ru and authors_en and len(authors_ru) != len(authors_en):
+        warnings.append(f"Русских авторов {len(authors_ru)}, английских {len(authors_en)} — проверьте список авторов.")
+    if soft is None and result["references"] and result["references_en"]:
+        result["references"], result["references_en"] = _reconcile_reference_lists(
+            result["references"], result["references_en"])
+    n_ru, n_en = len(result["references"]), len(result["references_en"])
+    if n_ru and n_en and n_ru != n_en:
+        warnings.append(
+            f"В русском списке литературы {n_ru} ссылок, в английском {n_en} — в журнале они должны совпадать, проверьте разбивку."
+        )
+    for a in authors:
+        if a["surname_ru"] and not a["org_ru"]:
+            warnings.append(f"У автора «{a['surname_ru']}» не определилась организация.")
 
     result["pages"] = _extract_pages(result["citation_ru"]) or _extract_pages(result["citation_en"])
     if not result["pages"]:

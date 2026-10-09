@@ -349,6 +349,8 @@ function deleteArticle() {
                 document.getElementById('f_date_approved').value = (p.dates && p.dates.approved) || '';
                 document.getElementById('f_date_accepted').value = (p.dates && p.dates.accepted) || '';
                 document.getElementById('f_pages').value = p.pages || '';
+                var artTypeSelect = document.querySelector('select[name="art_type"]');
+                if (artTypeSelect && p.art_type) { artTypeSelect.value = p.art_type; }
 
                 clearAuthors();
                 (p.authors || []).forEach(function(a) { addAuthorCard(a); });
