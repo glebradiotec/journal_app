@@ -1,0 +1,18 @@
+{# Состояние выпуска одной строкой: статьи → PDF → Метафора → подпись. Нужны issue и st (issue_stage). #}
+<span class="pub-stage">
+    <span class="pub-chip {{ 'pub-chip-ok' if st.articles else 'pub-chip-off' }}" title="Статей в черновике">{{ st.articles }} ст.</span>
+    <span class="pub-chip {{ 'pub-chip-ok' if st.articles and st.pdfs >= st.articles else ('pub-chip-warn' if st.pdfs else 'pub-chip-off') }}" title="PDF статей загружено">PDF {{ st.pdfs }}/{{ st.articles }}</span>
+    {% if st.mf_failed %}
+    <span class="pub-chip pub-chip-bad" title="Метафора не смогла обработать файл">Метафора: ошибка</span>
+    {% elif st.mf_processed %}
+    <span class="pub-chip pub-chip-ok" title="Загружено в Метафору">Метафора {{ st.mf_articles }}</span>
+    {% elif st.mf_sent %}
+    <span class="pub-chip pub-chip-warn" title="Файл отправлен, обработка не проверена">Метафора: отправлен</span>
+    {% else %}
+    <span class="pub-chip pub-chip-off" title="В Метафору не отправлялся">Метафора —</span>
+    {% endif %}
+    {% if st.mf_processed %}
+    <span class="pub-chip {{ 'pub-chip-ok' if st.mf_signed and st.mf_signed == st.mf_articles else ('pub-chip-warn' if st.mf_signed else 'pub-chip-off') }}" title="Подписано публикаций">подпись {{ st.mf_signed }}/{{ st.mf_articles }}</span>
+    {% endif %}
+    {% if st.on_site %}<span class="pub-chip pub-chip-ok" title="Записан в БД сайта">на сайте</span>{% endif %}
+</span>

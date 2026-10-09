@@ -1,41 +1,95 @@
 {% extends "base.html" %}
-{% block title %}Публикация на сайте{% endblock %}
-{% block body_class %}adm-body{% endblock %}
+{% block title %}Публикация выпусков{% endblock %}
+{% block body_class %}pub-body{% endblock %}
 {% block content %}
 
 <div class="adm-layout">
     {% include "publish/_sidebar.html" %}
 
     <div class="adm-main">
-        {% set mobile_title = 'Публикация на сайте' %}
+        {% set hide_import_btn = true %}
         {% include "publish/_topbar.html" %}
 
-        <div class="adm-welcome">
-            <h1 class="adm-welcome-title">Публикация на сайте</h1>
-            <p class="adm-welcome-sub">
-                Отдельный процесс: разбор .doc статьи → запись напрямую в БД radiotec.ru →
-                генерация XML для CrossRef и eLibrary. Не связан с обычным учётом статей.
+        <div class="pub-hero">
+            <h1 class="pub-hero-title">Публикация выпусков</h1>
+            <p class="pub-hero-sub">
+                Загрузите папку выпуска — статьи разберутся сами, данные сверятся с напечатанными PDF,
+                и выпуск можно отправлять в «Метафору».
             </p>
+            <div class="pub-hero-actions">
+                <a href="{{ url_for('admin_publish_import') }}" class="pub-cta">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/></svg>
+                    Загрузить выпуск
+                </a>
+            </div>
+            <div class="pub-hero-stats">
+                <div><span class="pub-hero-stat-num">{{ total_issues }}</span><span class="pub-hero-stat-label">{{ total_issues|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span></div>
+                <div><span class="pub-hero-stat-num">{{ total_articles }}</span><span class="pub-hero-stat-label">{{ total_articles|pluralize_ru('статья', 'статьи', 'статей') }}</span></div>
+            </div>
+        </div>
+
+        <div class="pub-how">
+            <div class="pub-how-step"><span class="pub-how-num">1</span>
+                <div class="pub-how-title">Загрузка</div>
+                <div class="pub-how-text">Перетащите папку выпуска: .doc статей и их PDF.</div></div>
+            <div class="pub-how-step"><span class="pub-how-num">2</span>
+                <div class="pub-how-title">Сверка</div>
+                <div class="pub-how-text">Авторы, страницы и литература сверяются с PDF.</div></div>
+            <div class="pub-how-step"><span class="pub-how-num">3</span>
+                <div class="pub-how-title">Метафора</div>
+                <div class="pub-how-text">XML и PDF статей уходят в ИС РЦНИ.</div></div>
+            <div class="pub-how-step"><span class="pub-how-num">4</span>
+                <div class="pub-how-title">Подпись</div>
+                <div class="pub-how-text">После проверки загруженного — подписание.</div></div>
         </div>
 
         {% if journals_error and not journals %}
-        <div class="pub-note-box">Не удалось получить список журналов с сайта ({{ journals_error }}).</div>
+        <div class="pub-note-box">Список журналов с сайта получить не удалось ({{ journals_error }}). Журнал появится здесь после загрузки первого выпуска.</div>
         {% endif %}
 
-        <div class="pub-journal-grid">
-            {% for j in journals %}
-            <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-journal-card">
-                <div class="pub-journal-card-name">{{ j.name }}</div>
-                <div class="pub-journal-card-issn">{{ j.issn }}</div>
-                <div class="pub-journal-card-stats">
-                    <span class="pub-badge pub-badge-draft">{{ j.issues }} выпуск{{ j.issues|pluralize_ru('', 'а', 'ов') }}</span>
-                    <span class="pub-badge pub-badge-draft">{{ j.articles }} стат{{ j.articles|pluralize_ru('ья', 'ьи', 'ей') }}</span>
-                </div>
+        {% set active = journals|selectattr('issues')|list %}
+        {% set idle = journals|rejectattr('issues')|list %}
+
+        {% if active %}
+        <h2 class="pub-section-title">Журналы в работе</h2>
+        <div class="pub-jgrid">
+            {% for j in active %}
+            <div class="pub-jcard">
+                <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-jcard-head">
+                    <span class="pub-jcard-name">{{ j.name }}</span>
+                    <span class="pub-jcard-issn">{{ j.issn }}</span>
+                </a>
+                {% for r in j.recent %}
+                {% set issue = r.issue %}{% set st = r.stage %}
+                <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-jcard-issue">
+                    <span class="pub-jcard-issue-name">{{ issue.year }} №{{ issue.number }}</span>
+                    {% include "publish/_stage.html" %}
+                </a>
+                {% endfor %}
+                {% if j.issues > j.recent|length %}
+                <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-jcard-issue">
+                    <span class="pub-cell-sub">Все выпуски — {{ j.issues }}</span>
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if idle %}
+        <h2 class="pub-section-title">{{ 'Остальные журналы' if active else 'Журналы' }}</h2>
+        <div class="pub-jgrid pub-jgrid-idle">
+            {% for j in idle %}
+            <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-jmini">
+                <span class="pub-jmini-name">{{ j.name }}</span>
+                <span class="pub-jmini-issn">{{ j.issn }} · выпусков нет</span>
             </a>
             {% endfor %}
         </div>
+        {% endif %}
+
         {% if not journals %}
-        <div class="adm-card"><div class="pub-empty">Журналов пока нет.</div></div>
+        <div class="adm-card"><div class="pub-empty">Выпусков пока нет — загрузите первый.</div></div>
         {% endif %}
     </div>
 </div>

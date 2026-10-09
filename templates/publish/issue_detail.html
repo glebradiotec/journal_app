@@ -1,39 +1,135 @@
 {% extends "base.html" %}
 {% block title %}{{ issue.year }} №{{ issue.number }} — публикация{% endblock %}
-{% block body_class %}adm-body{% endblock %}
+{% block body_class %}pub-body{% endblock %}
 {% block content %}
 
 <div class="adm-layout">
     {% include "publish/_sidebar.html" %}
 
     <div class="adm-main">
-        {% set mobile_title = 'Выпуск ' ~ issue.year ~ ' №' ~ issue.number %}
         {% include "publish/_topbar.html" %}
 
+        {# состояние публикаций в Метафоре по DOI — чтобы показать его сразу, без запросов #}
+        {% set mf_by_doi = {} %}
+        {% for a in mf_state.articles or [] %}{% if a.doi %}{% set _ = mf_by_doi.update({a.doi: a}) %}{% endif %}{% endfor %}
+        {% set can_delete = not issue.is_pushed and not mf_state.file_uid %}
+
         <div class="adm-welcome">
-            <h1 class="adm-welcome-title">
-                {{ issue.journal_name or issue.issn }} — {{ issue.year }} №{{ issue.number }}
-                {% if issue.is_pushed %}<span class="pub-badge pub-badge-pushed">отправлен на сайт</span>{% else %}<span class="pub-badge pub-badge-draft">черновик</span>{% endif %}
-            </h1>
-            <p class="adm-welcome-sub">ISSN {{ issue.issn }}{% if issue.elibrary_titleid %} · eLibrary titleid {{ issue.elibrary_titleid }}{% endif %}</p>
+            <h1 class="adm-welcome-title">{{ issue.journal_name or issue.issn }} — {{ issue.year }} №{{ issue.number }}</h1>
+            <p class="adm-welcome-sub">
+                ISSN {{ issue.issn }}{% if issue.volume %} · том {{ issue.volume }}{% endif %}{% if issue.elibrary_titleid %} · eLibrary titleid {{ issue.elibrary_titleid }}{% endif %}
+            </p>
         </div>
 
-        <div class="pub-actions">
-            <a href="{{ url_for('admin_publish_article_new', issue_id=issue.id) }}" class="pub-btn pub-btn-primary">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
-                Добавить статью
-            </a>
-            {% if issue.articles %}
-            <a href="{{ url_for('admin_publish_issue_preview', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">Предпросмотр и отправка на сайт</a>
-            {% endif %}
-            <a href="{{ url_for('admin_publish_journal_detail', issn=issue.issn) }}" class="pub-btn pub-btn-secondary">← Ко всем выпускам</a>
+        <div class="pub-steps">
+            <div class="pub-step {{ 'pub-step-done' if stage.articles else 'pub-step-now' }}">
+                <div class="pub-step-label">1 · Статьи</div>
+                <div class="pub-step-value">{{ stage.articles }}</div>
+                <div class="pub-step-hint">разобрано из .doc</div>
+            </div>
+            <div class="pub-step {{ 'pub-step-done' if stage.articles and stage.pdfs >= stage.articles else ('pub-step-now' if stage.articles else '') }}" id="stepCheck">
+                <div class="pub-step-label">2 · Сверка с PDF</div>
+                <div class="pub-step-value" id="stepCheckValue">PDF {{ stage.pdfs }} из {{ stage.articles }}</div>
+                <div class="pub-step-hint" id="stepCheckHint">проверяю…</div>
+            </div>
+            <div class="pub-step {{ 'pub-step-done' if stage.mf_processed else '' }}" id="stepMf">
+                <div class="pub-step-label">3 · Метафора</div>
+                <div class="pub-step-value" id="stepMfValue">{% if stage.mf_failed %}ошибка обработки{% elif stage.mf_processed %}загружено {{ stage.mf_articles }}{% elif stage.mf_sent %}отправлен{% else %}не отправлен{% endif %}</div>
+                <div class="pub-step-hint" id="stepMfHint">{% if stage.mf_processed %}PDF {{ stage.mf_pdfs }} из {{ stage.mf_articles }}{% else %}XML и PDF статей{% endif %}</div>
+            </div>
+            <div class="pub-step {{ 'pub-step-done' if stage.mf_articles and stage.mf_signed == stage.mf_articles else '' }}" id="stepSign">
+                <div class="pub-step-label">4 · Подпись</div>
+                <div class="pub-step-value" id="stepSignValue">{{ stage.mf_signed }} из {{ stage.mf_articles or stage.articles }}</div>
+                <div class="pub-step-hint">после неё правки закрыты</div>
+            </div>
         </div>
 
         <div class="adm-card">
             <div class="adm-card-header">
-                <h2 class="adm-card-title">Разделы выпуска <span class="pub-hint">({{ issue.sections|length }})</span></h2>
+                <h2 class="adm-card-title">Статьи <span class="pub-hint">({{ issue.articles|length }})</span></h2>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <input type="file" id="pdfInput" multiple accept=".pdf" style="display:none">
+                    <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="pdfAddBtn">Добавить PDF</button>
+                    <a href="{{ url_for('admin_publish_article_new', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary pub-btn-sm">Добавить статью вручную</a>
+                </div>
             </div>
+            {% if issue.articles %}
+            <div id="checkSummary" style="padding: 14px 22px 0;"></div>
+            <div class="pub-table-wrap">
+                <table class="pub-table">
+                    <thead><tr><th></th><th>Статья</th><th class="pub-num">Стр.</th><th>PDF</th><th>Метафора</th></tr></thead>
+                    <tbody>
+                    {% for art in issue.articles %}
+                    {% set m = mf_by_doi.get(art.doi) %}
+                    <tr data-article="{{ art.id }}" data-doi="{{ art.doi or '' }}" data-uid="{{ m.uid if m else '' }}">
+                        <td class="js-mark"><span class="pub-mark pub-mark-wait">…</span></td>
+                        <td>
+                            <div class="pub-cell-title"><a href="{{ url_for('admin_publish_article_edit', article_id=art.id) }}">{{ art.title_ru or '(без названия)' }}</a></div>
+                            <div class="pub-cell-sub">
+                                {% if art.authors %}{{ art.authors|map(attribute='surname_ru')|select|join(', ') }}{% else %}без авторов{% endif %}{% if art.doi %} · {{ art.doi }}{% endif %}
+                            </div>
+                            <ul class="pub-msgs js-msgs"></ul>
+                        </td>
+                        <td class="pub-num">{{ art.pages or '—' }}</td>
+                        <td class="js-pdf pub-cell-sub">…</td>
+                        <td class="js-mf">
+                            {% if m %}
+                            <span class="pub-chip pub-chip-ok">загружена</span>
+                            <span class="pub-chip {{ 'pub-chip-ok' if m.has_pdf else 'pub-chip-off' }}">PDF</span>
+                            {% if m.verify_errors is defined %}<span class="pub-chip {{ 'pub-chip-bad' if m.verify_errors else 'pub-chip-ok' }}">{{ 'расхождения' if m.verify_errors else 'сверена' }}</span>{% endif %}
+                            {% if m.signed_at %}<span class="pub-chip pub-chip-ok">подписана</span>{% endif %}
+                            {% else %}<span class="pub-cell-sub">—</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="pub-empty">В этом выпуске пока нет статей. <a href="{{ url_for('admin_publish_import') }}">Загрузите выпуск целиком</a> или добавьте статью вручную.</div>
+            {% endif %}
+        </div>
+
+        {% if issue.articles %}
+        <div class="adm-card">
+            <div class="adm-card-header"><h2 class="adm-card-title">Метафора</h2></div>
             <div class="adm-card-body">
+                {% if not mf_key_set %}
+                <div class="pub-warning-box" style="margin-bottom: 14px;">Ключ API Метафоры не задан (переменная <code>METAFORA_API_KEY</code> в <code>.env</code> на сервере) — отправка недоступна.</div>
+                {% endif %}
+                <p class="pub-card-note" id="mfNote">
+                    {% if stage.mf_processed %}
+                    Выпуск загружен в Метафору {{ mf_state.sent_at }}. Подпись ставится только на публикации, прошедшие сверку с PDF.
+                    {% elif stage.mf_sent %}
+                    Файл отправлен {{ mf_state.sent_at }}, результат обработки ещё не получен.
+                    {% else %}
+                    Отправка идёт по шагам: XML выпуска → PDF каждой статьи → сверка загруженного с PDF. Подпись — отдельной кнопкой.
+                    {% endif %}
+                </p>
+                <div id="mfProgress" style="display:none;">
+                    <div class="pub-progress"><div class="pub-progress-bar" id="mfBar"></div></div>
+                    <div class="pub-progress-text" id="mfProgressText"></div>
+                </div>
+                <div id="mfProblems"></div>
+                <div class="pub-actions" style="margin: 14px 0 0;">
+                    {% if not stage.mf_sent %}
+                    <button type="button" class="pub-btn pub-btn-primary" id="mfSend" disabled>Отправить в Метафору</button>
+                    {% else %}
+                    {% if not stage.mf_processed %}<button type="button" class="pub-btn pub-btn-primary" id="mfResume">Проверить обработку и продолжить</button>{% endif %}
+                    {% if stage.mf_processed %}
+                    <button type="button" class="pub-btn pub-btn-secondary" id="mfVerify">Сверить загруженное с PDF</button>
+                    {% if stage.mf_signed < stage.mf_articles %}<button type="button" class="pub-btn pub-btn-primary" id="mfSign">Подписать публикации</button>{% endif %}
+                    {% endif %}
+                    {% if not stage.mf_signed %}<button type="button" class="pub-btn pub-btn-secondary" id="mfReplace">Заменить в Метафоре</button>{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <details class="adm-card pub-details">
+            <summary>Разделы выпуска <span class="pub-hint">({{ issue.sections|length }}) — нужны для сайта, в Метафору не передаются</span></summary>
+            <div class="adm-card-body" style="border-top: 1px solid var(--color-border-muted);">
                 {% if issue.sections %}
                 <div class="pub-section-list">
                     {% for s in issue.sections %}
@@ -80,33 +176,17 @@
                     <button type="submit" class="pub-btn pub-btn-secondary pub-btn-sm">+ Добавить раздел</button>
                 </form>
             </div>
-        </div>
+        </details>
 
-        <div class="adm-card">
-            <div class="adm-card-header">
-                <h2 class="adm-card-title">Статьи в выпуске <span class="pub-hint">({{ issue.articles|length }})</span></h2>
-            </div>
+        <div class="pub-actions">
             {% if issue.articles %}
-            <div>
-                {% for art in issue.articles %}
-                <a href="{{ url_for('admin_publish_article_edit', article_id=art.id) }}" class="pub-list-item">
-                    <div>
-                        <div class="pub-list-title">{{ art.title_ru or '(без названия)' }}</div>
-                        <div class="pub-list-sub">
-                            {% if art.authors %}{{ art.authors|map(attribute='surname_ru')|select|join(', ') }}{% else %}без авторов{% endif %}
-                            {% if art.doi %} · DOI {{ art.doi }}{% endif %}
-                        </div>
-                    </div>
-                    {% if art.is_pushed %}
-                    <span class="pub-badge pub-badge-pushed">отправлена</span>
-                    {% else %}
-                    <span class="pub-badge pub-badge-draft">черновик</span>
-                    {% endif %}
-                </a>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="pub-empty">В этом выпуске пока нет статей — добавьте первую.</div>
+            <a href="{{ url_for('admin_publish_issue_preview', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">Сайт, CrossRef, eLibrary →</a>
+            {% endif %}
+            {% if can_delete %}
+            <form method="POST" action="{{ url_for('admin_publish_issue_delete', issue_id=issue.id) }}" style="display:inline;"
+                  onsubmit="return confirm('Удалить черновик выпуска со всеми статьями и PDF? В Метафоре и на сайте ничего не изменится.');">
+                <button type="submit" class="pub-btn pub-btn-danger">Удалить черновик</button>
+            </form>
             {% endif %}
         </div>
     </div>
@@ -244,6 +324,227 @@
         dropzone.classList.remove('pub-dropzone-active');
         if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
     });
+})();
+</script>
+<script>
+(function() {
+    var ISSUE = {{ url_for('admin_publish_issue_detail', issue_id=issue.id)|tojson }};
+    var KEY_SET = {{ mf_key_set|tojson }};
+    var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-article]'));
+    if (!rows.length) return;
+    var checkOk = false, running = false;
+
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+    function setMark(tr, kind, text) { var td = tr.querySelector('.js-mark'); td.innerHTML = ''; td.appendChild(el('span', 'pub-mark pub-mark-' + kind, text)); }
+    function setMsgs(tr, errors, warnings, prefix) {
+        var ul = tr.querySelector('.js-msgs');
+        Array.prototype.slice.call(ul.querySelectorAll('[data-src="' + prefix + '"]')).forEach(function(li) { li.remove(); });
+        (errors || []).forEach(function(m) { var li = el('li', 'pub-msg-err', (prefix === 'mf' ? 'В Метафоре: ' : '') + m); li.dataset.src = prefix; ul.appendChild(li); });
+        (warnings || []).forEach(function(m) { var li = el('li', 'pub-msg-warn', (prefix === 'mf' ? 'В Метафоре: ' : '') + m); li.dataset.src = prefix; ul.appendChild(li); });
+    }
+    function chip(kind, text) { return el('span', 'pub-chip pub-chip-' + kind, text); }
+    function setMf(tr, st) {
+        var td = tr.querySelector('.js-mf');
+        td.innerHTML = '';
+        td.appendChild(chip('ok', 'загружена'));
+        td.appendChild(document.createTextNode(' '));
+        td.appendChild(chip(st.has_pdf ? 'ok' : 'off', 'PDF'));
+        if (st.verified) { td.appendChild(document.createTextNode(' ')); td.appendChild(chip(st.verifyErrors ? 'bad' : 'ok', st.verifyErrors ? 'расхождения' : 'сверена')); }
+        if (st.signed) { td.appendChild(document.createTextNode(' ')); td.appendChild(chip('ok', 'подписана')); }
+    }
+    function api(method, path, body) {
+        var opt = { method: method };
+        if (body !== undefined) { opt.headers = { 'Content-Type': 'application/json' }; opt.body = JSON.stringify(body); }
+        return fetch(ISSUE + path, opt).then(function(r) {
+            return r.json().catch(function() { return { error: 'Сервер ответил с ошибкой ' + r.status }; })
+                .then(function(d) { return { ok: r.ok, status: r.status, data: d }; });
+        }).catch(function() { return { ok: false, status: 0, data: { error: 'Нет связи с сервером' } }; });
+    }
+    function rowByDoi(doi) { return rows.filter(function(tr) { return tr.dataset.doi && tr.dataset.doi === doi; })[0]; }
+
+    // ---------- сверка черновика с PDF (ничего не отправляет)
+    function runCheck() {
+        document.getElementById('stepCheckHint').textContent = 'проверяю…';
+        return api('GET', '/check').then(function(res) {
+            var d = res.data, box = document.getElementById('checkSummary');
+            box.innerHTML = '';
+            if (!res.ok) { box.appendChild(el('div', 'pub-warning-box', d.error || 'Сверка не удалась')); return; }
+            var bad = 0, withPdf = 0;
+            d.articles.forEach(function(a) {
+                var tr = rows.filter(function(r) { return r.dataset.article === String(a.id); })[0];
+                if (!tr) return;
+                setMsgs(tr, a.errors, a.warnings, 'chk');
+                setMark(tr, a.errors.length ? 'bad' : (a.warnings.length ? 'warn' : 'ok'), a.errors.length ? '✗' : (a.warnings.length ? '!' : '✓'));
+                var pdf = tr.querySelector('.js-pdf');
+                pdf.textContent = a.pdf || 'нет';
+                pdf.className = 'js-pdf' + (a.pdf ? '' : ' pub-msg-err');
+                if (a.errors.length) bad++;
+                if (a.pdf) withPdf++;
+            });
+            (d.problems || []).forEach(function(p) { box.appendChild(el('div', 'pub-warning-box', p)); });
+            if (d.orphan_pdfs && d.orphan_pdfs.length) {
+                box.appendChild(el('div', 'pub-warning-box', 'Есть PDF статей, для которых в выпуске нет статьи: ' + d.orphan_pdfs.join(', ') + '. Возможно, статья не загружена.'));
+            }
+            checkOk = d.ok;
+            var step = document.getElementById('stepCheck');
+            document.getElementById('stepCheckValue').textContent = 'PDF ' + withPdf + ' из ' + d.articles.length;
+            document.getElementById('stepCheckHint').textContent = d.ok ? 'расхождений нет' : (bad ? 'статей с ошибками: ' + bad : 'есть замечания');
+            step.className = 'pub-step ' + (d.ok ? 'pub-step-done' : 'pub-step-now');
+            var send = document.getElementById('mfSend');
+            if (send) {
+                send.disabled = !(d.ok && KEY_SET);
+                send.title = d.ok ? '' : 'Сначала устраните расхождения с PDF';
+            }
+        });
+    }
+
+    // ---------- добавление PDF
+    var pdfInput = document.getElementById('pdfInput');
+    document.getElementById('pdfAddBtn').addEventListener('click', function() { pdfInput.click(); });
+    pdfInput.addEventListener('change', function() {
+        var files = Array.prototype.slice.call(pdfInput.files), added = 0, skipped = 0;
+        pdfInput.value = '';
+        (function next() {
+            if (!files.length) {
+                showToast('PDF добавлено: ' + added + (skipped ? ', пропущено не-статей: ' + skipped : ''), 'success');
+                runCheck();
+                return;
+            }
+            var fd = new FormData(), f = files.shift();
+            fd.append('file', f, f.name);
+            fetch(ISSUE + '/pdf', { method: 'POST', body: fd }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.error) showToast(d.error, 'error'); else if (d.skipped) skipped++; else added++;
+                next();
+            }).catch(next);
+        })();
+    });
+
+    // ---------- Метафора
+    function progress(done, total, text) {
+        document.getElementById('mfProgress').style.display = '';
+        document.getElementById('mfBar').style.width = (total ? Math.round(100 * done / total) : 0) + '%';
+        document.getElementById('mfProgressText').textContent = text;
+    }
+    function fail(res) {
+        running = false;
+        var box = document.getElementById('mfProblems');
+        box.innerHTML = '';
+        var w = el('div', 'pub-warning-box', res.data.error || 'Ошибка');
+        if (res.data.problems) { var ul = el('ul'); res.data.problems.forEach(function(p) { ul.appendChild(el('li', null, p)); }); w.appendChild(ul); }
+        box.appendChild(w);
+        progress(0, 1, 'Остановлено.');
+    }
+    function lock(on) {
+        running = on;
+        ['mfSend', 'mfResume', 'mfVerify', 'mfSign', 'mfReplace'].forEach(function(id) { var b = document.getElementById(id); if (b) b.disabled = on; });
+    }
+
+    function pollUntilProcessed(tries) {
+        return api('GET', '/metafora/poll').then(function(res) {
+            if (!res.ok) return res;
+            if (res.data.code === 3 || res.data.code === 4) return res;
+            if (tries <= 0) { res.ok = false; res.data.error = 'Метафора обрабатывает файл дольше обычного. Нажмите «Проверить обработку и продолжить» чуть позже.'; return res; }
+            progress(1, 4, 'Метафора обрабатывает файл…');
+            return new Promise(function(r) { setTimeout(r, 3000); }).then(function() { return pollUntilProcessed(tries - 1); });
+        });
+    }
+
+    function eachArticle(articles, label, fn) {
+        var i = 0, total = articles.length, problems = 0;
+        function next() {
+            if (i >= total) return Promise.resolve(problems);
+            var a = articles[i++];
+            progress(i - 1, total, label + ' — ' + i + ' из ' + total);
+            return fn(a).then(function(ok) { if (!ok) problems++; return next(); });
+        }
+        return next();
+    }
+
+    function afterProcessed(res, doPdf) {
+        if (!res.ok) { fail(res); lock(false); return; }
+        if (res.data.code === 4) { res.data.error = 'Метафора не смогла обработать файл.'; fail(res); lock(false); return; }
+        var arts = res.data.articles, states = {};
+        arts.forEach(function(a) {
+            var tr = rowByDoi(a.doi);
+            states[a.uid] = { has_pdf: !!a.has_pdf, signed: !!a.signed_at, verified: a.verify_errors !== undefined, verifyErrors: (a.verify_errors || []).length };
+            if (tr) { tr.dataset.uid = a.uid; setMf(tr, states[a.uid]); }
+        });
+        var chain = Promise.resolve(0);
+        if (doPdf) {
+            chain = eachArticle(arts.filter(function(a) { return !a.has_pdf; }), 'Загружаю PDF статей', function(a) {
+                return api('POST', '/metafora/pdf', { uid: a.uid }).then(function(r) {
+                    var tr = rowByDoi(a.doi);
+                    states[a.uid].has_pdf = r.ok && r.data.has_pdf;
+                    if (tr) { setMf(tr, states[a.uid]); if (!r.ok) setMsgs(tr, [r.data.error], [], 'mf'); }
+                    return r.ok;
+                });
+            });
+        }
+        chain.then(function() {
+            return eachArticle(arts, 'Сверяю загруженное с PDF', function(a) {
+                return api('GET', '/metafora/verify?uid=' + encodeURIComponent(a.uid)).then(function(r) {
+                    var tr = rowByDoi(a.doi);
+                    if (!r.ok) { if (tr) setMsgs(tr, [r.data.error], [], 'mf'); return false; }
+                    states[a.uid] = { has_pdf: r.data.has_pdf, signed: !!r.data.signed_at, verified: true, verifyErrors: r.data.errors.length };
+                    if (tr) { setMf(tr, states[a.uid]); setMsgs(tr, r.data.errors, [], 'mf'); }
+                    return !r.data.errors.length;
+                });
+            });
+        }).then(function(problems) {
+            progress(1, 1, problems ? 'Готово, но у ' + problems + ' публикаций расхождения с PDF — смотрите таблицу.' : 'Готово: всё загруженное совпадает с PDF.');
+            if (problems) { lock(false); return; }
+            showToast('Выпуск в Метафоре, расхождений с PDF нет', 'success');
+            setTimeout(function() { window.location.reload(); }, 900);
+        });
+    }
+
+    function send(replace) {
+        if (running) return;
+        lock(true);
+        document.getElementById('mfProblems').innerHTML = '';
+        progress(0, 4, replace ? 'Заменяю файл в Метафоре…' : 'Отправляю XML выпуска…');
+        api('POST', '/metafora/start', { replace: !!replace }).then(function(res) {
+            if (!res.ok) { fail(res); lock(false); return; }
+            pollUntilProcessed(20).then(function(r) { afterProcessed(r, true); });
+        });
+    }
+
+    var b;
+    if ((b = document.getElementById('mfSend'))) b.addEventListener('click', function() {
+        if (!checkOk) { showToast('Сначала устраните расхождения с PDF', 'error'); return; }
+        if (confirm('Отправить выпуск в Метафору? Уйдут XML и PDF статей. Подпись ставится отдельно.')) send(false);
+    });
+    if ((b = document.getElementById('mfReplace'))) b.addEventListener('click', function() {
+        if (!checkOk) { showToast('Сначала устраните расхождения с PDF', 'error'); return; }
+        if (confirm('Заменить выпуск в Метафоре? Загруженный файл и его публикации будут удалены и загружены заново из текущего черновика.')) send(true);
+    });
+    if ((b = document.getElementById('mfResume'))) b.addEventListener('click', function() {
+        if (running) return;
+        lock(true);
+        pollUntilProcessed(20).then(function(r) { afterProcessed(r, true); });
+    });
+    if ((b = document.getElementById('mfVerify'))) b.addEventListener('click', function() {
+        if (running) return;
+        lock(true);
+        pollUntilProcessed(1).then(function(r) { afterProcessed(r, true); });
+    });
+    if ((b = document.getElementById('mfSign'))) b.addEventListener('click', function() {
+        if (running) return;
+        if (!confirm('Подписать публикации выпуска? После подписи их нельзя изменить, пока подпись не снята в Метафоре.')) return;
+        lock(true);
+        var uids = rows.map(function(tr) { return tr.dataset.uid; }).filter(Boolean);
+        eachArticle(uids, 'Подписываю', function(uid) {
+            return api('POST', '/metafora/sign-one', { uid: uid }).then(function(r) {
+                if (!r.ok) { var tr = rows.filter(function(t) { return t.dataset.uid === uid; })[0]; if (tr) setMsgs(tr, [r.data.error], [], 'mf'); }
+                return r.ok;
+            });
+        }).then(function(problems) {
+            progress(1, 1, problems ? 'Не подписано публикаций: ' + problems + ' — причины в таблице.' : 'Все публикации подписаны.');
+            setTimeout(function() { window.location.reload(); }, problems ? 2500 : 900);
+        });
+    });
+
+    runCheck();
 })();
 </script>
 {% endblock %}

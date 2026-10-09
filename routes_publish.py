@@ -5,6 +5,7 @@
 import io
 import json
 import os
+import re
 import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -15,6 +16,8 @@ from flask_login import current_user
 from models import db
 from models_publish import PubIssue, PubArticle, PubAuthor, PubSection
 from routes_admin import admin_required
+from routes_publish_hub import (
+    publish_required, register_publish_hub_routes, issue_stage, mf_load_state)
 import pdf_parser
 import article_template_parser
 import publish_config
@@ -27,6 +30,7 @@ import export_crossref
 import export_elibrary
 import export_metafora
 import metafora_api
+import publish_import
 import publish_journal_abbr
 
 
@@ -181,10 +185,17 @@ def _apply_article_fields(article: PubArticle, form):
     article.date_published = form.get('date_published', '').strip()
 
 
+def _issue_sort(number):
+    """'3' -> 3, '5(1)' -> 5 — для сортировки выпусков по номеру."""
+    m = re.match(r"\d+", str(number or ""))
+    return int(m.group(0)) if m else 0
+
+
 def register_publish_routes(app):
+    register_publish_hub_routes(app)
 
     @app.route('/admin/publish')
-    @admin_required
+    @publish_required
     def admin_publish_index():
         known_journals, journals_error = _safe_list_journals()
         by_issn = {j['issn']: j for j in known_journals if j['issn']}
@@ -200,22 +211,31 @@ def register_publish_routes(app):
             if not s['name']:
                 s['name'] = iss.journal_name or (by_issn.get(iss.issn) or {}).get('name') or iss.issn
 
+        issues_by_issn = defaultdict(list)
+        for iss in sorted(issue_rows, key=lambda i: (-i.year, -_issue_sort(i.number))):
+            issues_by_issn[iss.issn].append({'issue': iss, 'stage': issue_stage(iss)})
+
         journals = []
         seen_issn = set()
         for j in known_journals:
             issn = j['issn']
             s = stats.get(issn, {'issues': 0, 'articles': 0})
-            journals.append({'issn': issn, 'name': j['name'], 'issues': s['issues'], 'articles': s['articles']})
+            journals.append({'issn': issn, 'name': j['name'], 'issues': s['issues'], 'articles': s['articles'],
+                             'recent': issues_by_issn.get(issn, [])[:4]})
             seen_issn.add(issn)
         for issn, s in stats.items():
             if issn in seen_issn:
                 continue
-            journals.append({'issn': issn, 'name': s['name'], 'issues': s['issues'], 'articles': s['articles']})
+            journals.append({'issn': issn, 'name': s['name'], 'issues': s['issues'], 'articles': s['articles'],
+                             'recent': issues_by_issn.get(issn, [])[:4]})
+        # журналы, с которыми работают, — первыми
+        journals.sort(key=lambda j: (0 if j['issues'] else 1, j['name'] or ''))
 
-        return render_template('publish/index.html', journals=journals, journals_error=journals_error)
+        return render_template('publish/index.html', journals=journals, journals_error=journals_error,
+                               total_issues=len(issue_rows), total_articles=sum(len(i.articles) for i in issue_rows))
 
     @app.route('/admin/publish/journal/<path:issn>')
-    @admin_required
+    @publish_required
     def admin_publish_journal_detail(issn):
         known_journals, _err = _safe_list_journals()
         journal_name = next((j['name'] for j in known_journals if j['issn'] == issn), None)
@@ -223,13 +243,14 @@ def register_publish_routes(app):
         if not journal_name:
             journal_name = issues[0].journal_name if issues else issn
         years = sorted({iss.year for iss in issues}, reverse=True)
+        issues.sort(key=lambda i: (-i.year, -_issue_sort(i.number)))
         return render_template(
             'publish/journal_detail.html', issn=issn, journal_name=journal_name,
-            issues=issues, years=years,
+            issues=issues, years=years, stages={i.id: issue_stage(i) for i in issues},
         )
 
     @app.route('/admin/publish/issue/new', methods=['GET', 'POST'])
-    @admin_required
+    @publish_required
     def admin_publish_issue_new():
         if request.method == 'POST':
             issn = request.form.get('issn', '').strip()
@@ -265,13 +286,17 @@ def register_publish_routes(app):
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>')
-    @admin_required
+    @publish_required
     def admin_publish_issue_detail(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
-        return render_template('publish/issue_detail.html', issue=issue)
+        return render_template(
+            'publish/issue_detail.html', issue=issue, stage=issue_stage(issue), mf_state=mf_load_state(issue.id),
+            mf_key_set=bool(os.environ.get('METAFORA_API_KEY', '').strip()),
+            pdf_files=publish_import.list_issue_pdfs(issue.id),
+        )
 
     @app.route('/admin/publish/issue/<int:issue_id>/section/add', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_issue_add_section(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         title_ru = request.form.get('title_ru', '').strip()
@@ -285,7 +310,7 @@ def register_publish_routes(app):
         return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/sections/parse-pdf', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_issue_parse_sections(issue_id):
         PubIssue.query.get_or_404(issue_id)
         pdf_file = request.files.get('pdf_file')
@@ -303,7 +328,7 @@ def register_publish_routes(app):
         return jsonify(result)
 
     @app.route('/admin/publish/issue/<int:issue_id>/sections/bulk-add', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_issue_add_sections_bulk(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         data = request.get_json(silent=True) or {}
@@ -321,7 +346,7 @@ def register_publish_routes(app):
         return jsonify({'added': added})
 
     @app.route('/admin/publish/parse-doc', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_parse_doc():
         doc_file = request.files.get('doc_file')
         if not doc_file or not doc_file.filename:
@@ -344,7 +369,7 @@ def register_publish_routes(app):
         return jsonify({'parsed': parsed, 'warnings': warnings})
 
     @app.route('/admin/publish/issue/<int:issue_id>/article/new', methods=['GET', 'POST'])
-    @admin_required
+    @publish_required
     def admin_publish_article_new(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         if request.method == 'POST':
@@ -366,7 +391,7 @@ def register_publish_routes(app):
                                 article_types=ARTICLE_TYPES, existing_authors=[])
 
     @app.route('/admin/publish/article/<int:article_id>/edit', methods=['GET', 'POST'])
-    @admin_required
+    @publish_required
     def admin_publish_article_edit(article_id):
         article = PubArticle.query.get_or_404(article_id)
         issue = article.issue
@@ -387,7 +412,7 @@ def register_publish_routes(app):
                                 article_types=ARTICLE_TYPES, existing_authors=existing_authors)
 
     @app.route('/admin/publish/article/<int:article_id>/delete', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_article_delete(article_id):
         article = PubArticle.query.get_or_404(article_id)
         issue_id = article.issue_id
@@ -399,7 +424,7 @@ def register_publish_routes(app):
         return redirect(url_for('admin_publish_issue_detail', issue_id=issue_id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/preview')
-    @admin_required
+    @publish_required
     def admin_publish_issue_preview(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         if not issue.articles:
@@ -484,11 +509,10 @@ def register_publish_routes(app):
             'publish/preview.html', issue=issue, journal_row=journal_row,
             computed_dois=computed_dois, warnings=warnings, production=production,
             elibrary_ready=elibrary_ready, crossref_ready=crossref_ready, metafora_ready=metafora_ready,
-            mf_state=_mf_load_state(issue.id), mf_key_set=bool(os.environ.get('METAFORA_API_KEY', '').strip()),
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>/generate-elibrary', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_issue_generate_elibrary(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         if not issue.articles:
@@ -506,7 +530,7 @@ def register_publish_routes(app):
         return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/generate-metafora', methods=['POST'])
-    @admin_required
+    @publish_required
     def admin_publish_issue_generate_metafora(issue_id):
         issue = PubIssue.query.get_or_404(issue_id)
         if not issue.articles:
@@ -520,124 +544,7 @@ def register_publish_routes(app):
         flash('XML для Метафоры сгенерирован — можно скачать ниже.', 'success')
         return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
 
-    # ---- Метафора: отправка по API ----
-    # Состояние отправки (file_uid, uid статей) хранится рядом с XML, в БД ничего не добавляем.
-
-    def _mf_state_path(issue_id):
-        return os.path.join(PUB_EXPORTS_FOLDER, f'{issue_id}_metafora_state.json')
-
-    def _mf_load_state(issue_id):
-        try:
-            with open(_mf_state_path(issue_id), encoding='utf-8') as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            return {}
-
-    def _mf_save_state(issue_id, state):
-        os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
-        with open(_mf_state_path(issue_id), 'w', encoding='utf-8') as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
-
-    def _mf_xml(issue_id):
-        path = os.path.join(PUB_EXPORTS_FOLDER, f'{issue_id}_metafora.xml')
-        if not os.path.exists(path):
-            return None
-        with open(path, 'rb') as f:
-            return f.read()
-
-    def _mf_redirect(issue_id):
-        return redirect(url_for('admin_publish_issue_preview', issue_id=issue_id))
-
-    @app.route('/admin/publish/issue/<int:issue_id>/metafora/check', methods=['POST'])
-    @admin_required
-    def admin_publish_metafora_check(issue_id):
-        PubIssue.query.get_or_404(issue_id)
-        xml = _mf_xml(issue_id)
-        if xml is None:
-            flash('Сначала сгенерируйте XML для Метафоры.', 'error')
-            return _mf_redirect(issue_id)
-        problems = metafora_api.validate_journal_xml(xml)
-        if problems:
-            for p in problems:
-                flash(f'Метафора: {p}', 'error')
-        else:
-            flash('XML проходит проверку по схеме Метафоры — можно отправлять.', 'success')
-        return _mf_redirect(issue_id)
-
-    @app.route('/admin/publish/issue/<int:issue_id>/metafora/send', methods=['POST'])
-    @admin_required
-    def admin_publish_metafora_send(issue_id):
-        PubIssue.query.get_or_404(issue_id)
-        xml = _mf_xml(issue_id)
-        if xml is None:
-            flash('Сначала сгенерируйте XML для Метафоры.', 'error')
-            return _mf_redirect(issue_id)
-        problems = metafora_api.validate_journal_xml(xml)
-        if problems:
-            for p in problems:
-                flash(f'Метафора: {p}', 'error')
-            flash('Отправка отменена: исправьте проблемы выше и пересоберите XML.', 'error')
-            return _mf_redirect(issue_id)
-        try:
-            file_uid = metafora_api.upload_journal_xml(xml, filename=f'{issue_id}_metafora.xml')
-        except metafora_api.MetaforaError as e:
-            flash(str(e), 'error')
-            return _mf_redirect(issue_id)
-        _mf_save_state(issue_id, {
-            'file_uid': file_uid,
-            'sent_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-        })
-        flash('Выпуск отправлен в Метафору. Нажмите «Проверить статус», чтобы увидеть результат обработки.', 'success')
-        return _mf_redirect(issue_id)
-
-    @app.route('/admin/publish/issue/<int:issue_id>/metafora/status', methods=['POST'])
-    @admin_required
-    def admin_publish_metafora_status(issue_id):
-        PubIssue.query.get_or_404(issue_id)
-        state = _mf_load_state(issue_id)
-        if not state.get('file_uid'):
-            flash('Выпуск ещё не отправлялся в Метафору.', 'error')
-            return _mf_redirect(issue_id)
-        try:
-            st = metafora_api.file_status(state['file_uid'])
-            signed = metafora_api.publications_status(st['articles'])
-        except metafora_api.MetaforaError as e:
-            flash(str(e), 'error')
-            return _mf_redirect(issue_id)
-        state.update({
-            'status_code': st['code'], 'status_text': st['text'],
-            'articles': [{'uid': u, 'signed_at': signed.get(u)} for u in st['articles']],
-            'checked_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-        })
-        _mf_save_state(issue_id, state)
-        flash(f'Метафора: файл {st["text"]}; статей — {len(st["articles"])}.',
-              'error' if st['code'] == 4 else 'success')
-        return _mf_redirect(issue_id)
-
-    @app.route('/admin/publish/issue/<int:issue_id>/metafora/sign', methods=['POST'])
-    @admin_required
-    def admin_publish_metafora_sign(issue_id):
-        PubIssue.query.get_or_404(issue_id)
-        state = _mf_load_state(issue_id)
-        if state.get('status_code') != 3 or not state.get('articles'):
-            flash('Подписывать можно только после успешной обработки: нажмите «Проверить статус».', 'error')
-            return _mf_redirect(issue_id)
-        done, failed = 0, []
-        for a in state['articles']:
-            if a.get('signed_at'):
-                continue
-            try:
-                metafora_api.sign_publication(a['uid'])
-                done += 1
-            except metafora_api.MetaforaError as e:
-                failed.append(str(e))
-                break
-        if failed:
-            flash(f'Подписано {done}, затем ошибка: {failed[0]}', 'error')
-        else:
-            flash(f'Подписано публикаций: {done}.', 'success')
-        return redirect(url_for('admin_publish_metafora_status', issue_id=issue_id), code=307)
-
+    # Запись в БД боевого сайта — только администраторам (остальной раздел открыт всем сотрудникам).
     @app.route('/admin/publish/issue/<int:issue_id>/confirm', methods=['POST'])
     @admin_required
     def admin_publish_issue_confirm(issue_id):
@@ -784,7 +691,7 @@ def register_publish_routes(app):
         return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/download/<kind>')
-    @admin_required
+    @publish_required
     def admin_publish_download(issue_id, kind):
         fname_map = {
             'crossref': f'{issue_id}_crossref.xml',

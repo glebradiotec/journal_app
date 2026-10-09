@@ -152,3 +152,134 @@
     .pub-row { grid-template-columns: 1fr; }
     .pub-journal-grid { grid-template-columns: 1fr; }
 }
+
+/* =============================================
+   Оболочка раздела: обычная страница сайта с общей шапкой (как главная), без меню админки.
+   Классы adm-layout/adm-main оставлены в шаблонах — по ним base.html при переходах внутри
+   раздела заменяет только содержимое, — но раскладка у них здесь своя.
+   ============================================= */
+.pub-body .adm-layout { display: block; min-height: 0; max-width: 1100px; margin: 0 auto; padding: 8px 24px 56px; }
+.pub-body .adm-main { padding: 0; background: none; }
+
+.pub-crumbs { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 4px 0 22px; }
+.pub-crumbs-path { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; min-width: 0; }
+.pub-crumb { color: var(--color-fg-muted); text-decoration: none; font-weight: 500; padding: 4px 8px; border-radius: 6px; }
+a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); }
+.pub-crumb-root { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--color-fg-default); }
+.pub-crumb-current { color: var(--color-fg-default); font-weight: 600; }
+.pub-crumb-sep { color: var(--color-border-default); }
+
+/* Hero главной раздела — в том же ключе, что на главной сайта */
+.pub-hero {
+    position: relative; overflow: hidden; text-align: center; padding: 38px 24px 32px; margin-bottom: 24px;
+    border: 1px solid var(--color-border-default); border-radius: 20px;
+    background: linear-gradient(105deg, rgba(252,253,254,1) 0%, rgba(246,250,252,0.98) 25%, rgba(238,245,249,0.6) 55%, rgba(228,238,248,0.25) 100%);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+[data-theme="dark"] .pub-hero { background: linear-gradient(105deg, rgba(20,45,65,0.98) 0%, rgba(15,55,85,0.95) 30%, rgba(0,100,140,0.15) 60%, rgba(25,55,100,0.2) 100%); }
+.pub-hero-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; color: var(--color-fg-default); margin: 0 0 8px; }
+.pub-hero-sub { font-size: 15px; color: var(--color-fg-muted); margin: 0 auto 22px; max-width: 620px; line-height: 1.5; }
+.pub-hero-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.pub-cta { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; font-size: 15px; font-weight: 600; border-radius: 12px; text-decoration: none; color: #fff; background: linear-gradient(135deg, #5BA4B0 0%, #4A8E99 100%); box-shadow: 0 4px 14px rgba(91,164,176,0.35); transition: box-shadow 0.15s, transform 0.15s; border: none; cursor: pointer; }
+.pub-cta:hover { box-shadow: 0 6px 20px rgba(91,164,176,0.45); transform: translateY(-1px); color: #fff; }
+.pub-hero-stats { display: flex; justify-content: center; gap: 40px; margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--color-border-muted); }
+.pub-hero-stat-num { display: block; font-size: 26px; font-weight: 700; color: #5BA4B0; line-height: 1.1; }
+.pub-hero-stat-label { font-size: 12px; color: var(--color-fg-muted); }
+
+.pub-how { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+.pub-how-step { padding: 14px 16px; border: 1px solid var(--color-border-muted); border-radius: 12px; background: var(--color-canvas-default); }
+.pub-how-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(91,164,176,0.14); color: #4A8E99; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+[data-theme="dark"] .pub-how-num { color: #7CC5D0; }
+.pub-how-title { font-size: 14px; font-weight: 700; color: var(--color-fg-default); margin-bottom: 3px; }
+.pub-how-text { font-size: 12.5px; color: var(--color-fg-muted); line-height: 1.45; }
+
+.pub-section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--color-fg-muted); margin: 0 0 12px; }
+
+/* Карточка журнала с последними выпусками */
+.pub-jcard { background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 14px; overflow: hidden; transition: border-color 0.15s, box-shadow 0.15s; }
+.pub-jcard:hover { border-color: #5BA4B0; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.pub-jcard-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px 12px; text-decoration: none; color: inherit; }
+.pub-jcard-name { font-size: 15px; font-weight: 700; color: var(--color-fg-default); }
+.pub-jcard-issn { font-size: 12px; color: var(--color-fg-muted); white-space: nowrap; }
+.pub-jcard-issue { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px; border-top: 1px solid var(--color-border-muted); text-decoration: none; color: inherit; }
+.pub-jcard-issue:hover { background: var(--color-canvas-subtle); }
+.pub-jcard-issue-name { font-size: 13.5px; font-weight: 600; color: var(--color-fg-default); white-space: nowrap; }
+.pub-jcard-empty { padding: 0 20px 16px; font-size: 12.5px; color: var(--color-fg-muted); }
+.pub-jgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; margin-bottom: 28px; align-items: start; }
+.pub-jgrid-idle { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.pub-jmini { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border: 1px solid var(--color-border-muted); border-radius: 10px; text-decoration: none; color: inherit; background: var(--color-canvas-default); }
+.pub-jmini:hover { border-color: #5BA4B0; }
+.pub-jmini-name { font-size: 13.5px; font-weight: 600; color: var(--color-fg-default); }
+.pub-jmini-issn { font-size: 12px; color: var(--color-fg-muted); }
+
+/* Чипы состояния */
+.pub-stage { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pub-chip { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; border: 1px solid transparent; }
+.pub-chip-ok { background: rgba(26,127,55,0.10); color: #1a7f37; }
+.pub-chip-warn { background: rgba(154,103,0,0.12); color: #9a6700; }
+.pub-chip-bad { background: rgba(207,34,46,0.10); color: #cf222e; }
+.pub-chip-off { background: transparent; color: var(--color-fg-muted); border-color: var(--color-border-muted); }
+[data-theme="dark"] .pub-chip-ok { color: #3fb950; background: rgba(63,185,80,0.12); }
+[data-theme="dark"] .pub-chip-warn { color: #d29922; background: rgba(210,153,34,0.14); }
+[data-theme="dark"] .pub-chip-bad { color: #f85149; background: rgba(248,81,73,0.12); }
+
+/* Загрузка выпуска */
+.pub-drop { border: 2px dashed var(--color-border-default); border-radius: 16px; padding: 44px 24px; text-align: center; cursor: pointer; transition: all 0.15s; background: var(--color-canvas-default); }
+.pub-drop:hover, .pub-drop.pub-drop-active { border-color: #5BA4B0; background: rgba(91,164,176,0.06); }
+.pub-drop-icon { color: #5BA4B0; margin-bottom: 10px; }
+.pub-drop-title { font-size: 17px; font-weight: 700; color: var(--color-fg-default); margin-bottom: 6px; }
+.pub-drop-text { font-size: 13.5px; color: var(--color-fg-muted); line-height: 1.5; }
+.pub-drop-links { margin-top: 14px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.pub-drop input[type="file"] { display: none; }
+
+.pub-progress { height: 6px; border-radius: 999px; background: var(--color-canvas-inset); overflow: hidden; margin: 14px 0 6px; }
+.pub-progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, #5BA4B0, #4A8E99); transition: width 0.25s ease; }
+.pub-progress-text { font-size: 12.5px; color: var(--color-fg-muted); }
+
+.pub-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pub-table th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-fg-muted); padding: 10px 14px; border-bottom: 1px solid var(--color-border-default); white-space: nowrap; }
+.pub-table td { padding: 11px 14px; border-bottom: 1px solid var(--color-border-muted); vertical-align: top; color: var(--color-fg-default); }
+.pub-table tr:last-child td { border-bottom: none; }
+.pub-table tr.pub-row-link:hover td { background: var(--color-canvas-subtle); }
+.pub-table .pub-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pub-table-wrap { overflow-x: auto; }
+.pub-cell-title { font-weight: 600; }
+.pub-cell-title a { color: inherit; text-decoration: none; }
+.pub-cell-title a:hover { color: #4A8E99; text-decoration: underline; }
+.pub-cell-sub { font-size: 12px; color: var(--color-fg-muted); margin-top: 2px; }
+.pub-msgs { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; }
+.pub-msgs li { padding: 2px 0 2px 16px; position: relative; line-height: 1.4; }
+.pub-msgs li::before { content: ""; position: absolute; left: 3px; top: 9px; width: 6px; height: 6px; border-radius: 50%; }
+.pub-msg-err { color: #cf222e; } .pub-msg-err::before { background: #cf222e; }
+.pub-msg-warn { color: #9a6700; } .pub-msg-warn::before { background: #bf8700; }
+[data-theme="dark"] .pub-msg-err { color: #f85149; } [data-theme="dark"] .pub-msg-warn { color: #d29922; }
+
+.pub-mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.pub-mark-ok { background: rgba(26,127,55,0.12); color: #1a7f37; }
+.pub-mark-warn { background: rgba(154,103,0,0.14); color: #9a6700; }
+.pub-mark-bad { background: rgba(207,34,46,0.12); color: #cf222e; }
+.pub-mark-wait { background: var(--color-canvas-inset); color: var(--color-fg-muted); }
+[data-theme="dark"] .pub-mark-ok { color: #3fb950; } [data-theme="dark"] .pub-mark-bad { color: #f85149; } [data-theme="dark"] .pub-mark-warn { color: #d29922; }
+
+/* Шаги на странице выпуска */
+.pub-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+.pub-step { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--color-border-muted); background: var(--color-canvas-default); }
+.pub-step-done { border-color: rgba(26,127,55,0.35); background: rgba(26,127,55,0.05); }
+.pub-step-now { border-color: #5BA4B0; box-shadow: 0 0 0 3px rgba(91,164,176,0.12); }
+.pub-step-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-fg-muted); }
+.pub-step-value { font-size: 15px; font-weight: 700; color: var(--color-fg-default); margin-top: 4px; }
+.pub-step-hint { font-size: 12px; color: var(--color-fg-muted); margin-top: 2px; }
+
+.pub-card-note { font-size: 13px; color: var(--color-fg-muted); margin: 0 0 14px; line-height: 1.5; }
+.pub-summary { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.pub-details > summary { cursor: pointer; padding: 16px 22px; font-size: 14px; font-weight: 600; color: var(--color-fg-default); list-style: none; }
+.pub-details > summary::-webkit-details-marker { display: none; }
+.pub-details > summary::before { content: "›"; display: inline-block; margin-right: 8px; transition: transform 0.15s; color: var(--color-fg-muted); }
+.pub-details[open] > summary::before { transform: rotate(90deg); }
+
+@media (max-width: 800px) {
+    .pub-body .adm-layout { padding: 4px 16px 40px; }
+    .pub-how, .pub-steps { grid-template-columns: 1fr 1fr; }
+    .pub-hero-title { font-size: 26px; }
+    .pub-jgrid { grid-template-columns: 1fr; }
+}

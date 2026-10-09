@@ -1,17 +1,2 @@
-<script>
-function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('open');
-    document.getElementById('sidebarOverlay').classList.toggle('active');
-}
-function toggleAdmTheme() {
-    var cur = document.documentElement.getAttribute('data-theme');
-    var next = cur === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = next === 'dark' ? '☀️' : '🌙'; });
-}
-(function() {
-    var t = localStorage.getItem('theme') || 'light';
-    document.querySelectorAll('.adm-theme-icon').forEach(function(el) { el.textContent = t === 'dark' ? '☀️' : '🌙'; });
-})();
-</script>
+{# Общих скриптов у раздела больше нет: тему и выход обслуживает общая шапка. Файл оставлен,
+   чтобы не менять подключение во всех шаблонах раздела. #}

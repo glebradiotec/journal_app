@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Предпросмотр — {{ issue.journal_name }}, {{ issue.year }} №{{ issue.number }}{% endblock %}
-{% block body_class %}adm-body{% endblock %}
+{% block body_class %}pub-body{% endblock %}
 {% block content %}
 
 <div class="adm-layout">
@@ -93,7 +93,6 @@
                 <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">← Назад к выпуску</a>
             </div>
         {% endif %}
-        {% if metafora_ready %}{% include "publish/_metafora_panel.html" %}{% endif %}
     </div>
 </div>
 

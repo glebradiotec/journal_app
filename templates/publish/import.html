@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Загрузка выпуска{% endblock %}
+{% block body_class %}pub-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        {% set hide_import_btn = true %}
+        {% set crumb_last = 'Загрузка выпуска' %}
+        {% include "publish/_topbar.html" %}
+
+        <div class="adm-welcome">
+            <h1 class="adm-welcome-title">Загрузка выпуска</h1>
+            <p class="adm-welcome-sub">Журнал, год и номер определятся сами — по DOI статей.</p>
+        </div>
+
+        <div class="pub-drop" id="impDrop">
+            <input type="file" id="impFiles" multiple accept=".doc,.docx,.rtf,.pdf">
+            <input type="file" id="impFolder" webkitdirectory>
+            <div class="pub-drop-icon">
+                <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/></svg>
+            </div>
+            <div class="pub-drop-title">Перетащите сюда папку выпуска</div>
+            <div class="pub-drop-text">
+                Нужны .doc статей и их PDF. Если в папке есть подпапки <b>doc</b> и <b>pdf</b>,
+                возьмутся только они — рецензии и акты экспертизы не загружаются.
+            </div>
+            <div class="pub-drop-links">
+                <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="impPickFolder">Выбрать папку</button>
+                <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="impPickFiles">Выбрать файлы</button>
+            </div>
+        </div>
+
+        <div id="impWork" style="display:none; margin-top: 22px;">
+            <div class="pub-progress"><div class="pub-progress-bar" id="impBar"></div></div>
+            <div class="pub-progress-text" id="impProgressText"></div>
+
+            <div class="adm-card" id="impIssueCard" style="display:none; margin-top: 20px;">
+                <div class="adm-card-header"><h2 class="adm-card-title">Выпуск</h2></div>
+                <div class="adm-card-body">
+                    <div id="impIssueNote"></div>
+                    <div class="pub-row">
+                        <div class="pub-field"><label class="pub-label">Журнал</label><input class="pub-input" id="impJournal"></div>
+                        <div class="pub-field"><label class="pub-label">ISSN</label><input class="pub-input" id="impIssn"></div>
+                        <div class="pub-field"><label class="pub-label">Год</label><input class="pub-input" id="impYear" inputmode="numeric"></div>
+                        <div class="pub-field"><label class="pub-label">Номер</label><input class="pub-input" id="impNumber"></div>
+                        <div class="pub-field"><label class="pub-label">Том</label><input class="pub-input" id="impVolume"></div>
+                    </div>
+                    <div class="pub-actions" style="margin: 6px 0 0;">
+                        <button type="button" class="pub-btn pub-btn-primary" id="impCreate">Создать выпуск</button>
+                        <button type="button" class="pub-btn pub-btn-secondary" id="impCancel">Отменить</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="adm-card" style="margin-top: 20px;">
+                <div class="adm-card-header">
+                    <h2 class="adm-card-title">Файлы <span class="pub-hint" id="impCounts"></span></h2>
+                </div>
+                <div class="pub-table-wrap">
+                    <table class="pub-table">
+                        <thead><tr><th></th><th>Файл</th><th>Что это</th><th class="pub-num">Стр.</th><th class="pub-num">Авторов</th><th class="pub-num">Литература</th><th>PDF</th></tr></thead>
+                        <tbody id="impRows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include "publish/_scripts.html" %}
+<script>
+(function() {
+    var TOKEN = {{ token|tojson }};
+    var BASE = {{ url_for('admin_publish_import')|tojson }} + '/' + TOKEN;
+    var DOC_RE = /\.(docx?|rtf)$/i, PDF_RE = /\.pdf$/i;
+    var drop = document.getElementById('impDrop');
+    if (!drop) return;
+    var rowsEl = document.getElementById('impRows');
+    var docs = {};      // имя файла -> {tr, data}
+    var pdfByDoi = {};  // doi -> имя PDF
+    var busy = false, created = false;
+
+    function el(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined) e.textContent = text;
+        return e;
+    }
+    function mark(kind, text) { return el('span', 'pub-mark pub-mark-' + kind, text); }
+
+    // --- отбор файлов: если есть подпапки doc и pdf, берём только их
+    function pick(files) {
+        var list = files.filter(function(f) {
+            var n = f.file.name;
+            return n.indexOf('~$') !== 0 && n.charAt(0) !== '.' && (DOC_RE.test(n) || PDF_RE.test(n));
+        });
+        function inDir(f, dir) { return f.path.toLowerCase().split('/').slice(0, -1).indexOf(dir) !== -1; }
+        var hasDocDir = list.some(function(f) { return DOC_RE.test(f.file.name) && inDir(f, 'doc'); });
+        var hasPdfDir = list.some(function(f) { return PDF_RE.test(f.file.name) && inDir(f, 'pdf'); });
+        return list.filter(function(f) {
+            if (DOC_RE.test(f.file.name)) return !hasDocDir || inDir(f, 'doc');
+            return !hasPdfDir || inDir(f, 'pdf');
+        });
+    }
+
+    function readEntries(items) {
+        // Перетаскивание папки: обходим дерево через webkitGetAsEntry
+        var out = [], pending = [];
+        function walk(entry, prefix) {
+            if (entry.isFile) {
+                pending.push(new Promise(function(res) {
+                    entry.file(function(file) { out.push({ file: file, path: prefix + file.name }); res(); }, res);
+                }));
+            } else if (entry.isDirectory) {
+                var reader = entry.createReader();
+                pending.push(new Promise(function(res) {
+                    (function readBatch() {
+                        reader.readEntries(function(batch) {
+                            if (!batch.length) { res(); return; }
+                            batch.forEach(function(e) { walk(e, prefix + entry.name + '/'); });
+                            readBatch();
+                        }, res);
+                    })();
+                }));
+            }
+        }
+        for (var i = 0; i < items.length; i++) {
+            var entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+            if (entry) walk(entry, '');
+        }
+        function settle(n) {
+            return Promise.all(pending).then(function() { return pending.length === n ? out : settle(pending.length); });
+        }
+        return settle(pending.length);
+    }
+
+    function addRow(name, kindText) {
+        var tr = el('tr');
+        var c = [el('td'), el('td', 'pub-cell-title', name), el('td', null, kindText), el('td', 'pub-num'), el('td', 'pub-num'), el('td', 'pub-num'), el('td')];
+        c[0].appendChild(mark('wait', '…'));
+        c.forEach(function(td) { tr.appendChild(td); });
+        rowsEl.appendChild(tr);
+        return { tr: tr, c: c };
+    }
+    function setMark(row, kind, text) { row.c[0].innerHTML = ''; row.c[0].appendChild(mark(kind, text)); }
+    function addMsgs(td, items, cls) {
+        if (!items || !items.length) return;
+        var ul = td.querySelector('ul') || td.appendChild(el('ul', 'pub-msgs'));
+        items.forEach(function(m) { ul.appendChild(el('li', cls, m)); });
+    }
+
+    function post(url, file) {
+        var fd = new FormData();
+        fd.append('file', file, file.name);
+        return fetch(url, { method: 'POST', body: fd }).then(function(r) {
+            return r.json().catch(function() { return { error: 'Сервер ответил с ошибкой ' + r.status }; })
+                .then(function(d) { return { ok: r.ok, data: d }; });
+        }).catch(function() { return { ok: false, data: { error: 'Не удалось отправить файл' } }; });
+    }
+
+    function refreshPdfColumn() {
+        var articles = 0, withPdf = 0;
+        Object.keys(docs).forEach(function(k) {
+            var d = docs[k];
+            if (!d.data || d.data.kind !== 'article') return;
+            articles++;
+            var pdf = pdfByDoi[(d.data.doi || '').toLowerCase()];
+            d.row.c[6].textContent = pdf || '—';
+            d.row.c[6].className = pdf ? '' : 'pub-cell-sub';
+            if (pdf) withPdf++;
+        });
+        document.getElementById('impCounts').textContent = articles ? '· статей ' + articles + ', с PDF ' + withPdf : '';
+        return { articles: articles, withPdf: withPdf };
+    }
+
+    function upload(files) {
+        if (busy || created) return;
+        files = pick(files);
+        if (!files.length) { showToast('В выбранном нет файлов .doc или .pdf', 'error'); return; }
+        busy = true;
+        document.getElementById('impWork').style.display = '';
+        var bar = document.getElementById('impBar'), text = document.getElementById('impProgressText');
+        files.sort(function(a, b) { return a.file.name.localeCompare(b.file.name, 'ru'); });
+        var docFiles = files.filter(function(f) { return DOC_RE.test(f.file.name); });
+        var pdfFiles = files.filter(function(f) { return PDF_RE.test(f.file.name); });
+        var queue = docFiles.concat(pdfFiles), done = 0;
+
+        function next() {
+            if (!queue.length) { finish(); return; }
+            var f = queue.shift(), isDoc = DOC_RE.test(f.file.name);
+            text.textContent = (isDoc ? 'Разбираю ' : 'Загружаю ') + f.file.name + ' — ' + (done + 1) + ' из ' + (done + queue.length + 1);
+            var row = isDoc ? addRow(f.file.name, '') : null;
+            post(BASE + (isDoc ? '/doc' : '/pdf'), f.file).then(function(res) {
+                var d = res.data;
+                if (isDoc) {
+                    docs[f.file.name] = { row: row, data: res.ok ? d : null };
+                    if (!res.ok || d.kind === 'error') {
+                        setMark(row, 'bad', '!'); row.c[2].textContent = (d.error || d.reason || 'ошибка');
+                    } else if (d.kind === 'skipped') {
+                        setMark(row, 'wait', '–'); row.c[2].textContent = d.reason; row.c[2].className = 'pub-cell-sub';
+                    } else {
+                        setMark(row, d.warnings.length ? 'warn' : 'ok', d.warnings.length ? '!' : '✓');
+                        row.c[2].textContent = d.title;
+                        row.c[2].appendChild(el('div', 'pub-cell-sub', d.authors.join(', ') + ' · ' + d.doi));
+                        addMsgs(row.c[2], d.warnings, 'pub-msg-warn');
+                        row.c[3].textContent = d.pages;
+                        row.c[4].textContent = d.authors.length;
+                        row.c[5].textContent = d.refs + ' / ' + d.refs_en;
+                    }
+                } else if (res.ok && d.doi) {
+                    pdfByDoi[d.doi.toLowerCase()] = d.file;
+                } else if (!res.ok) {
+                    var r2 = addRow(f.file.name, d.error || 'ошибка'); setMark(r2, 'bad', '!');
+                }
+                done++;
+                bar.style.width = Math.round(100 * done / (done + queue.length)) + '%';
+                refreshPdfColumn();
+                next();
+            });
+        }
+
+        function finish() {
+            busy = false;
+            var c = refreshPdfColumn();
+            text.textContent = 'Загружено: статей ' + c.articles + ', PDF к ним ' + c.withPdf + '.';
+            fetch(BASE + '/summary').then(function(r) { return r.json(); }).then(showIssue);
+        }
+        next();
+    }
+
+    function showIssue(s) {
+        var card = document.getElementById('impIssueCard'), note = document.getElementById('impIssueNote');
+        card.style.display = '';
+        note.innerHTML = '';
+        if (!s.issue) {
+            note.appendChild(el('div', 'pub-warning-box', 'Среди файлов не нашлось ни одной статьи с DOI — создавать выпуск не из чего.'));
+            document.getElementById('impCreate').disabled = true;
+            return;
+        }
+        document.getElementById('impJournal').value = s.issue.journal_name || '';
+        document.getElementById('impIssn').value = s.issue.issn;
+        document.getElementById('impYear').value = s.issue.year;
+        document.getElementById('impNumber').value = s.issue.number;
+        document.getElementById('impVolume').value = s.issue.volume || '';
+        if (s.other_issue_files && s.other_issue_files.length) {
+            note.appendChild(el('div', 'pub-warning-box', 'Эти статьи, судя по DOI, из другого выпуска: ' + s.other_issue_files.join(', ') + '. Они тоже попадут в создаваемый выпуск — уберите лишнее и загрузите заново, если это ошибка.'));
+        }
+        if (s.existing_url) {
+            var box = el('div', 'pub-warning-box', 'Такой выпуск уже есть в разделе. ');
+            var a = el('a', null, 'Открыть его'); a.href = s.existing_url; box.appendChild(a);
+            note.appendChild(box);
+            document.getElementById('impCreate').disabled = true;
+        }
+        var c = refreshPdfColumn();
+        if (c.articles && c.withPdf < c.articles) {
+            note.appendChild(el('div', 'pub-note-box', 'PDF есть не у всех статей (' + c.withPdf + ' из ' + c.articles + '). Выпуск создать можно, недостающие PDF добавляются на его странице — без них сверка и отправка в Метафору для этих статей невозможны.'));
+        }
+    }
+
+    document.getElementById('impCreate').addEventListener('click', function() {
+        var btn = this;
+        btn.disabled = true;
+        fetch(BASE + '/create', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                journal_name: document.getElementById('impJournal').value, issn: document.getElementById('impIssn').value,
+                year: document.getElementById('impYear').value, number: document.getElementById('impNumber').value,
+                volume: document.getElementById('impVolume').value,
+            }),
+        }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+          .then(function(res) {
+              if (res.ok) { created = true; window.location.href = res.data.url; return; }
+              btn.disabled = false;
+              showToast(res.data.error || 'Не удалось создать выпуск', 'error');
+          }).catch(function() { btn.disabled = false; showToast('Не удалось создать выпуск', 'error'); });
+    });
+
+    document.getElementById('impCancel').addEventListener('click', function() {
+        fetch(BASE + '/cancel', { method: 'POST' }).then(function() { window.location.href = {{ url_for('admin_publish_index')|tojson }}; });
+    });
+
+    var inFiles = document.getElementById('impFiles'), inFolder = document.getElementById('impFolder');
+    document.getElementById('impPickFiles').addEventListener('click', function(e) { e.stopPropagation(); inFiles.click(); });
+    document.getElementById('impPickFolder').addEventListener('click', function(e) { e.stopPropagation(); inFolder.click(); });
+    drop.addEventListener('click', function(e) { if (e.target === drop || e.target.closest('.pub-drop-icon, .pub-drop-title, .pub-drop-text')) inFolder.click(); });
+    function fromInput(input) {
+        var list = Array.prototype.map.call(input.files, function(f) { return { file: f, path: f.webkitRelativePath || f.name }; });
+        input.value = '';
+        upload(list);
+    }
+    inFiles.addEventListener('change', function() { fromInput(inFiles); });
+    inFolder.addEventListener('change', function() { fromInput(inFolder); });
+    drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('pub-drop-active'); });
+    drop.addEventListener('dragleave', function() { drop.classList.remove('pub-drop-active'); });
+    drop.addEventListener('drop', function(e) {
+        e.preventDefault();
+        drop.classList.remove('pub-drop-active');
+        var items = e.dataTransfer.items;
+        if (items && items.length && items[0].webkitGetAsEntry) {
+            readEntries(items).then(upload);
+        } else {
+            upload(Array.prototype.map.call(e.dataTransfer.files, function(f) { return { file: f, path: f.name }; }));
+        }
+    });
+})();
+</script>
+{% endblock %}
