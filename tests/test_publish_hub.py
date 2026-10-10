@@ -72,6 +72,14 @@ def test_staff_user_can_open_section(client, staff, dirs):
     assert client.get("/admin/publish/import").status_code == 200
 
 
+def test_home_button_link_has_no_host_or_port(client, staff, dirs):
+    """Кнопка на главной не должна содержать адрес сервера: за nginx он получается без порта (был 502)."""
+    import re
+    html = client.get("/").get_data(as_text=True)
+    m = re.search(r'<a href="([^"]+)" class="home-btn home-btn-secondary">', html)
+    assert m and m.group(1) == "admin/publish"
+
+
 def test_author_is_kept_out(app, client, dirs):
     _login(client, _user("author"))
     assert client.get("/admin/publish").status_code == 302
