@@ -140,6 +140,10 @@
                     }
                 } else if (res.ok && d.doi) {
                     pdfByDoi[d.doi.toLowerCase()] = d.file;
+                } else if (res.ok && d.toc) {
+                    var rt = addRow(f.file.name, 'Титул выпуска: найдено разделов — ' + d.toc.sections);
+                    setMark(rt, d.toc.warnings.length ? 'warn' : 'ok', d.toc.warnings.length ? '!' : '✓');
+                    addMsgs(rt.c[2], d.toc.warnings, 'pub-msg-warn');
                 } else if (!res.ok) {
                     var r2 = addRow(f.file.name, d.error || 'ошибка'); setMark(r2, 'bad', '!');
                 }
@@ -183,6 +187,9 @@
             document.getElementById('impCreate').disabled = true;
         }
         var c = refreshPdfColumn();
+        if (s.sections && s.sections.length) {
+            note.appendChild(el('div', 'pub-note-box', 'Разделы выпуска из титульного PDF (' + s.sections.length + '): ' + s.sections.join('; ') + '. Статьи распределятся по ним сами — по первой странице.'));
+        }
         if (c.articles && c.withPdf < c.articles) {
             note.appendChild(el('div', 'pub-note-box', 'PDF есть не у всех статей (' + c.withPdf + ' из ' + c.articles + '). Выпуск создать можно, недостающие PDF добавляются на его странице — без них сверка и отправка в Метафору для этих статей невозможны.'));
         }

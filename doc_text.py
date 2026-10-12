@@ -259,3 +259,83 @@ def extract_text(path):
     if not text:
         raise DocFormatError("в документе нет текста")
     return text + "\n" + SOFT_BREAK_MARK
+
+
+# ---------------------------------------------------------------- .docx
+
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def extract_docx_text(path):
+    """Текст .docx (Word 2007+) без внешних библиотек, в том же виде, что extract_text для .doc.
+
+    Зачем свой разбор, а не python-docx: библиотека теряет неразрывный дефис Word (<w:noBreakHyphen/>) —
+    «1–4» у номеров организаций превращалось в «14», и организации не привязывались к авторам;
+    не отличает мягкий перенос строки от конца абзаца и тянет в текст коды полей.
+    Мягкий перенос помечается так же, как в extract_text: строка после него начинается с U+2028,
+    и такая же метка стоит в самом конце текста."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    try:
+        with zipfile.ZipFile(path) as z:
+            root = ET.fromstring(z.read("word/document.xml"))
+    except (zipfile.BadZipFile, KeyError, ET.ParseError) as e:
+        raise DocFormatError(f"не файл Word 2007+: {e}")
+    body = root.find(_W + "body")
+    if body is None:
+        raise DocFormatError("в документе нет текста")
+
+    out, fields = [], []   # fields: для каждого открытого поля — True, пока идёт его код (до разделителя)
+
+    def run(r):
+        for ch in r:
+            tag = ch.tag
+            if tag == _W + "fldChar":
+                kind = ch.get(_W + "fldCharType")
+                if kind == "begin":
+                    fields.append(True)
+                elif kind == "separate" and fields:
+                    fields[-1] = False
+                elif kind == "end" and fields:
+                    fields.pop()
+                continue
+            if any(fields):          # внутри кода поля (HYPERLINK, PAGEREF …) текста нет
+                continue
+            if tag == _W + "t":
+                out.append(ch.text or "")
+            elif tag == _W + "tab":
+                out.append("\t")
+            elif tag in (_W + "br", _W + "cr"):
+                out.append("\n" + SOFT_BREAK_MARK if ch.get(_W + "type") in (None, "textWrapping") else "\n")
+            elif tag == _W + "noBreakHyphen":
+                out.append("-")
+            elif tag == _W + "sym":
+                code = int(ch.get(_W + "char", "0") or "0", 16) if (ch.get(_W + "char") or "").strip() else 0
+                font = (ch.get(_W + "font") or "").lower()
+                out.append(_SYMBOL_FONT.get(code & 0xFF, "") if font == "symbol" and code >= 0xF000 else (chr(code) if code else ""))
+
+    def inline(el):
+        for ch in el:
+            if ch.tag == _W + "r":
+                run(ch)
+            elif ch.tag in (_W + "hyperlink", _W + "ins", _W + "fldSimple", _W + "smartTag", _W + "sdt",
+                            _W + "sdtContent", _W + "customXml"):
+                inline(ch)
+
+    def paragraph(p):
+        inline(p)
+        out.append("\n")
+
+    def block(el):
+        for ch in el:
+            if ch.tag == _W + "p":
+                paragraph(ch)
+            elif ch.tag in (_W + "tbl", _W + "tr", _W + "tc", _W + "sdt", _W + "sdtContent"):
+                block(ch)
+
+    block(body)
+    text = "".join(out).strip()
+    if not text:
+        raise DocFormatError("в документе нет текста")
+    return text + "\n" + SOFT_BREAK_MARK

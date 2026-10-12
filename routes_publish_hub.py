@@ -157,7 +157,9 @@ def register_publish_hub_routes(app):
         if issue:
             row = PubIssue.query.filter_by(issn=issue['issn'], year=issue['year'], number=issue['number']).first()
             existing = url_for('admin_publish_issue_detail', issue_id=row.id) if row else None
-        return jsonify({'issue': issue, 'other_issue_files': odd, 'articles': len(parsed), 'existing_url': existing})
+        secs = publish_import.load_sections(token)
+        return jsonify({'issue': issue, 'other_issue_files': odd, 'articles': len(parsed), 'existing_url': existing,
+                        'sections': [x['title_ru'] for x in (secs or {}).get('sections', [])]})
 
     @app.route('/admin/publish/import/<token>/create', methods=['POST'])
     @publish_required

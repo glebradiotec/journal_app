@@ -778,6 +778,13 @@ def extract_text_any(file_path):
         return text
 
     if suffix == 'docx':
+        # Свой разбор (см. doc_text.extract_docx_text): python-docx теряет неразрывный дефис Word
+        # и не различает мягкие переносы; он остаётся запасным способом.
+        try:
+            import doc_text
+            return doc_text.extract_docx_text(file_path)
+        except Exception:  # noqa: BLE001
+            pass
         from docx import Document as DocxDocument
         doc = DocxDocument(file_path)
         return "\n".join(p.text for p in doc.paragraphs)
@@ -896,4 +903,20 @@ def extract_toc_sections(file_path):
         en = en_headings[i] if i < len(en_headings) else ""
         sections.append({"title_ru": ru.strip().capitalize(), "title_en": en.strip().capitalize()})
 
-    return {"sections": sections, "warnings": warnings}
+    return {"sections": sections, "warnings": warnings, "pages": _toc_page_sections(text_ru, ru_headings)}
+
+
+def _toc_page_sections(text, headings):
+    """Какой раздел у статьи, начинающейся на странице N: [[N, индекс раздела], …].
+
+    В оглавлении за заголовком раздела (заглавными буквами) идут статьи, и у каждой в конце отдельной
+    строкой стоит номер её первой страницы — по нему статья и привязывается к разделу."""
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    start = next((i + 1 for i, l in enumerate(lines) if l.lower() == "содержание"), 0)
+    pages, current = [], -1
+    for l in lines[start:]:
+        if current + 1 < len(headings) and l == headings[current + 1]:
+            current += 1
+        elif current >= 0 and re.fullmatch(r"\d{1,4}", l):
+            pages.append([int(l), current])
+    return pages

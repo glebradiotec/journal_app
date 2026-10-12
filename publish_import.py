@@ -24,7 +24,7 @@ import article_template_parser
 import pdf_parser
 import publish_sanitize
 from models import db
-from models_publish import PubArticle, PubAuthor, PubIssue
+from models_publish import PubArticle, PubAuthor, PubIssue, PubSection
 
 BASE_DIR = os.path.dirname(__file__)
 IMPORT_ROOT = os.path.join(BASE_DIR, "uploads", "publish_import")
@@ -147,10 +147,37 @@ def add_pdf(folder, storage):
         raise ImportError_(f"«{name}»: не читается как PDF ({e}).")
     m = _DOI_RE.search(first)
     if not m:
-        # Титул, PDF целого номера, список книг — не статьи; хранить их незачем.
+        # Титул, PDF целого номера, список книг — не статьи, хранить их незачем. Но у титула есть
+        # «Содержание»: из него берутся разделы выпуска и то, какая статья в каком разделе.
+        toc = None
+        try:
+            toc = pdf_parser.extract_toc_sections(path)
+        except Exception:  # noqa: BLE001
+            toc = None
         os.remove(path)
-        return {"file": name, "doi": "", "pages": pages, "skipped": True}
+        out = {"file": name, "doi": "", "pages": pages, "skipped": True}
+        if toc and toc.get("sections"):
+            # разделы нужны только при создании выпуска — то есть для папки сессии импорта (…/<token>/pdf)
+            if os.path.basename(folder) == "pdf":
+                _save_sections(os.path.dirname(folder), toc, name)
+            out["toc"] = {"sections": len(toc["sections"]), "warnings": toc.get("warnings") or []}
+        return out
     return {"file": os.path.basename(path), "doi": m.group(0), "pages": pages}
+
+
+def _save_sections(session_folder, toc, source):
+    """Разделы и привязка «страница -> раздел» из титульного PDF; лежат рядом с разобранными статьями."""
+    os.makedirs(session_folder, exist_ok=True)
+    with open(os.path.join(session_folder, "sections.json"), "w", encoding="utf-8") as f:
+        json.dump({"source": source, "sections": toc["sections"], "pages": toc.get("pages") or []}, f, ensure_ascii=False)
+
+
+def load_sections(token):
+    try:
+        with open(os.path.join(session_dir(token), "sections.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
 
 
 def session_pdf_dir(token):
@@ -252,16 +279,40 @@ def create_issue(token, fields, user_id):
             dst = _unique_path(MANUSCRIPT_ROOT, f"issue{issue.id}_{parsed['_file']}")
             shutil.copy2(src, dst)
             art.manuscript_file = os.path.basename(dst)
+    assign_sections(issue, load_sections(token))
     db.session.commit()
 
     src_pdf = session_pdf_dir(token)
+    dst_pdf = issue_pdf_dir(issue.id)
+    shutil.rmtree(dst_pdf, ignore_errors=True)   # номера выпусков могут повторяться — старые PDF не должны достаться новому
     if os.path.isdir(src_pdf):
-        dst_pdf = issue_pdf_dir(issue.id)
         os.makedirs(dst_pdf, exist_ok=True)
         for name in os.listdir(src_pdf):
             shutil.move(os.path.join(src_pdf, name), _unique_path(dst_pdf, name))
     shutil.rmtree(session_dir(token), ignore_errors=True)
     return issue
+
+
+def assign_sections(issue, sections):
+    """Создаёт разделы выпуска и ставит каждой статье её раздел — по первой странице статьи."""
+    if not sections or not sections.get("sections"):
+        return 0
+    db.session.flush()
+    db.session.expire(issue, ["articles"])   # статьи только что добавлены — список в памяти мог устареть
+    rows = []
+    for sec in sections["sections"]:
+        row = PubSection(issue_id=issue.id, title_ru=sec["title_ru"], title_en=sec.get("title_en") or "")
+        db.session.add(row)
+        rows.append(row)
+    by_page = {int(pg): idx for pg, idx in sections.get("pages") or []}
+    assigned = 0
+    for art in issue.articles:
+        m = re.match(r"\s*(\d+)", art.pages or "")
+        idx = by_page.get(int(m.group(1))) if m else None
+        if idx is not None and 0 <= idx < len(rows):
+            art.section_ru, art.section_en = rows[idx].title_ru, rows[idx].title_en
+            assigned += 1
+    return assigned
 
 
 def list_issue_pdfs(issue_id):

@@ -279,3 +279,92 @@ def test_verify_marks_article_without_pdf_as_error(client, issue, mf, monkeypatc
     monkeypatch.setattr(metafora_check, "article_from_api", lambda uid: {"doi": ARTICLE["doi"], "has_pdf": False, "signed_at": None})
     d = client.get(f"/admin/publish/issue/{issue.id}/metafora/verify?uid=a1").get_json()
     assert d["errors"] and hub.mf_load_state(issue.id)["articles"][0]["verify_errors"]
+
+
+# ---------------------------------------------------------------- разделы из титульного PDF
+
+def test_articles_get_sections_by_first_page(client, issue):
+    arts = issue.articles
+    arts[0].pages = "5-19"
+    second = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-03", pages="20-30"), None)
+    third = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-04", pages="41-53"), None)
+    db.session.flush()
+    toc = {"sections": [{"title_ru": "Первый раздел", "title_en": "First"}, {"title_ru": "Второй раздел", "title_en": ""}],
+           "pages": [[5, 0], [20, 0], [41, 1]]}
+    assert publish_import.assign_sections(issue, toc) == 3
+    db.session.commit()
+    assert [a.section_ru for a in issue.articles] == ["Первый раздел", "Первый раздел", "Второй раздел"]
+    assert issue.articles[0].section_en == "First"
+    assert [s.title_ru for s in issue.sections] == ["Первый раздел", "Второй раздел"]
+
+
+def test_no_toc_means_no_sections(client, issue):
+    assert publish_import.assign_sections(issue, None) == 0
+    assert publish_import.assign_sections(issue, {"sections": [], "pages": []}) == 0
+    assert issue.sections == []
+
+
+def test_toc_maps_pages_to_the_heading_above_them():
+    import pdf_parser
+    text = ("Содержание\nПЕРВЫЙ РАЗДЕЛ\nАвтор А.А. Статья один\n5\nАвтор Б.Б. Статья два\n20\n"
+            "ВТОРОЙ РАЗДЕЛ\nАвтор В.В. Статья три\n41\n")
+    heads = ["ПЕРВЫЙ РАЗДЕЛ", "ВТОРОЙ РАЗДЕЛ"]
+    assert pdf_parser._toc_page_sections(text, heads) == [[5, 0], [20, 0], [41, 1]]
+
+
+# ---------------------------------------------------------------- .docx без внешних библиотек
+
+def _make_docx(tmp_path, body_xml):
+    import zipfile
+    path = tmp_path / "a.docx"
+    ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", f'<?xml version="1.0" encoding="UTF-8"?><w:document {ns}><w:body>{body_xml}</w:body></w:document>')
+    return str(path)
+
+
+def test_docx_keeps_non_breaking_hyphen_in_footnote_ranges(tmp_path):
+    """«1–4» с неразрывным дефисом Word читалось как «14», и организации не привязывались к авторам."""
+    import doc_text
+    body = ('<w:p><w:r><w:t>1</w:t></w:r><w:r><w:noBreakHyphen/></w:r><w:r><w:t>4 ВУНЦ ВВС (г. Воронеж, Россия)</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t>Первая</w:t></w:r><w:r><w:br/></w:r><w:r><w:t>вторая</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t>Почта </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+            '<w:r><w:instrText> HYPERLINK "mailto:a@b.ru" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+            '<w:r><w:t>a@b.ru</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>')
+    out = doc_text.extract_docx_text(_make_docx(tmp_path, body)).split("\n")
+    assert out[0] == "1-4 ВУНЦ ВВС (г. Воронеж, Россия)"
+    assert out[1] == "Первая" and out[2] == " вторая"
+    assert out[3] == "Почта a@b.ru" and out[-1] == " "
+
+
+def test_docx_that_is_not_word_is_rejected(tmp_path):
+    import doc_text
+    bad = tmp_path / "b.docx"
+    bad.write_bytes(b"not a zip")
+    with pytest.raises(doc_text.DocFormatError):
+        doc_text.extract_docx_text(str(bad))
+
+
+def test_reference_check_tolerates_glyph_artifacts_in_pdf_text():
+    """В слое текста PDF «Orbital» бывает прочитан как «Brbital» — это не ошибка данных."""
+    import metafora_check as mc
+    article = {"title": "T", "title_en": "T", "doi": "d", "udk": ["1"], "fpage": 1, "lpage": 1, "abstract": "", "abstract_en": "",
+               "keywords": [], "keywords_en": [], "received": None, "accepted": None, "authors": [],
+               "refs": ["Padgett M. Light's Orbital Angular Momentum [Электронный ресурс]. 2004. URL: https://x.ru/a.pdf (дата доступа 03.05.2026)."],
+               "refs_en": [], "raw": ""}
+    pdf = {"n": 1, "p1": "", "all": "Список источников\n1. Padgett M. Light's Brbital Angular Momentum [Электронный ресурс]. 2004. "
+                                   "URL: https://x.ru/a.pdf (дата доступа 03.05.2026).\nИнформация об авторах"}
+    errors, _ = mc.check_article(article, pdf)
+    assert not [e for e in errors if "не совпали со списком" in e]
+
+
+def test_creating_an_issue_does_not_inherit_pdfs_of_a_deleted_one(client, staff, dirs):
+    import os
+    stale = publish_import.issue_pdf_dir(1)
+    os.makedirs(stale)
+    open(os.path.join(stale, "old.pdf"), "wb").write(b"x")
+    token = publish_import.new_token()
+    _session_with_article(token)
+    summary = client.get(f"/admin/publish/import/{token}/summary").get_json()
+    client.post(f"/admin/publish/import/{token}/create", json=summary["issue"])
+    assert PubIssue.query.one().id == 1 and publish_import.list_issue_pdfs(1) == []

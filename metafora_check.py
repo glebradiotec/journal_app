@@ -261,7 +261,9 @@ def check_article(a, P):
             continue
         nsec = norm(sec)
         # каждая ссылка должна стоять в СВОЁМ разделе PDF — и началом, и концом (ловит обрывки и склейки)
-        miss = [r[:60] for r in good if norm(r)[:45] not in nsec or norm(r)[-25:] not in nsec]
+        # Ссылка должна найтись в списке PDF хотя бы одним концом. Требовать оба нельзя: у части PDF в слое
+        # текста искажены отдельные буквы («Orbital» читается как «Brbital»), а данные при этом верны.
+        miss = [r[:60] for r in good if norm(r)[:45] not in nsec and norm(r)[-25:] not in nsec]
         if miss:
             errs.append(f"{len(miss)} {lab} ссылок не совпали со списком в PDF, напр.: {miss[0]}")
         if cnt_pdf and cnt_pdf != len(lst):

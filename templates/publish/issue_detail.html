@@ -78,6 +78,7 @@
                             <div class="pub-cell-sub">
                                 {% if art.authors %}{{ art.authors|map(attribute='surname_ru')|select|join(', ') }}{% else %}без авторов{% endif %}{% if art.doi %} · {{ art.doi }}{% endif %}
                             </div>
+                            {% if art.section_ru %}<div class="pub-cell-sub">Раздел: {{ art.section_ru }}</div>{% endif %}
                             <ul class="pub-msgs js-msgs"></ul>
                         </td>
                         <td class="pub-num">{{ art.pages or '—' }}</td>
@@ -172,7 +173,7 @@
         {% endif %}
 
         <details class="adm-card pub-details">
-            <summary>Разделы выпуска <span class="pub-hint">({{ issue.sections|length }}) — нужны для сайта, в Метафору не передаются</span></summary>
+            <summary>Разделы выпуска <span class="pub-hint">({{ issue.sections|length }}) — берутся из титульного PDF, правятся здесь</span></summary>
             <div class="adm-card-body" style="border-top: 1px solid var(--color-border-muted);">
                 {% if issue.sections %}
                 <div class="pub-section-list">
