@@ -13,30 +13,19 @@
         <div class="pub-hero">
             <h1 class="pub-hero-title">Публикация выпусков</h1>
             <p class="pub-hero-sub">
-                Бросьте папку выпуска в рамку ниже — статьи разберутся сами, данные сверятся с напечатанными PDF.
-                Дальше выпуск уходит на сайт, в eLibrary, CrossRef и в «Метафору».
+                Выпуск загружается папкой целиком: статьи разбираются сами и сверяются с напечатанными PDF.
+                Дальше он уходит на сайт, в eLibrary, CrossRef и в «Метафору».
             </p>
+            <div class="pub-hero-actions">
+                <a href="{{ url_for('admin_publish_import') }}" class="pub-btn pub-btn-primary">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
+                    Загрузить выпуск
+                </a>
+            </div>
             <div class="pub-hero-stats">
                 <div><span class="pub-hero-stat-num">{{ total_issues }}</span><span class="pub-hero-stat-label">{{ total_issues|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span></div>
                 <div><span class="pub-hero-stat-num">{{ total_articles }}</span><span class="pub-hero-stat-label">{{ total_articles|pluralize_ru('статья', 'статьи', 'статей') }}</span></div>
             </div>
-        </div>
-
-        {% include "publish/_import_widget.html" %}
-
-        <div class="pub-how" style="margin-top: 28px;">
-            <div class="pub-how-step"><span class="pub-how-num">1</span>
-                <div class="pub-how-title">Загрузка</div>
-                <div class="pub-how-text">Папка выпуска: .doc статей и их PDF. Выпуск определяется сам.</div></div>
-            <div class="pub-how-step"><span class="pub-how-num">2</span>
-                <div class="pub-how-title">Сверка</div>
-                <div class="pub-how-text">Авторы, страницы и литература сверяются с PDF.</div></div>
-            <div class="pub-how-step"><span class="pub-how-num">3</span>
-                <div class="pub-how-title">Отправка</div>
-                <div class="pub-how-text">Сайт, eLibrary, CrossRef, «Метафора» — каждое назначение отдельно.</div></div>
-            <div class="pub-how-step"><span class="pub-how-num">4</span>
-                <div class="pub-how-title">Контроль</div>
-                <div class="pub-how-text">Видно, что и куда ушло; в «Метафоре» — подпись после проверки.</div></div>
         </div>
 
         {% if journals_error and not journals %}
@@ -52,8 +41,7 @@
             {% for j in active %}
             <div class="pub-jcard">
                 <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-jcard-head">
-                    <span class="pub-jcard-name">{{ j.name }}</span>
-                    <span class="pub-jcard-issn">{{ j.issn }}</span>
+                    <span class="pub-jcard-name" title="{{ j.name }}">{{ j.name }}</span>
                 </a>
                 {% for r in j.recent %}
                 {% set issue = r.issue %}{% set st = r.stage %}
@@ -62,11 +50,10 @@
                     {% include "publish/_stage.html" %}
                 </a>
                 {% endfor %}
-                {% if j.issues > j.recent|length %}
-                <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-jcard-issue">
+                <a href="{{ url_for('admin_publish_journal_detail', issn=j.issn) }}" class="pub-jcard-issue pub-jcard-all">
                     <span class="pub-cell-sub">Все выпуски — {{ j.issues }}</span>
+                    <span class="pub-jcard-issn">ISSN {{ j.issn }}</span>
                 </a>
-                {% endif %}
             </div>
             {% endfor %}
         </div>
@@ -91,5 +78,4 @@
 </div>
 
 {% include "publish/_scripts.html" %}
-{% include "publish/_import_widget_script.html" %}
 {% endblock %}

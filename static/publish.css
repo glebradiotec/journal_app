@@ -196,16 +196,18 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 .pub-section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--color-fg-muted); margin: 0 0 12px; }
 
 /* Карточка журнала с последними выпусками */
-.pub-jcard { background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 14px; overflow: hidden; transition: border-color 0.15s, box-shadow 0.15s; }
+.pub-jcard { background: var(--color-canvas-default); border: 1px solid var(--color-border-default); border-radius: 14px; overflow: hidden; transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex; flex-direction: column; min-height: 272px; }  /* шапка 52 + 4 выпуска и «Все выпуски» по 44 */
 .pub-jcard:hover { border-color: #5BA4B0; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-.pub-jcard-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px 12px; text-decoration: none; color: inherit; }
-.pub-jcard-name { font-size: 15px; font-weight: 700; color: var(--color-fg-default); }
+.pub-jcard-head { min-height: 52px; box-sizing: border-box; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 20px 12px; text-decoration: none; color: inherit; }
+.pub-jcard-name { font-size: 14px; font-weight: 700; color: var(--color-fg-default); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pub-jcard-issn { font-size: 12px; color: var(--color-fg-muted); white-space: nowrap; }
-.pub-jcard-issue { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px; border-top: 1px solid var(--color-border-muted); text-decoration: none; color: inherit; }
+.pub-jcard-issue { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px; min-height: 44px; box-sizing: border-box; border-top: 1px solid var(--color-border-muted); text-decoration: none; color: inherit; }
+.pub-jcard-all { margin-top: auto; }
 .pub-jcard-issue:hover { background: var(--color-canvas-subtle); }
 .pub-jcard-issue-name { font-size: 13.5px; font-weight: 600; color: var(--color-fg-default); white-space: nowrap; }
 .pub-jcard-empty { padding: 0 20px 16px; font-size: 12.5px; color: var(--color-fg-muted); }
-.pub-jgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 14px; margin-bottom: 28px; align-items: start; }
+.pub-jgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 14px; margin-bottom: 28px; align-items: stretch; }
 .pub-jgrid-idle { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .pub-jmini { display: flex; flex-direction: column; gap: 2px; padding: 12px 16px; border: 1px solid var(--color-border-muted); border-radius: 10px; text-decoration: none; color: inherit; background: var(--color-canvas-default); }
 .pub-jmini:hover { border-color: #5BA4B0; }
