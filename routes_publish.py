@@ -427,14 +427,8 @@ def register_publish_routes(app):
         flash('Статья удалена из черновика.', 'success')
         return redirect(url_for('admin_publish_issue_detail', issue_id=issue_id))
 
-    @app.route('/admin/publish/issue/<int:issue_id>/preview')
-    @publish_required
-    def admin_publish_issue_preview(issue_id):
-        issue = PubIssue.query.get_or_404(issue_id)
-        if not issue.articles:
-            flash('В выпуске пока нет ни одной статьи.', 'error')
-            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
-
+    def _site_precheck(issue):
+        """Проверка перед записью на сайт (только чтение): в какую БД пишем, что не так, какие будут DOI."""
         warnings = []
         journal_row = None
         num_id = None
@@ -445,8 +439,9 @@ def register_publish_routes(app):
                 'запись в боевую базу сайта не произойдёт.'
             )
 
-        engine = site_db.get_engine()
+        engine = None
         try:
+            engine = site_db.get_engine()
             with engine.connect() as conn:
                 journal_row = site_db.get_journal_by_issn(conn, issue.issn)
                 if journal_row is None:
@@ -505,48 +500,58 @@ def register_publish_routes(app):
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: нет аннотации.')
             if not art.authors:
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: не указано ни одного автора.')
+        return {'production': production, 'warnings': warnings, 'dois': computed_dois, 'journal_row': journal_row}
 
-        elibrary_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_elibrary.xml'))
-        crossref_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_crossref.xml'))
-        metafora_ready = os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_metafora.xml'))
-        return render_template(
-            'publish/preview.html', issue=issue, journal_row=journal_row,
-            computed_dois=computed_dois, warnings=warnings, production=production,
-            elibrary_ready=elibrary_ready, crossref_ready=crossref_ready, metafora_ready=metafora_ready,
-        )
-
-    @app.route('/admin/publish/issue/<int:issue_id>/generate-elibrary', methods=['POST'])
+    @app.route('/admin/publish/issue/<int:issue_id>/preview')
     @publish_required
-    def admin_publish_issue_generate_elibrary(issue_id):
+    def admin_publish_issue_preview(issue_id):
+        # Отдельной страницы предпросмотра больше нет: проверка и запись на сайт — на странице выпуска.
+        return redirect(url_for('admin_publish_issue_detail', issue_id=issue_id))
+
+    @app.route('/admin/publish/issue/<int:issue_id>/site-check')
+    @publish_required
+    def admin_publish_issue_site_check(issue_id):
+        """Проверка перед записью на сайт — только чтение, ничего не пишет."""
         issue = PubIssue.query.get_or_404(issue_id)
         if not issue.articles:
+            return jsonify({'error': 'В выпуске нет статей.'}), 400
+        res = _site_precheck(issue)
+        return jsonify({
+            'production': res['production'], 'pushed': issue.is_pushed, 'warnings': res['warnings'],
+            'articles': [{'title': art.title_ru, 'doi': doi} for art, doi in zip(issue.articles, res['dois'])],
+        })
+
+    @app.route('/admin/publish/issue/<int:issue_id>/export/<kind>')
+    @publish_required
+    def admin_publish_export(issue_id, kind):
+        """XML для eLibrary / Метафоры — собирается в момент нажатия из текущих данных выпуска и сразу
+        скачивается (поэтому выгрузка не может устареть). CrossRef собирается при записи на сайт — отдаётся он."""
+        issue = PubIssue.query.get_or_404(issue_id)
+        back = redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        if kind == 'crossref':
+            return admin_publish_download(issue_id, kind)
+        if kind not in ('elibrary', 'metafora'):
+            return 'unknown', 404
+        if not issue.articles:
             flash('В выпуске нет статей.', 'error')
-            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
-        os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+            return back
         issue_view = _IssueView(issue)
+        name = issue.journal_name or issue.issn
         try:
-            elibrary_xml = export_elibrary.build_elibrary_xml(issue_view, issue.journal_name or issue.issn)
-            with open(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_elibrary.xml'), 'wb') as f:
-                f.write(elibrary_xml)
-            flash('eLibrary XML сгенерирован — можно скачать ниже.', 'success')
+            xml = (export_elibrary.build_elibrary_xml(issue_view, name) if kind == 'elibrary'
+                   else export_metafora.build_metafora_xml(issue_view, name))
         except export_elibrary.ElibraryExportError as e:
-            flash(f'Не удалось сгенерировать eLibrary XML: {e}', 'error')
-        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
-
-    @app.route('/admin/publish/issue/<int:issue_id>/generate-metafora', methods=['POST'])
-    @publish_required
-    def admin_publish_issue_generate_metafora(issue_id):
-        issue = PubIssue.query.get_or_404(issue_id)
-        if not issue.articles:
-            flash('В выпуске нет статей.', 'error')
-            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
-        os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
-        issue_view = _IssueView(issue)
-        metafora_xml = export_metafora.build_metafora_xml(issue_view, issue.journal_name or issue.issn)
-        with open(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_metafora.xml'), 'wb') as f:
-            f.write(metafora_xml)
-        flash('XML для Метафоры сгенерирован — можно скачать ниже.', 'success')
-        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+            flash(f'Не удалось собрать eLibrary XML: {e}', 'error')
+            return back
+        download_name = publish_journal_abbr.export_filename(issue, kind)
+        if kind == 'elibrary':
+            # Восстановление проекта в Articulus принимает только zip-архив с XML внутри.
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(download_name, xml)
+            buf.seek(0)
+            return send_file(buf, as_attachment=True, download_name=f'{download_name}.zip', mimetype='application/zip')
+        return send_file(io.BytesIO(xml), as_attachment=True, download_name=download_name, mimetype='application/xml')
 
     # Запись в БД боевого сайта — только администраторам (остальной раздел открыт всем сотрудникам).
     @app.route('/admin/publish/issue/<int:issue_id>/confirm', methods=['POST'])
@@ -559,7 +564,7 @@ def register_publish_routes(app):
         for art in issue.articles:
             if not art.authors:
                 flash(f'У статьи «{art.title_ru[:60]}» нет авторов — отправка отменена.', 'error')
-                return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+                return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
         engine = site_db.get_engine()
         try:
@@ -567,7 +572,7 @@ def register_publish_routes(app):
                 journal_row = site_db.get_journal_by_issn(conn, issue.issn)
                 if journal_row is None:
                     flash(f'Журнал с ISSN {issue.issn} не найден на сайте — отправка отменена.', 'error')
-                    return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+                    return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
                 jr_num = journal_row[0]
 
                 num_id, _created = site_db.find_or_create_nomera(conn, jr_num, issue.year, issue.number)
@@ -638,7 +643,7 @@ def register_publish_routes(app):
                                             for col, length, limit in too_long)
                         flash(f'Статья №{i} «{art.title_ru[:60]}»: не влезает в поля сайта — '
                               f'{details}. Ничего не отправлено, сократите текст.', 'error')
-                        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+                        return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
                 inserted_ids = []
                 try:
@@ -657,7 +662,7 @@ def register_publish_routes(app):
         except Exception as e:
             db.session.rollback()
             flash(f'Ошибка при записи в БД сайта: {e}', 'error')
-            return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
         issue.pushed_at = datetime.now(timezone.utc)
         db.session.commit()
@@ -692,7 +697,7 @@ def register_publish_routes(app):
             flash(f'Статьи записаны на сайт, но XML для Метафоры не сгенерирован: {e}', 'warning')
 
         flash(f'Выпуск {issue.year} №{issue.number} отправлен на сайт ({len(issue.articles)} стат.).', 'success')
-        return redirect(url_for('admin_publish_issue_preview', issue_id=issue.id))
+        return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
     @app.route('/admin/publish/issue/<int:issue_id>/download/<kind>')
     @publish_required
@@ -707,8 +712,8 @@ def register_publish_routes(app):
             return 'unknown', 404
         path = os.path.join(PUB_EXPORTS_FOLDER, fname)
         if not os.path.exists(path):
-            flash('Файл ещё не сгенерирован — сначала отправьте выпуск на сайт.', 'error')
-            return redirect(url_for('admin_publish_issue_preview', issue_id=issue_id))
+            flash('CrossRef XML появится после записи выпуска на сайт.' if kind == 'crossref' else 'Файл ещё не сгенерирован.', 'error')
+            return redirect(url_for('admin_publish_issue_detail', issue_id=issue_id))
         issue = PubIssue.query.get_or_404(issue_id)
         download_name = publish_journal_abbr.export_filename(issue, kind)
 

@@ -37,10 +37,10 @@
                 <div class="pub-step-value">{{ 'на сайте' if stage.on_site else 'не отправлен' }}</div>
                 <div class="pub-step-hint">radiotec.ru</div>
             </div>
-            <div class="pub-step {{ 'pub-step-done' if exports.elibrary else '' }}">
+            <div class="pub-step">
                 <div class="pub-step-label">eLibrary</div>
-                <div class="pub-step-value">{{ 'XML готов' if exports.elibrary else 'не собран' }}</div>
-                <div class="pub-step-hint">архив для загрузки</div>
+                <div class="pub-step-value">XML по кнопке</div>
+                <div class="pub-step-hint">собирается при скачивании</div>
             </div>
             <div class="pub-step {{ 'pub-step-done' if exports.crossref else '' }}">
                 <div class="pub-step-label">CrossRef</div>
@@ -105,32 +105,44 @@
         <div class="adm-card">
             <div class="adm-card-header"><h2 class="adm-card-title">Сайт, eLibrary, CrossRef</h2></div>
             <div class="pub-dest-list">
-                <div class="pub-dest">
+                <div class="pub-dest" style="flex-wrap: wrap;">
                     <div class="pub-dest-info">
                         <div class="pub-dest-name">Сайт radiotec.ru {% if stage.on_site %}<span class="pub-chip pub-chip-ok">на сайте</span>{% else %}<span class="pub-chip pub-chip-off">не отправлен</span>{% endif %}</div>
-                        <div class="pub-dest-text">Статьи записываются в базу сайта; после этого у них появляются страницы и ID для CrossRef. Запись делает администратор.</div>
+                        <div class="pub-dest-text">Статьи записываются в базу сайта; после этого у них появляются страницы и ID для CrossRef. Запись подтверждает администратор.</div>
                     </div>
-                    <a href="{{ url_for('admin_publish_issue_preview', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary pub-btn-sm">{{ 'Открыть' if stage.on_site else ('Предпросмотр и отправка' if is_admin else 'Предпросмотр') }}</a>
+                    <div class="pub-dest-actions">
+                        {% if not stage.on_site %}<button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="siteCheckBtn">Проверить и записать…</button>{% endif %}
+                    </div>
+                    <div id="sitePanel" class="pub-site-panel" style="display:none;">
+                        <div id="sitePanelBody"></div>
+                        <div class="pub-actions" style="margin: 14px 0 0;">
+                            {% if is_admin %}
+                            <form method="POST" action="{{ url_for('admin_publish_issue_confirm', issue_id=issue.id) }}" id="siteConfirmForm" style="display:none;">
+                                <button type="submit" class="pub-btn pub-btn-primary" id="siteConfirmBtn">Записать на сайт</button>
+                            </form>
+                            {% else %}
+                            <span class="pub-cell-sub">Записывает на сайт администратор — здесь можно проверить, что получится.</span>
+                            {% endif %}
+                            <button type="button" class="pub-btn pub-btn-secondary" id="siteCancelBtn">Закрыть</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="pub-dest">
                     <div class="pub-dest-info">
-                        <div class="pub-dest-name">eLibrary {% if exports.elibrary %}<span class="pub-chip pub-chip-ok">XML готов</span>{% else %}<span class="pub-chip pub-chip-off">не собран</span>{% endif %}</div>
-                        <div class="pub-dest-text">Архив с XML для загрузки в eLibrary. Можно собрать сразу, не дожидаясь сайта.</div>
+                        <div class="pub-dest-name">eLibrary</div>
+                        <div class="pub-dest-text">Архив с XML для загрузки в eLibrary. Собирается в момент нажатия из текущих данных выпуска.</div>
                     </div>
                     <div class="pub-dest-actions">
-                        {% if exports.elibrary %}<a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='elibrary') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать</a>{% endif %}
-                        <form method="POST" action="{{ url_for('admin_publish_issue_generate_elibrary', issue_id=issue.id) }}" style="display:inline;">
-                            <button type="submit" class="pub-btn pub-btn-secondary pub-btn-sm">{{ 'Пересобрать' if exports.elibrary else 'Собрать XML' }}</button>
-                        </form>
+                        <a href="{{ url_for('admin_publish_export', issue_id=issue.id, kind='elibrary') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать XML</a>
                     </div>
                 </div>
                 <div class="pub-dest">
                     <div class="pub-dest-info">
                         <div class="pub-dest-name">CrossRef {% if exports.crossref %}<span class="pub-chip pub-chip-ok">XML готов</span>{% else %}<span class="pub-chip pub-chip-off">после записи на сайт</span>{% endif %}</div>
-                        <div class="pub-dest-text">XML для регистрации DOI. Ссылка на статью в нём ведёт на страницу сайта, поэтому собирается после записи выпуска на сайт.</div>
+                        <div class="pub-dest-text">XML для регистрации DOI. Ссылка на статью в нём ведёт на страницу сайта, поэтому XML появляется после записи выпуска на сайт.</div>
                     </div>
                     <div class="pub-dest-actions">
-                        {% if exports.crossref %}<a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='crossref') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать</a>{% endif %}
+                        {% if exports.crossref %}<a href="{{ url_for('admin_publish_export', issue_id=issue.id, kind='crossref') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать XML</a>{% endif %}
                     </div>
                 </div>
             </div>
@@ -167,6 +179,7 @@
                     {% endif %}
                     {% if not stage.mf_signed %}<button type="button" class="pub-btn pub-btn-secondary" id="mfReplace">Заменить в Метафоре</button>{% endif %}
                     {% endif %}
+                    <a href="{{ url_for('admin_publish_export', issue_id=issue.id, kind='metafora') }}" class="pub-btn pub-btn-secondary">Скачать XML</a>
                 </div>
             </div>
         </div>
@@ -585,6 +598,47 @@
             setTimeout(function() { window.location.reload(); }, problems ? 2500 : 900);
         });
     });
+
+    // ---------- Сайт: проверка перед записью — здесь же, без перехода на другую страницу
+    var siteBtn = document.getElementById('siteCheckBtn');
+    if (siteBtn) {
+        var sitePanel = document.getElementById('sitePanel'), siteBody = document.getElementById('sitePanelBody');
+        var siteForm = document.getElementById('siteConfirmForm');
+        document.getElementById('siteCancelBtn').addEventListener('click', function() { sitePanel.style.display = 'none'; });
+        siteBtn.addEventListener('click', function() {
+            siteBtn.disabled = true;
+            sitePanel.style.display = '';
+            siteBody.innerHTML = '';
+            siteBody.appendChild(el('div', 'pub-cell-sub', 'Проверяю…'));
+            if (siteForm) siteForm.style.display = 'none';
+            api('GET', '/site-check').then(function(res) {
+                siteBtn.disabled = false;
+                siteBody.innerHTML = '';
+                if (!res.ok) { siteBody.appendChild(el('div', 'pub-warning-box', res.data.error || 'Проверка не удалась')); return; }
+                var d = res.data;
+                siteBody.appendChild(el('div', d.production ? 'pub-note-box' : 'pub-warning-box',
+                    d.production ? 'Запись пойдёт в БОЕВУЮ базу сайта radiotec.ru.' : 'Это локальная тестовая база: на сайт radiotec.ru ничего не попадёт.'));
+                if (d.warnings.length) {
+                    var box = el('div', 'pub-warning-box'), ul = el('ul');
+                    box.appendChild(el('strong', null, 'Проверьте перед записью:'));
+                    d.warnings.forEach(function(w) { ul.appendChild(el('li', null, w)); });
+                    box.appendChild(ul); siteBody.appendChild(box);
+                } else {
+                    siteBody.appendChild(el('div', 'pub-success-box', 'Замечаний нет.'));
+                }
+                var det = el('details'), sum = el('summary', 'pub-cell-sub', 'DOI статей (' + d.articles.length + ')');
+                det.appendChild(sum);
+                d.articles.forEach(function(a) { det.appendChild(el('div', 'pub-cell-sub', a.doi + ' — ' + a.title)); });
+                siteBody.appendChild(det);
+                if (siteForm) {
+                    siteForm.style.display = '';
+                    siteForm.onsubmit = function() {
+                        return confirm(d.production ? 'Записать эти статьи прямо в боевую БД сайта radiotec.ru?' : 'Записать статьи в локальную тестовую БД (без риска для сайта)?');
+                    };
+                }
+            });
+        });
+    }
 
     runCheck();
 })();

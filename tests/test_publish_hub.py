@@ -45,6 +45,8 @@ def dirs(tmp_path, monkeypatch):
     monkeypatch.setattr(publish_import, "ISSUE_PDF_ROOT", str(tmp_path / "pdfs"))
     monkeypatch.setattr(publish_import, "MANUSCRIPT_ROOT", str(tmp_path / "manuscripts"))
     monkeypatch.setattr(hub, "PUB_EXPORTS_FOLDER", str(tmp_path / "exports"))
+    import routes_publish
+    monkeypatch.setattr(routes_publish, "PUB_EXPORTS_FOLDER", str(tmp_path / "exports"))
     return tmp_path
 
 
@@ -368,3 +370,56 @@ def test_creating_an_issue_does_not_inherit_pdfs_of_a_deleted_one(client, staff,
     summary = client.get(f"/admin/publish/import/{token}/summary").get_json()
     client.post(f"/admin/publish/import/{token}/create", json=summary["issue"])
     assert PubIssue.query.one().id == 1 and publish_import.list_issue_pdfs(1) == []
+
+
+# ---------------------------------------------------------------- действия на странице выпуска (без предпросмотра)
+
+def test_old_preview_url_leads_to_the_issue_page(client, issue):
+    r = client.get(f"/admin/publish/issue/{issue.id}/preview")
+    assert r.status_code == 302 and r.headers["Location"].endswith(f"/admin/publish/issue/{issue.id}")
+
+
+def test_metafora_xml_is_built_on_download_and_is_current(client, issue):
+    r = client.get(f"/admin/publish/issue/{issue.id}/export/metafora")
+    assert r.status_code == 200 and b"<journal>" in r.data and ARTICLE["title_ru"].encode() in r.data
+    PubArticle.query.one().title_ru = "Новое название"
+    db.session.commit()
+    assert "Новое название".encode() in client.get(f"/admin/publish/issue/{issue.id}/export/metafora").data
+
+
+def test_elibrary_export_is_a_zip_with_the_xml(client, issue):
+    import io as _io
+    import zipfile as _zip
+    r = client.get(f"/admin/publish/issue/{issue.id}/export/elibrary")
+    if r.status_code == 302:                      # у журнала нет titleid eLibrary — это сообщение, а не падение
+        assert r.headers["Location"].endswith(f"/admin/publish/issue/{issue.id}")
+        return
+    assert r.mimetype == "application/zip"
+    names = _zip.ZipFile(_io.BytesIO(r.data)).namelist()
+    assert len(names) == 1 and names[0].endswith(".xml")
+
+
+def test_crossref_export_before_site_push_explains_instead_of_failing(client, issue):
+    r = client.get(f"/admin/publish/issue/{issue.id}/export/crossref")
+    assert r.status_code == 302 and r.headers["Location"].endswith(f"/admin/publish/issue/{issue.id}")
+
+
+def test_unknown_export_kind_is_404(client, issue):
+    assert client.get(f"/admin/publish/issue/{issue.id}/export/other").status_code == 404
+
+
+def test_site_check_is_read_only_json(client, issue, monkeypatch):
+    import routes_publish
+    monkeypatch.setattr(routes_publish.site_db, "get_engine", lambda: (_ for _ in ()).throw(RuntimeError("нет базы")))
+    d = client.get(f"/admin/publish/issue/{issue.id}/site-check").get_json()
+    assert d["production"] is False and d["pushed"] is False
+    assert d["articles"][0]["doi"] == ARTICLE["doi"]
+    assert any("Не удалось подключиться" in w for w in d["warnings"])
+    assert PubIssue.query.one().pushed_at is None
+
+
+def test_issue_page_has_all_destinations_and_no_preview_link(client, issue):
+    html = client.get(f"/admin/publish/issue/{issue.id}").get_data(as_text=True)
+    for label in ("Сайт radiotec.ru", "eLibrary", "CrossRef", "Метафора"):
+        assert label in html
+    assert "/preview" not in html and "generate-" not in html
