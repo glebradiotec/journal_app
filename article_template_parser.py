@@ -59,8 +59,25 @@ import re
 _SUPERSCRIPT_DIGITS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
 
 
+# Заголовки шаблона, которые в рукописях иногда набраны без пробелов («Дляцитирования», «Keywords» слитно со словом
+# рядом — не бывает, а вот двойные слова склеиваются): сравниваем без пробелов и возвращаем как в шаблоне.
+_CANON_HEADINGS = (
+    "Аннотация", "Ключевые слова", "Для цитирования", "Введение", "Список источников", "Информация об авторах",
+    "Abstract", "Keywords", "For citation", "References", "Information about the authors",
+    "A brief version in English is given at the end of the article",
+)
+_CANON_BY_KEY = {re.sub(r"\s+", "", h).lower(): h for h in _CANON_HEADINGS}
+
+
+def _canon_heading(line):
+    """«Дляцитирования» -> «Для цитирования». Только для коротких строк, целиком совпадающих с заголовком без пробелов."""
+    if line and len(line) < 80:
+        return _CANON_BY_KEY.get(re.sub(r"\s+", "", line).lower(), line)
+    return line
+
+
 def _lines(text):
-    return [l.strip().translate(_SUPERSCRIPT_DIGITS) for l in text.split("\n")]
+    return [_canon_heading(l.strip().translate(_SUPERSCRIPT_DIGITS)) for l in text.split("\n")]
 
 
 def _find(lines, pred, start=0):

@@ -170,7 +170,9 @@ def check_article(a, P):
         errs.append(f"страницы {fp}-{lp}, а в PDF {P['n']} стр.")
 
     A = a["authors"]
-    cit = P["all"].split("Для цитирования", 1)[1][:1200] if "Для цитирования" in P["all"] else ""
+    # В макете бывает «Дляцитирования» слитно — ищем и так.
+    m_cit = re.search(r"Для\s*цитирования", P["all"])
+    cit = P["all"][m_cit.end():][:1200] if m_cit else ""
     w = a["title"].split()[0] if a["title"].split() else ""
     head = cit.split(w, 1)[0] if w and w in cit else cit
     cnt = len(_NAME.findall(head.replace("\n", " ")))

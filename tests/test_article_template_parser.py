@@ -71,6 +71,18 @@ def test_baseline_has_no_warnings():
     assert result["pages"] == "29-40" and len(result["references"]) == len(result["references_en"]) == 2
 
 
+def test_headings_typed_without_spaces_are_still_found():
+    """В рукописи бывает «Дляцитирования», «Ключевыеслова» слитно (так же попадает и в печатный PDF)."""
+    text = HEADER.format(**DEFAULTS)
+    for heading in ("Для цитирования", "Ключевые слова", "Information about the authors", "For citation"):
+        assert heading in text
+        text = text.replace("\n" + heading + "\n", "\n" + heading.replace(" ", "") + "\n")
+    result, warnings = P.parse_article_text(text)
+    assert warnings == []
+    assert result["pages"] == "29-40" and result["keywords_ru"] and result["keywords_en"]
+    assert len(result["references"]) == len(result["references_en"]) == 2
+
+
 def test_author_with_single_initial_is_kept():
     result, _ = parse(authors="Б. Балбашио1, А.А. Скрылев2", authors_en="B. Balbashio1, A.A. Skrylev2",
                       citation="Балбашио Б., Скрылев А.А.")
