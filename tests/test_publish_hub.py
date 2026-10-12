@@ -209,7 +209,10 @@ def test_check_reports_missing_pdf(client, issue):
 
 class FakeMetafora:
     def __init__(self, monkeypatch):
-        self.existing_dois, self.signed, self.deleted, self.uploaded, self.signed_calls = set(), {}, [], [], []
+        self.existing, self.signed, self.deleted, self.uploaded, self.signed_calls = {}, {}, [], [], []
+        monkeypatch.setattr(metafora_api, "file_status", lambda uid: {
+            "code": 3, "text": "обработан", "raw": {},
+            "articles": [h["article_uid"] for h in self.existing.values() if h["file_uid"] == uid]})
         monkeypatch.setattr(metafora_api, "_request", self._request)
         monkeypatch.setattr(metafora_api, "upload_journal_xml", self._upload)
         monkeypatch.setattr(metafora_api, "publications_status", lambda uids: {u: self.signed.get(u) for u in uids})
@@ -218,9 +221,14 @@ class FakeMetafora:
 
     def _request(self, method, path, **kw):
         doi = path.rsplit("/doi/", 1)[-1]
-        if doi in self.existing_dois:
-            return object()
+        if doi in self.existing:
+            hit = self.existing[doi]
+            return type("R", (), {"json": lambda _self: {"message": "Success", "data": hit}})()
         raise metafora_api.MetaforaError("не найдено", status=404)
+
+    def add_existing(self, doi, file_uid="ext-1", signed_at=None, has_pdf=True):
+        self.existing[doi] = {"article_uid": f"uid-{doi[-3:]}", "has_pdf": has_pdf, "signed_at": signed_at,
+                              "file_uid": file_uid, "created_at": "2026-10-09T12:25:18.000000Z"}
 
     def _upload(self, xml, filename="x.xml"):
         self.uploaded.append(filename)
@@ -242,12 +250,61 @@ def test_start_uploads_xml_and_remembers_file(client, issue, mf):
     assert hub.mf_load_state(issue.id)["file_uid"] == "file-1"
 
 
-def test_start_refuses_when_articles_already_in_metafora(client, issue, mf):
-    """Выпуск, загруженный в Метафору другим путём, повторно не отправляется — были бы дубликаты."""
-    mf.existing_dois.add(ARTICLE["doi"])
+def test_start_adopts_issue_already_in_metafora(client, issue, mf):
+    """Выпуск, загруженный в Метафору другим путём, не отправляется повторно (были бы дубликаты): подхватывается."""
+    mf.add_existing(ARTICLE["doi"], signed_at="2026-10-09T12:32:23Z")
     r = client.post(f"/admin/publish/issue/{issue.id}/metafora/start", json={})
-    assert r.status_code == 409 and r.get_json()["dois"] == [ARTICLE["doi"]]
+    assert r.status_code == 200 and r.get_json() == {"file_uid": "ext-1", "linked": True}
+    state = hub.mf_load_state(issue.id)
+    assert mf.uploaded == [] and state["file_uid"] == "ext-1" and state["status_code"] == 3
+    assert state["articles"][0]["has_pdf"] is True and state["articles"][0]["signed_at"]
+
+
+def _second_article(issue, staff):
+    publish_import.make_article(issue.id, dict(ARTICLE, doi=ARTICLE["doi"][:-2] + "99"), staff.id)
+    db.session.commit()
+    return ARTICLE["doi"][:-2] + "99"
+
+
+def test_start_refuses_when_only_part_of_the_issue_is_in_metafora(client, issue, staff, mf):
+    _second_article(issue, staff)
+    mf.add_existing(ARTICLE["doi"])
+    r = client.post(f"/admin/publish/issue/{issue.id}/metafora/start", json={})
+    assert r.status_code == 409 and "1 из 2" in r.get_json()["error"]
     assert mf.uploaded == [] and not hub.mf_load_state(issue.id)
+
+
+def test_start_refuses_when_issue_is_split_between_files(client, issue, staff, mf):
+    second = _second_article(issue, staff)
+    mf.add_existing(ARTICLE["doi"], file_uid="ext-1")
+    mf.add_existing(second, file_uid="ext-2")
+    r = client.post(f"/admin/publish/issue/{issue.id}/metafora/start", json={})
+    assert r.status_code == 409 and "разных файлах" in r.get_json()["error"] and mf.uploaded == []
+
+
+def test_link_picks_up_issue_uploaded_elsewhere(client, issue, mf):
+    mf.add_existing(ARTICLE["doi"], signed_at="2026-10-09T12:32:23Z")
+    assert client.post(f"/admin/publish/issue/{issue.id}/metafora/link").get_json() == {"linked": True, "articles": 1}
+    st = hub.mf_load_state(issue.id)
+    assert st["file_uid"] == "ext-1" and st["linked"] and st["articles"][0]["doi"] == ARTICLE["doi"]
+    assert hub.issue_stage(issue)["mf_sent"] and hub.issue_stage(issue)["mf_signed"] == 1
+
+
+def test_index_offers_metafora_sync_only_for_unsent_issues(client, issue, monkeypatch):
+    monkeypatch.setenv("METAFORA_API_KEY", "k")
+    html = client.get("/admin/publish").get_data(as_text=True)
+    assert 'id="mfSyncBtn"' in html and f"[{issue.id}]" in html
+    hub.mf_save_state(issue.id, {"file_uid": "f1"})
+    assert 'id="mfSyncBtn"' not in client.get("/admin/publish").get_data(as_text=True)
+
+
+def test_link_does_nothing_when_issue_is_not_in_metafora_or_already_known(client, issue, mf):
+    assert client.post(f"/admin/publish/issue/{issue.id}/metafora/link").get_json()["linked"] is False
+    assert not hub.mf_load_state(issue.id)
+    mf.add_existing(ARTICLE["doi"])
+    hub.mf_save_state(issue.id, {"file_uid": "mine"})
+    client.post(f"/admin/publish/issue/{issue.id}/metafora/link")
+    assert hub.mf_load_state(issue.id) == {"file_uid": "mine"}
 
 
 def test_start_twice_needs_explicit_replace(client, issue, mf):

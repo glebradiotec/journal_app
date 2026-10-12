@@ -570,6 +570,13 @@
         });
     }
 
+    // Выпуск мог быть загружен в Метафору не отсюда: один запрос — и состояние подтянется само.
+    if (document.getElementById('mfSend') && KEY_SET) {
+        api('POST', '/metafora/link').then(function(res) {
+            if (res.ok && res.data.linked) window.location.reload();
+        });
+    }
+
     var b;
     if ((b = document.getElementById('mfSend'))) b.addEventListener('click', function() {
         if (!checkOk) { showToast('Сначала устраните расхождения с PDF', 'error'); return; }

@@ -231,9 +231,12 @@ def register_publish_routes(app):
         # журналы, с которыми работают, — первыми
         journals.sort(key=lambda j: (0 if j['issues'] else 1, j['name'] or ''))
 
+        # выпуски, про которые неизвестно, лежат ли они уже в Метафоре (кнопка «Сверить с Метафорой»)
+        mf_unknown = [i.id for i in issue_rows if i.articles and not mf_load_state(i.id).get('file_uid')]
+        mf_key_set = bool(os.environ.get('METAFORA_API_KEY', '').strip())
         return render_template('publish/index.html', journals=journals, journals_error=journals_error,
                                total_issues=len(issue_rows), total_articles=sum(len(i.articles) for i in issue_rows),
-                               token=publish_import.new_token())
+                               token=publish_import.new_token(), mf_unknown=mf_unknown if mf_key_set else [])
 
     @app.route('/admin/publish/journal/<path:issn>')
     @publish_required

@@ -244,6 +244,66 @@ def register_publish_hub_routes(app):
 
     # ============================================================ Метафора — по шагам
 
+    def _mf_lookup(doi):
+        """Публикация в Метафоре по DOI: {'article_uid','file_uid','has_pdf','signed_at','created_at'} или None."""
+        try:
+            data = metafora_api._request('GET', f'/api/v2/publications/doi/{doi}').json().get('data') or {}
+        except metafora_api.MetaforaError as e:
+            if e.status == 404:
+                return None
+            raise
+        data = data[0] if isinstance(data, list) else data
+        return data if data.get('article_uid') else None
+
+    def _mf_link(issue):
+        """Выпуск мог попасть в Метафору не отсюда (вручную или tools/metafora_issue.py). Если все его статьи
+        там уже есть и лежат в одном файле — запоминаем это, и страница показывает выпуск как загруженный.
+        Возвращает (state, None) или (None, причина); причина пустая, если в Метафоре выпуска нет совсем."""
+        found, missing = {}, []
+        for art in issue.articles:
+            if not art.doi:
+                missing.append(art)
+                continue
+            hit = _mf_lookup(art.doi)
+            if hit:
+                found[art.doi] = hit
+            else:
+                missing.append(art)
+            if not found and len(issue.articles) > 1 and art is issue.articles[0]:
+                return None, ''  # первая статья не найдена — выпуска в Метафоре нет, остальные не спрашиваем
+        if not found:
+            return None, ''
+        files = {h.get('file_uid') for h in found.values()}
+        if missing or len(files) != 1 or None in files:
+            return None, (f'В Метафоре найдено статей этого выпуска: {len(found)} из {len(issue.articles)}'
+                          f'{"" if len(files) == 1 else ", и они лежат в разных файлах"}. '
+                          'Повторная загрузка создала бы дубликаты — разберите выпуск в Метафоре вручную.')
+        file_uid = files.pop()
+        st = metafora_api.file_status(file_uid)
+        by_doi = {a.doi: a for a in issue.articles}
+        arts = [{'uid': h['article_uid'], 'doi': doi, 'title': (by_doi[doi].title_ru or ''),
+                 'has_pdf': bool(h.get('has_pdf')), 'signed_at': h.get('signed_at')} for doi, h in found.items()]
+        state = {'file_uid': file_uid, 'sent_at': min((h.get('created_at') or '') for h in found.values()) or _now(),
+                 'status_code': st['code'], 'status_text': st['text'], 'articles': arts, 'linked': True,
+                 'checked_at': _now()}
+        return state, None
+
+    @app.route('/admin/publish/issue/<int:issue_id>/metafora/link', methods=['POST'])
+    @publish_required
+    def admin_publish_metafora_link(issue_id):
+        """Подтягивает состояние выпуска, который уже лежит в Метафоре (загружен не из раздела). Ничего не меняет там."""
+        issue = PubIssue.query.get_or_404(issue_id)
+        if mf_load_state(issue_id).get('file_uid') or not issue.articles:
+            return jsonify({'linked': False})
+        try:
+            state, why = _mf_link(issue)
+        except metafora_api.MetaforaError as e:
+            return _json_error(str(e), 502)
+        if state:
+            mf_save_state(issue_id, state)
+            return jsonify({'linked': True, 'articles': len(state['articles'])})
+        return jsonify({'linked': False, 'message': why or ''})
+
     @app.route('/admin/publish/issue/<int:issue_id>/metafora/start', methods=['POST'])
     @publish_required
     def admin_publish_metafora_start(issue_id):
@@ -267,22 +327,14 @@ def register_publish_hub_routes(app):
                                        'Сначала снимите с них подпись — подписанное заменить нельзя.', 409)
                 metafora_api.delete_file(state['file_uid'])
             else:
-                # Выпуск мог попасть в Метафору другим путём (вручную или tools/metafora_issue.py) —
-                # повторная загрузка создала бы дубликаты, поэтому сначала ищем статьи по DOI.
-                found = []
-                for art in issue.articles:
-                    if not art.doi:
-                        continue
-                    try:
-                        metafora_api._request('GET', f'/api/v2/publications/doi/{art.doi}')
-                        found.append(art.doi)
-                    except metafora_api.MetaforaError as e:
-                        if e.status != 404:
-                            raise
-                if found:
-                    return _json_error(
-                        f'В Метафоре уже есть статьи этого выпуска ({len(found)} из {len(issue.articles)}), '
-                        'загруженные не отсюда. Повторная загрузка создала бы дубликаты.', 409, dois=found)
+                # Выпуск мог попасть в Метафору другим путём — повторная загрузка создала бы дубликаты:
+                # если он там целиком, просто подхватываем его (дальше PDF и сверка идут как обычно).
+                linked, why = _mf_link(issue)
+                if linked:
+                    mf_save_state(issue_id, linked)
+                    return jsonify({'file_uid': linked['file_uid'], 'linked': True})
+                if why:
+                    return _json_error(why, 409)
             file_uid = metafora_api.upload_journal_xml(xml, filename=f'{issue_id}_metafora.xml')
         except metafora_api.MetaforaError as e:
             return _json_error(str(e), 502)

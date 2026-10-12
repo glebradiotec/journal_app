@@ -21,6 +21,9 @@
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
                     Загрузить выпуск
                 </a>
+                {% if mf_unknown %}
+                <button type="button" class="pub-btn pub-btn-secondary" id="mfSyncBtn" title="Находит выпуски, которые уже загружены в Метафору не из этого раздела, и отмечает их">Сверить с Метафорой</button>
+                {% endif %}
             </div>
             <div class="pub-hero-stats">
                 <div><span class="pub-hero-stat-num">{{ total_issues }}</span><span class="pub-hero-stat-label">{{ total_issues|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span></div>
@@ -76,6 +79,33 @@
         {% endif %}
     </div>
 </div>
+
+{% if mf_unknown %}
+<script>
+(function() {
+    var btn = document.getElementById('mfSyncBtn');
+    if (!btn) return;
+    var ids = {{ mf_unknown|tojson }}, csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    btn.addEventListener('click', function() {
+        btn.disabled = true;
+        var i = 0, linked = 0, failed = 0;
+        (function next() {
+            if (i >= ids.length) {
+                btn.textContent = failed ? 'Не удалось проверить: ' + failed + ', подхвачено: ' + linked : 'Подхвачено выпусков: ' + linked;
+                if (linked) setTimeout(function() { window.location.reload(); }, 1200); else btn.disabled = false;
+                return;
+            }
+            btn.textContent = 'Сверяю с Метафорой… ' + (i + 1) + ' из ' + ids.length;
+            fetch('/admin/publish/issue/' + ids[i++] + '/metafora/link', { method: 'POST', headers: { 'X-CSRFToken': csrf } })
+                .then(function(r) { return r.json(); })
+                .then(function(d) { if (d.linked) linked++; else if (d.error) failed++; })
+                .catch(function() { failed++; })
+                .then(next);
+        })();
+    });
+})();
+</script>
+{% endif %}
 
 {% include "publish/_scripts.html" %}
 {% endblock %}
