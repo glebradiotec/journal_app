@@ -177,6 +177,21 @@ def test_delete_draft_issue(client, issue):
     assert r.status_code == 302 and PubIssue.query.count() == 0
 
 
+def test_csrf_token_does_not_expire_after_an_hour(app):
+    # Страница раздела стоит открытой часами; токен с часовым сроком ронял кнопки «CSRF token has expired».
+    assert app.config["WTF_CSRF_TIME_LIMIT"] is None
+
+
+def test_bad_csrf_token_returns_to_the_page_with_a_message(app, client, issue):
+    app.config["WTF_CSRF_ENABLED"] = True
+    url = f"/admin/publish/issue/{issue.id}"
+    r = client.post(url + "/delete", headers={"Referer": url}, data={"csrf_token": "stale"})
+    assert r.status_code == 302 and r.headers["Location"].endswith(url)
+    assert PubIssue.query.count() == 1
+    with client.session_transaction() as s:
+        assert "устарела" in dict(s["_flashes"] and [tuple(f) for f in s["_flashes"]])["error"]
+
+
 def test_issue_sent_to_metafora_cannot_be_deleted(client, issue):
     hub.mf_save_state(issue.id, {"file_uid": "f1"})
     client.post(f"/admin/publish/issue/{issue.id}/delete")

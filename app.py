@@ -6,11 +6,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # Загружаем переменные из .env файла
 
-from flask import Flask, session, request, jsonify, redirect, url_for
+from flask import Flask, session, request, jsonify, redirect, url_for, flash
 from flask_compress import Compress
 from flask_login import LoginManager
 from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from backup import create_backup
@@ -31,6 +31,17 @@ BASE_DIR = Path(__file__).parent
 app = Flask(__name__)
 Compress(app)  # Gzip/Brotli сжатие ответов (~60-80% меньше трафика)
 CSRFProtect(app)  # Защита от CSRF-атак (токен проверяется на каждом POST)
+# Токен не «протухает» через час: страница раздела часто стоит открытой дольше, и кнопки с записью падали
+# с «CSRF token has expired». Токен по-прежнему привязан к сессии (она живёт 30 дней).
+app.config['WTF_CSRF_TIME_LIMIT'] = None
+
+
+@app.errorhandler(CSRFError)
+def _csrf_failed(e):
+    if request.accept_mimetypes.best == 'application/json' or request.headers.get('X-Requested-With'):
+        return jsonify({'ok': False, 'error': 'Страница устарела. Обновите её и повторите.'}), 400
+    flash('Страница устарела, действие не выполнено. Повторите его ещё раз.', 'error')
+    return redirect(request.referrer or url_for('index'))
 
 # === ProxyFix: корректная работа за реверс-прокси (Nginx, Cloudflare и т.д.) ===
 # Без этого Flask не знает реальный протокол (HTTPS) и IP клиента,
