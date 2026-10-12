@@ -262,7 +262,7 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 [data-theme="dark"] .pub-mark-ok { color: #3fb950; } [data-theme="dark"] .pub-mark-bad { color: #f85149; } [data-theme="dark"] .pub-mark-warn { color: #d29922; }
 
 /* Шаги на странице выпуска */
-.pub-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+.pub-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 24px; }
 .pub-step { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--color-border-muted); background: var(--color-canvas-default); }
 .pub-step-done { border-color: rgba(26,127,55,0.35); background: rgba(26,127,55,0.05); }
 .pub-step-now { border-color: #5BA4B0; box-shadow: 0 0 0 3px rgba(91,164,176,0.12); }
@@ -279,7 +279,17 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 
 @media (max-width: 800px) {
     .pub-body .adm-layout { padding: 4px 16px 40px; }
-    .pub-how, .pub-steps { grid-template-columns: 1fr 1fr; }
+    .pub-how { grid-template-columns: 1fr 1fr; }
+    .pub-steps { grid-template-columns: 1fr 1fr; }
     .pub-hero-title { font-size: 26px; }
     .pub-jgrid { grid-template-columns: 1fr; }
 }
+
+.pub-dest-list { padding: 4px 22px; }
+.pub-dest { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 0; border-bottom: 1px solid var(--color-border-muted); }
+.pub-dest:last-child { border-bottom: none; }
+.pub-dest-info { min-width: 0; }
+.pub-dest-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 15px; font-weight: 700; color: var(--color-fg-default); }
+.pub-dest-text { font-size: 12.5px; color: var(--color-fg-muted); margin-top: 4px; line-height: 1.45; max-width: 620px; }
+.pub-dest-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 800px) { .pub-dest { flex-direction: column; align-items: flex-start; } }

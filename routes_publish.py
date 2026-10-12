@@ -293,6 +293,9 @@ def register_publish_routes(app):
             'publish/issue_detail.html', issue=issue, stage=issue_stage(issue), mf_state=mf_load_state(issue.id),
             mf_key_set=bool(os.environ.get('METAFORA_API_KEY', '').strip()),
             pdf_files=publish_import.list_issue_pdfs(issue.id),
+            exports={k: os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_{k}.xml'))
+                     for k in ('elibrary', 'crossref', 'metafora')},
+            is_admin=current_user.is_admin,
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>/section/add', methods=['POST'])

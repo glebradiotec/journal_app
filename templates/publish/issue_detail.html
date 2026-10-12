@@ -23,24 +23,34 @@
 
         <div class="pub-steps">
             <div class="pub-step {{ 'pub-step-done' if stage.articles else 'pub-step-now' }}">
-                <div class="pub-step-label">1 · Статьи</div>
+                <div class="pub-step-label">Статьи</div>
                 <div class="pub-step-value">{{ stage.articles }}</div>
                 <div class="pub-step-hint">разобрано из .doc</div>
             </div>
             <div class="pub-step {{ 'pub-step-done' if stage.articles and stage.pdfs >= stage.articles else ('pub-step-now' if stage.articles else '') }}" id="stepCheck">
-                <div class="pub-step-label">2 · Сверка с PDF</div>
+                <div class="pub-step-label">Сверка с PDF</div>
                 <div class="pub-step-value" id="stepCheckValue">PDF {{ stage.pdfs }} из {{ stage.articles }}</div>
                 <div class="pub-step-hint" id="stepCheckHint">проверяю…</div>
             </div>
-            <div class="pub-step {{ 'pub-step-done' if stage.mf_processed else '' }}" id="stepMf">
-                <div class="pub-step-label">3 · Метафора</div>
-                <div class="pub-step-value" id="stepMfValue">{% if stage.mf_failed %}ошибка обработки{% elif stage.mf_processed %}загружено {{ stage.mf_articles }}{% elif stage.mf_sent %}отправлен{% else %}не отправлен{% endif %}</div>
-                <div class="pub-step-hint" id="stepMfHint">{% if stage.mf_processed %}PDF {{ stage.mf_pdfs }} из {{ stage.mf_articles }}{% else %}XML и PDF статей{% endif %}</div>
+            <div class="pub-step {{ 'pub-step-done' if stage.on_site else '' }}">
+                <div class="pub-step-label">Сайт</div>
+                <div class="pub-step-value">{{ 'на сайте' if stage.on_site else 'не отправлен' }}</div>
+                <div class="pub-step-hint">radiotec.ru</div>
             </div>
-            <div class="pub-step {{ 'pub-step-done' if stage.mf_articles and stage.mf_signed == stage.mf_articles else '' }}" id="stepSign">
-                <div class="pub-step-label">4 · Подпись</div>
-                <div class="pub-step-value" id="stepSignValue">{{ stage.mf_signed }} из {{ stage.mf_articles or stage.articles }}</div>
-                <div class="pub-step-hint">после неё правки закрыты</div>
+            <div class="pub-step {{ 'pub-step-done' if exports.elibrary else '' }}">
+                <div class="pub-step-label">eLibrary</div>
+                <div class="pub-step-value">{{ 'XML готов' if exports.elibrary else 'не собран' }}</div>
+                <div class="pub-step-hint">архив для загрузки</div>
+            </div>
+            <div class="pub-step {{ 'pub-step-done' if exports.crossref else '' }}">
+                <div class="pub-step-label">CrossRef</div>
+                <div class="pub-step-value">{{ 'XML готов' if exports.crossref else 'не собран' }}</div>
+                <div class="pub-step-hint">{{ 'DOI статей' if exports.crossref else 'после записи на сайт' }}</div>
+            </div>
+            <div class="pub-step {{ 'pub-step-done' if stage.mf_processed else '' }}" id="stepMf">
+                <div class="pub-step-label">Метафора</div>
+                <div class="pub-step-value" id="stepMfValue">{% if stage.mf_failed %}ошибка обработки{% elif stage.mf_processed %}загружено {{ stage.mf_articles }}{% elif stage.mf_sent %}отправлен{% else %}не отправлен{% endif %}</div>
+                <div class="pub-step-hint" id="stepMfHint">{% if stage.mf_processed %}подписано {{ stage.mf_signed }} из {{ stage.mf_articles }}{% else %}ИС РЦНИ{% endif %}</div>
             </div>
         </div>
 
@@ -92,7 +102,41 @@
 
         {% if issue.articles %}
         <div class="adm-card">
-            <div class="adm-card-header"><h2 class="adm-card-title">Метафора</h2></div>
+            <div class="adm-card-header"><h2 class="adm-card-title">Сайт, eLibrary, CrossRef</h2></div>
+            <div class="pub-dest-list">
+                <div class="pub-dest">
+                    <div class="pub-dest-info">
+                        <div class="pub-dest-name">Сайт radiotec.ru {% if stage.on_site %}<span class="pub-chip pub-chip-ok">на сайте</span>{% else %}<span class="pub-chip pub-chip-off">не отправлен</span>{% endif %}</div>
+                        <div class="pub-dest-text">Статьи записываются в базу сайта; после этого у них появляются страницы и ID для CrossRef. Запись делает администратор.</div>
+                    </div>
+                    <a href="{{ url_for('admin_publish_issue_preview', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary pub-btn-sm">{{ 'Открыть' if stage.on_site else ('Предпросмотр и отправка' if is_admin else 'Предпросмотр') }}</a>
+                </div>
+                <div class="pub-dest">
+                    <div class="pub-dest-info">
+                        <div class="pub-dest-name">eLibrary {% if exports.elibrary %}<span class="pub-chip pub-chip-ok">XML готов</span>{% else %}<span class="pub-chip pub-chip-off">не собран</span>{% endif %}</div>
+                        <div class="pub-dest-text">Архив с XML для загрузки в eLibrary. Можно собрать сразу, не дожидаясь сайта.</div>
+                    </div>
+                    <div class="pub-dest-actions">
+                        {% if exports.elibrary %}<a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='elibrary') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать</a>{% endif %}
+                        <form method="POST" action="{{ url_for('admin_publish_issue_generate_elibrary', issue_id=issue.id) }}" style="display:inline;">
+                            <button type="submit" class="pub-btn pub-btn-secondary pub-btn-sm">{{ 'Пересобрать' if exports.elibrary else 'Собрать XML' }}</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="pub-dest">
+                    <div class="pub-dest-info">
+                        <div class="pub-dest-name">CrossRef {% if exports.crossref %}<span class="pub-chip pub-chip-ok">XML готов</span>{% else %}<span class="pub-chip pub-chip-off">после записи на сайт</span>{% endif %}</div>
+                        <div class="pub-dest-text">XML для регистрации DOI. Ссылка на статью в нём ведёт на страницу сайта, поэтому собирается после записи выпуска на сайт.</div>
+                    </div>
+                    <div class="pub-dest-actions">
+                        {% if exports.crossref %}<a href="{{ url_for('admin_publish_download', issue_id=issue.id, kind='crossref') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать</a>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="adm-card">
+            <div class="adm-card-header"><h2 class="adm-card-title">Метафора <span class="pub-hint">(ИС РЦНИ)</span></h2></div>
             <div class="adm-card-body">
                 {% if not mf_key_set %}
                 <div class="pub-warning-box" style="margin-bottom: 14px;">Ключ API Метафоры не задан (переменная <code>METAFORA_API_KEY</code> в <code>.env</code> на сервере) — отправка недоступна.</div>
@@ -179,9 +223,6 @@
         </details>
 
         <div class="pub-actions">
-            {% if issue.articles %}
-            <a href="{{ url_for('admin_publish_issue_preview', issue_id=issue.id) }}" class="pub-btn pub-btn-secondary">Сайт, CrossRef, eLibrary →</a>
-            {% endif %}
             {% if can_delete %}
             <form method="POST" action="{{ url_for('admin_publish_issue_delete', issue_id=issue.id) }}" style="display:inline;"
                   onsubmit="return confirm('Удалить черновик выпуска со всеми статьями и PDF? В Метафоре и на сайте ничего не изменится.');">

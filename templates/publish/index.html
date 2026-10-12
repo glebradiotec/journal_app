@@ -13,8 +13,8 @@
         <div class="pub-hero">
             <h1 class="pub-hero-title">Публикация выпусков</h1>
             <p class="pub-hero-sub">
-                Загрузите папку выпуска — статьи разберутся сами, данные сверятся с напечатанными PDF,
-                и выпуск можно отправлять в «Метафору».
+                Загрузите папку выпуска — статьи разберутся сами, данные сверятся с напечатанными PDF.
+                Дальше выпуск уходит на сайт, в eLibrary, CrossRef и в «Метафору».
             </p>
             <div class="pub-hero-actions">
                 <a href="{{ url_for('admin_publish_import') }}" class="pub-cta">
@@ -31,16 +31,16 @@
         <div class="pub-how">
             <div class="pub-how-step"><span class="pub-how-num">1</span>
                 <div class="pub-how-title">Загрузка</div>
-                <div class="pub-how-text">Перетащите папку выпуска: .doc статей и их PDF.</div></div>
+                <div class="pub-how-text">Папка выпуска: .doc статей и их PDF. Выпуск определяется сам.</div></div>
             <div class="pub-how-step"><span class="pub-how-num">2</span>
                 <div class="pub-how-title">Сверка</div>
                 <div class="pub-how-text">Авторы, страницы и литература сверяются с PDF.</div></div>
             <div class="pub-how-step"><span class="pub-how-num">3</span>
-                <div class="pub-how-title">Метафора</div>
-                <div class="pub-how-text">XML и PDF статей уходят в ИС РЦНИ.</div></div>
+                <div class="pub-how-title">Отправка</div>
+                <div class="pub-how-text">Сайт, eLibrary, CrossRef, «Метафора» — каждое назначение отдельно.</div></div>
             <div class="pub-how-step"><span class="pub-how-num">4</span>
-                <div class="pub-how-title">Подпись</div>
-                <div class="pub-how-text">После проверки загруженного — подписание.</div></div>
+                <div class="pub-how-title">Контроль</div>
+                <div class="pub-how-text">Видно, что и куда ушло; в «Метафоре» — подпись после проверки.</div></div>
         </div>
 
         {% if journals_error and not journals %}

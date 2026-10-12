@@ -16,6 +16,17 @@
             <p class="adm-welcome-sub">Журнал, год и номер определятся сами — по DOI статей.</p>
         </div>
 
+        <div class="pub-note-box" style="margin-bottom: 18px;">
+            <strong>Что загружать.</strong> Папку <b>одного выпуска</b> — ту, где лежат статьи:
+            <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.55;">
+                <li><b>.doc / .docx</b> — по одному файлу на статью;</li>
+                <li><b>PDF</b> — по одному файлу на статью, как в напечатанном номере (с шапкой и страницами);</li>
+                <li>титул, «К читателям», рекламу и PDF всего номера можно не убирать — они пропускаются сами;</li>
+                <li>если внутри есть подпапки <b>doc</b> и <b>pdf</b> (например, «макет»), берутся только они; рецензии, акты экспертизы и обложки не нужны и не загружаются.</li>
+            </ul>
+            <div style="margin-top: 8px;">Можно бросить и всю папку выпуска целиком, и только «макет». Выпуск за раз — один. На этом шаге ничего никуда не отправляется: создаётся черновик, который можно проверить.</div>
+        </div>
+
         <div class="pub-drop" id="impDrop">
             <input type="file" id="impFiles" multiple accept=".doc,.docx,.rtf,.pdf">
             <input type="file" id="impFolder" webkitdirectory>
@@ -24,8 +35,7 @@
             </div>
             <div class="pub-drop-title">Перетащите сюда папку выпуска</div>
             <div class="pub-drop-text">
-                Нужны .doc статей и их PDF. Если в папке есть подпапки <b>doc</b> и <b>pdf</b>,
-                возьмутся только они — рецензии и акты экспертизы не загружаются.
+                Файлы .doc статей и их PDF. Рецензии и акты экспертизы в загрузку не попадают.
             </div>
             <div class="pub-drop-links">
                 <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="impPickFolder">Выбрать папку</button>
