@@ -181,8 +181,23 @@
             note.appendChild(el('div', 'pub-warning-box', 'Эти статьи, судя по DOI, из другого выпуска: ' + s.other_issue_files.join(', ') + '. Они тоже попадут в создаваемый выпуск — уберите лишнее и загрузите заново, если это ошибка.'));
         }
         if (s.existing_url) {
-            var box = el('div', 'pub-warning-box', 'Такой выпуск уже есть в разделе. ');
-            var a = el('a', null, 'Открыть его'); a.href = s.existing_url; box.appendChild(a);
+            var ex = s.existing || {};
+            var box = el('div', 'pub-warning-box', 'Такой выпуск уже есть в разделе' + (ex.articles ? ' (статей: ' + ex.articles + ')' : '') + '. ');
+            box.appendChild(document.createTextNode(ex.blocked
+                ? ex.blocked
+                : 'Можно открыть его или заменить новой загрузкой: прежний черновик будет удалён вместе с его PDF.'));
+            var acts = el('div', 'pub-actions', null);
+            acts.style.margin = '12px 0 0';
+            var open = el('a', 'pub-btn pub-btn-secondary pub-btn-sm', 'Открыть существующий'); open.href = s.existing_url;
+            acts.appendChild(open);
+            if (!ex.blocked) {
+                var rep = el('button', 'pub-btn pub-btn-danger pub-btn-sm', 'Заменить новой загрузкой'); rep.type = 'button';
+                rep.addEventListener('click', function() {
+                    if (confirm('Заменить выпуск? Прежний черновик (статьи, разделы, PDF) будет удалён, вместо него создастся новый из загруженных файлов.')) createIssue(rep, true);
+                });
+                acts.appendChild(rep);
+            }
+            box.appendChild(acts);
             note.appendChild(box);
             document.getElementById('impCreate').disabled = true;
         }
@@ -195,15 +210,14 @@
         }
     }
 
-    document.getElementById('impCreate').addEventListener('click', function() {
-        var btn = this;
+    function createIssue(btn, replace) {
         btn.disabled = true;
         fetch(BASE + '/create', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 journal_name: document.getElementById('impJournal').value, issn: document.getElementById('impIssn').value,
                 year: document.getElementById('impYear').value, number: document.getElementById('impNumber').value,
-                volume: document.getElementById('impVolume').value,
+                volume: document.getElementById('impVolume').value, replace: !!replace,
             }),
         }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
           .then(function(res) {
@@ -211,7 +225,8 @@
               btn.disabled = false;
               showToast(res.data.error || 'Не удалось создать выпуск', 'error');
           }).catch(function() { btn.disabled = false; showToast('Не удалось создать выпуск', 'error'); });
-    });
+    }
+    document.getElementById('impCreate').addEventListener('click', function() { createIssue(this, false); });
 
     document.getElementById('impCancel').addEventListener('click', function() {
         fetch(BASE + '/cancel', { method: 'POST' }).then(function() { window.location.href = {{ url_for('admin_publish_index')|tojson }}; });

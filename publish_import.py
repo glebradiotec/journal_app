@@ -247,8 +247,21 @@ def make_article(issue_id, parsed, user_id):
     return art
 
 
-def create_issue(token, fields, user_id):
-    """Создаёт черновик выпуска из разобранных статей сессии. -> PubIssue."""
+def replace_blocker(issue):
+    """Почему черновик выпуска нельзя заменить новой загрузкой (пусто — можно). Отправленное на сайт или в Метафору
+    заменой не трогаем: там уже лежит то, что из черновика ушло."""
+    if issue.is_pushed or any(a.is_pushed for a in issue.articles):
+        return "Выпуск уже записан на сайт radiotec.ru — заменить его нельзя."
+    from routes_publish_hub import mf_load_state   # здесь, а не наверху: модуль routes_… сам импортирует publish_import
+    if mf_load_state(issue.id).get("file_uid"):
+        return "Выпуск уже отправлен в Метафору — заменить его нельзя."
+    return ""
+
+
+def create_issue(token, fields, user_id, replace=False):
+    """Создаёт черновик выпуска из разобранных статей сессии. -> PubIssue.
+    replace=True: уже существующий черновик такого же выпуска удаляется и заменяется новым (в одной транзакции —
+    если создание не удалось, старый остаётся)."""
     parsed_list = sorted(load_parsed(token), key=_doi_order)
     if not parsed_list:
         raise ImportError_("В загруженных файлах не нашлось ни одной статьи.")
@@ -260,27 +273,39 @@ def create_issue(token, fields, user_id):
     if not issn or not number:
         raise ImportError_("Укажите ISSN и номер выпуска.")
     existing = PubIssue.query.filter_by(issn=issn, year=year, number=number).first()
-    if existing:
+    old_files = None
+    if existing and not replace:
         err = ImportError_(f"Выпуск {year} №{number} этого журнала уже есть в разделе.")
         err.issue_id = existing.id
         raise err
+    if existing:
+        why = replace_blocker(existing)
+        if why:
+            raise ImportError_(why)
+        old_files = (existing.id, [a.manuscript_file for a in existing.articles if a.manuscript_file])
+        db.session.delete(existing)
+        db.session.flush()
 
-    issue = PubIssue(issn=issn, year=year, number=number, journal_name=(fields.get("journal_name") or "").strip(),
-                     volume=str(fields.get("volume") or "").strip(), created_by_user_id=user_id)
-    db.session.add(issue)
-    db.session.flush()
+    try:
+        issue = PubIssue(issn=issn, year=year, number=number, journal_name=(fields.get("journal_name") or "").strip(),
+                         volume=str(fields.get("volume") or "").strip(), created_by_user_id=user_id)
+        db.session.add(issue)
+        db.session.flush()
 
-    os.makedirs(MANUSCRIPT_ROOT, exist_ok=True)
-    doc_dir = os.path.join(session_dir(token), "doc")
-    for parsed in parsed_list:
-        art = make_article(issue.id, parsed, user_id)
-        src = os.path.join(doc_dir, parsed.get("_file") or "")
-        if os.path.isfile(src):
-            dst = _unique_path(MANUSCRIPT_ROOT, f"issue{issue.id}_{parsed['_file']}")
-            shutil.copy2(src, dst)
-            art.manuscript_file = os.path.basename(dst)
-    assign_sections(issue, load_sections(token))
-    db.session.commit()
+        os.makedirs(MANUSCRIPT_ROOT, exist_ok=True)
+        doc_dir = os.path.join(session_dir(token), "doc")
+        for parsed in parsed_list:
+            art = make_article(issue.id, parsed, user_id)
+            src = os.path.join(doc_dir, parsed.get("_file") or "")
+            if os.path.isfile(src):
+                dst = _unique_path(MANUSCRIPT_ROOT, f"issue{issue.id}_{parsed['_file']}")
+                shutil.copy2(src, dst)
+                art.manuscript_file = os.path.basename(dst)
+        assign_sections(issue, load_sections(token))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
 
     src_pdf = session_pdf_dir(token)
     dst_pdf = issue_pdf_dir(issue.id)
@@ -290,6 +315,14 @@ def create_issue(token, fields, user_id):
         for name in os.listdir(src_pdf):
             shutil.move(os.path.join(src_pdf, name), _unique_path(dst_pdf, name))
     shutil.rmtree(session_dir(token), ignore_errors=True)
+    if old_files:   # старый черновик: его PDF и рукописи — уже после успешной замены
+        if old_files[0] != issue.id:   # SQLite может отдать новому выпуску номер старого — тогда папка уже новая
+            shutil.rmtree(issue_pdf_dir(old_files[0]), ignore_errors=True)
+        for name in old_files[1]:
+            try:
+                os.remove(os.path.join(MANUSCRIPT_ROOT, os.path.basename(name)))
+            except OSError:
+                pass
     return issue
 
 

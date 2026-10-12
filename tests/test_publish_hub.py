@@ -1,6 +1,8 @@
 """Раздел публикации: доступ, загрузка выпуска целиком, шаги отправки в Метафору.
 Метафора подменена (monkeypatch) — сеть и ключ не используются."""
 import io
+from datetime import datetime, timezone
+import os
 import json
 
 import pytest
@@ -153,6 +155,61 @@ def test_import_refuses_duplicate_issue(client, issue):
                     json={"issn": "2070-0970", "year": 2025, "number": "3"})
     assert r.status_code == 409 and r.get_json()["existing_url"].endswith(f"/issue/{issue.id}")
     assert PubIssue.query.count() == 1
+
+
+def test_summary_tells_whether_existing_issue_can_be_replaced(client, issue):
+    token = publish_import.new_token()
+    _session_with_article(token)
+    ex = client.get(f"/admin/publish/import/{token}/summary").get_json()["existing"]
+    assert ex == {"articles": 1, "blocked": ""}
+    hub.mf_save_state(issue.id, {"file_uid": "f1"})
+    ex = client.get(f"/admin/publish/import/{token}/summary").get_json()["existing"]
+    assert "Метафору" in ex["blocked"]
+
+
+def test_replace_swaps_the_draft_for_the_new_upload(client, issue, dirs):
+    old_id = issue.id
+    pdf_dir = publish_import.issue_pdf_dir(old_id)
+    os.makedirs(pdf_dir)
+    open(os.path.join(pdf_dir, "old.pdf"), "wb").write(b"%PDF-old")
+    token = publish_import.new_token()
+    _session_with_article(token)
+    os.makedirs(publish_import.session_pdf_dir(token), exist_ok=True)
+    open(os.path.join(publish_import.session_pdf_dir(token), "new.pdf"), "wb").write(b"%PDF-new")
+
+    r = client.post(f"/admin/publish/import/{token}/create",
+                    json={"issn": "2070-0970", "year": 2025, "number": "3", "replace": True})
+    assert r.status_code == 200
+    iss = PubIssue.query.one()
+    assert PubArticle.query.count() == 1
+    names = os.listdir(publish_import.issue_pdf_dir(iss.id))
+    assert names == ["new.pdf"]                      # PDF старого черновика не достались новому
+    assert iss.id == old_id or not os.path.exists(pdf_dir)
+
+
+@pytest.mark.parametrize("blocker", ["site", "metafora"])
+def test_replace_is_refused_for_issue_already_sent(client, issue, blocker):
+    if blocker == "site":
+        issue.pushed_at = datetime.now(timezone.utc)
+        db.session.commit()
+    else:
+        hub.mf_save_state(issue.id, {"file_uid": "f1"})
+    token = publish_import.new_token()
+    _session_with_article(token)
+    r = client.post(f"/admin/publish/import/{token}/create",
+                    json={"issn": "2070-0970", "year": 2025, "number": "3", "replace": True})
+    assert r.status_code == 400 and "заменить его нельзя" in r.get_json()["error"]
+    assert PubIssue.query.one().id == issue.id and PubArticle.query.count() == 1
+
+
+def test_failed_replace_keeps_the_old_draft(client, issue, monkeypatch):
+    token = publish_import.new_token()
+    _session_with_article(token)
+    monkeypatch.setattr(publish_import, "make_article", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("сбой")))
+    with pytest.raises(RuntimeError):
+        client.post(f"/admin/publish/import/{token}/create",
+                    json={"issn": "2070-0970", "year": 2025, "number": "3", "replace": True})
+    assert PubIssue.query.count() == 1 and PubArticle.query.count() == 1
 
 
 def test_bad_token_and_wrong_file_type_are_rejected(client, staff, dirs):

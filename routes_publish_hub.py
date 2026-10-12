@@ -153,12 +153,15 @@ def register_publish_hub_routes(app):
         except publish_import.ImportError_ as e:
             return _json_error(str(e))
         issue, odd = publish_import.detect_issue(parsed)
-        existing = None
+        existing, existing_info = None, None
         if issue:
             row = PubIssue.query.filter_by(issn=issue['issn'], year=issue['year'], number=issue['number']).first()
             existing = url_for('admin_publish_issue_detail', issue_id=row.id) if row else None
+            if row:
+                existing_info = {'articles': len(row.articles), 'blocked': publish_import.replace_blocker(row)}
         secs = publish_import.load_sections(token)
         return jsonify({'issue': issue, 'other_issue_files': odd, 'articles': len(parsed), 'existing_url': existing,
+                        'existing': existing_info,
                         'sections': [x['title_ru'] for x in (secs or {}).get('sections', [])]})
 
     @app.route('/admin/publish/import/<token>/create', methods=['POST'])
@@ -166,7 +169,7 @@ def register_publish_hub_routes(app):
     def admin_publish_import_create(token):
         fields = request.get_json(silent=True) or {}
         try:
-            issue = publish_import.create_issue(token, fields, current_user.id)
+            issue = publish_import.create_issue(token, fields, current_user.id, replace=bool(fields.get('replace')))
         except publish_import.ImportError_ as e:
             existing_id = getattr(e, 'issue_id', None)
             return _json_error(str(e), 409 if existing_id else 400,
