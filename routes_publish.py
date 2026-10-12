@@ -232,7 +232,8 @@ def register_publish_routes(app):
         journals.sort(key=lambda j: (0 if j['issues'] else 1, j['name'] or ''))
 
         return render_template('publish/index.html', journals=journals, journals_error=journals_error,
-                               total_issues=len(issue_rows), total_articles=sum(len(i.articles) for i in issue_rows))
+                               total_issues=len(issue_rows), total_articles=sum(len(i.articles) for i in issue_rows),
+                               token=publish_import.new_token())
 
     @app.route('/admin/publish/journal/<path:issn>')
     @publish_required

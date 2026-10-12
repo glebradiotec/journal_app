@@ -1,0 +1,62 @@
+{# Загрузка выпуска: рамка для папки, таблица разобранных файлов, форма создания. Нужна переменная token. #}
+        <div class="pub-note-box" style="margin-bottom: 18px;">
+            <strong>Что загружать.</strong> Папку <b>одного выпуска</b> — ту, где лежат статьи:
+            <ul style="margin: 8px 0 0; padding-left: 20px; line-height: 1.55;">
+                <li><b>.doc / .docx</b> — по одному файлу на статью;</li>
+                <li><b>PDF</b> — по одному файлу на статью, как в напечатанном номере (с шапкой и страницами);</li>
+                <li>титул, «К читателям», рекламу и PDF всего номера можно не убирать — они пропускаются сами;</li>
+                <li>если внутри есть подпапки <b>doc</b> и <b>pdf</b> (например, «макет»), берутся только они; рецензии, акты экспертизы и обложки не нужны и не загружаются.</li>
+            </ul>
+            <div style="margin-top: 8px;">Можно бросить и всю папку выпуска целиком, и только «макет». Выпуск за раз — один. На этом шаге ничего никуда не отправляется: создаётся черновик, который можно проверить.</div>
+        </div>
+
+        <div class="pub-drop" id="impDrop">
+            <input type="file" id="impFiles" multiple accept=".doc,.docx,.rtf,.pdf">
+            <input type="file" id="impFolder" webkitdirectory>
+            <div class="pub-drop-icon">
+                <svg width="40" height="40" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/></svg>
+            </div>
+            <div class="pub-drop-title">Перетащите сюда папку выпуска</div>
+            <div class="pub-drop-text">
+                Файлы .doc статей и их PDF. Рецензии и акты экспертизы в загрузку не попадают.
+            </div>
+            <div class="pub-drop-links">
+                <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="impPickFolder">Выбрать папку</button>
+                <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="impPickFiles">Выбрать файлы</button>
+            </div>
+        </div>
+
+        <div id="impWork" style="display:none; margin-top: 22px;">
+            <div class="pub-progress"><div class="pub-progress-bar" id="impBar"></div></div>
+            <div class="pub-progress-text" id="impProgressText"></div>
+
+            <div class="adm-card" id="impIssueCard" style="display:none; margin-top: 20px;">
+                <div class="adm-card-header"><h2 class="adm-card-title">Выпуск</h2></div>
+                <div class="adm-card-body">
+                    <div id="impIssueNote"></div>
+                    <div class="pub-row">
+                        <div class="pub-field"><label class="pub-label">Журнал</label><input class="pub-input" id="impJournal"></div>
+                        <div class="pub-field"><label class="pub-label">ISSN</label><input class="pub-input" id="impIssn"></div>
+                        <div class="pub-field"><label class="pub-label">Год</label><input class="pub-input" id="impYear" inputmode="numeric"></div>
+                        <div class="pub-field"><label class="pub-label">Номер</label><input class="pub-input" id="impNumber"></div>
+                        <div class="pub-field"><label class="pub-label">Том</label><input class="pub-input" id="impVolume"></div>
+                    </div>
+                    <div class="pub-actions" style="margin: 6px 0 0;">
+                        <button type="button" class="pub-btn pub-btn-primary" id="impCreate">Создать выпуск</button>
+                        <button type="button" class="pub-btn pub-btn-secondary" id="impCancel">Отменить</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="adm-card" style="margin-top: 20px;">
+                <div class="adm-card-header">
+                    <h2 class="adm-card-title">Файлы <span class="pub-hint" id="impCounts"></span></h2>
+                </div>
+                <div class="pub-table-wrap">
+                    <table class="pub-table">
+                        <thead><tr><th></th><th>Файл</th><th>Что это</th><th class="pub-num">Стр.</th><th class="pub-num">Авторов</th><th class="pub-num">Литература</th><th>PDF</th></tr></thead>
+                        <tbody id="impRows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
