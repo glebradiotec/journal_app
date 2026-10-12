@@ -298,6 +298,18 @@ def test_index_offers_metafora_sync_only_for_unsent_issues(client, issue, monkey
     assert 'id="mfSyncBtn"' not in client.get("/admin/publish").get_data(as_text=True)
 
 
+def test_hidden_site_journals_are_not_listed_unless_they_have_drafts(client, issue, monkeypatch):
+    import routes_publish
+    site = [{"journ_id": 2, "name": "Радиосистемы", "issn": "0869-7220", "titleid": ""},
+            {"journ_id": 10, "name": "Экология - XXI век", "issn": "", "titleid": ""},
+            {"journ_id": 3, "name": "Антенны", "issn": "0320-9601", "titleid": ""},
+            {"journ_id": 20, "name": "Нелинейный мир", "issn": issue.issn, "titleid": ""}]  # скрытый номер, но выпуск есть
+    monkeypatch.setattr(routes_publish, "_safe_list_journals", lambda: (site, None))
+    html = client.get("/admin/publish").get_data(as_text=True)
+    assert "Антенны" in html and "Нелинейный мир" in html
+    assert "Радиосистемы" not in html and "Экология" not in html
+
+
 def test_link_does_nothing_when_issue_is_not_in_metafora_or_already_known(client, issue, mf):
     assert client.post(f"/admin/publish/issue/{issue.id}/metafora/link").get_json()["linked"] is False
     assert not hub.mf_load_state(issue.id)

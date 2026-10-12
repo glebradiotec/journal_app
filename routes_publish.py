@@ -191,6 +191,13 @@ def _issue_sort(number):
     return int(m.group(0)) if m else 0
 
 
+# Журналы сайта (journals.journ_id), которых нет в списке раздела «Публикация»: Радиосистемы, Экология - XXI век,
+# Космическая съёмка Земли, Вопросы биологической, медицинской и фармацевтической химии, Вакуумная, плазменная и
+# твердотельная электроника. Это только скрытие в разделе — в БД сайта они остаются; журнал с загруженными сюда
+# выпусками всё равно показывается. Вернуть журнал в список — убрать его номер отсюда.
+HIDDEN_SITE_JOURNAL_IDS = {2, 10, 13, 19, 20}
+
+
 def register_publish_routes(app):
     register_publish_hub_routes(app)
 
@@ -199,6 +206,9 @@ def register_publish_routes(app):
     def admin_publish_index():
         known_journals, journals_error = _safe_list_journals()
         by_issn = {j['issn']: j for j in known_journals if j['issn']}
+        drafted_issn = {i.issn for i in PubIssue.query.with_entities(PubIssue.issn).all()}
+        known_journals = [j for j in known_journals
+                          if j['journ_id'] not in HIDDEN_SITE_JOURNAL_IDS or (j['issn'] and j['issn'] in drafted_issn)]
 
         # Считаем выпуски/статьи по ISSN, встречающимся в наших черновиках — включая те,
         # которых нет в списке с сайта (например, ISSN введён вручную).

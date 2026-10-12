@@ -21,9 +21,6 @@
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
                     Загрузить выпуск
                 </a>
-                {% if mf_unknown %}
-                <button type="button" class="pub-btn pub-btn-secondary" id="mfSyncBtn" title="Находит выпуски, которые уже загружены в Метафору не из этого раздела, и отмечает их">Сверить с Метафорой</button>
-                {% endif %}
             </div>
             <div class="pub-hero-stats">
                 <div><span class="pub-hero-stat-num">{{ total_issues }}</span><span class="pub-hero-stat-label">{{ total_issues|pluralize_ru('выпуск', 'выпуска', 'выпусков') }}</span></div>
@@ -39,7 +36,12 @@
         {% set idle = journals|rejectattr('issues')|list %}
 
         {% if active %}
-        <h2 class="pub-section-title">Журналы в работе</h2>
+        <div class="pub-section-head">
+            <h2 class="pub-section-title">Журналы в работе</h2>
+            {% if mf_unknown %}
+            <button type="button" class="pub-linkbtn" id="mfSyncBtn" title="Находит выпуски, которые уже загружены в Метафору не из этого раздела, и отмечает их">Сверить с Метафорой</button>
+            {% endif %}
+        </div>
         <div class="pub-jgrid">
             {% for j in active %}
             <div class="pub-jcard">
