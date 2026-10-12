@@ -194,3 +194,39 @@ def delete_articles(conn, art_ids):
     (таблицы сайта MyISAM, ROLLBACK на них не работает)."""
     for art_id in art_ids:
         conn.execute(text("DELETE FROM articles WHERE art_id = :id"), {"id": art_id})
+
+
+def delete_created(conn, nomera_id, nomera_created, created_section_ids):
+    """Убирает то, что создала запись выпуска, и только если оно осталось пустым: разделы без статей и
+    выпуск без разделов. Чужое (уже существовавшее до записи) не трогает. Возвращает, что удалено."""
+    removed = {"sections": [], "nomera": None}
+    for razd_id in created_section_ids or []:
+        left = conn.execute(text("SELECT COUNT(*) FROM articles WHERE razd_id = :id"), {"id": razd_id}).scalar()
+        if not left:
+            conn.execute(text("DELETE FROM razdel_numbers WHERE razd_id = :id"), {"id": razd_id})
+            removed["sections"].append(razd_id)
+    if nomera_created and nomera_id:
+        left = conn.execute(text("SELECT COUNT(*) FROM razdel_numbers WHERE number = :id"), {"id": nomera_id}).scalar()
+        if not left:
+            conn.execute(text("DELETE FROM nomera WHERE num_id = :id"), {"id": nomera_id})
+            removed["nomera"] = nomera_id
+    return removed
+
+
+def rollback_push(conn, record):
+    """Откат записи выпуска по записи о том, что было создано (см. routes_publish: _site_push_record).
+
+    Статья удаляется, только если по её art_id на сайте всё ещё лежит та же статья (тот же DOI): если её
+    уже правили или номер занят чем-то другим, чужое не удаляем. -> (удалено статей, пропущено, что убрано)."""
+    deleted, skipped = [], []
+    for art in record.get("articles") or []:
+        row = conn.execute(text("SELECT doi FROM articles WHERE art_id = :id"), {"id": art["art_id"]}).fetchone()
+        bare = lambda d: (d or "").replace("https://doi.org/", "")  # noqa: E731
+        if row is not None and bare(row[0]) == bare(art.get("doi")):
+            conn.execute(text("DELETE FROM articles WHERE art_id = :id"), {"id": art["art_id"]})
+            deleted.append(art["art_id"])
+        else:
+            skipped.append(art["art_id"])
+    created_sections = [x["id"] for x in record.get("sections") or [] if x.get("created")]
+    removed = delete_created(conn, record.get("nomera_id"), record.get("nomera_created"), created_sections)
+    return deleted, skipped, removed

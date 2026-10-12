@@ -297,6 +297,7 @@ def register_publish_routes(app):
             exports={k: os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_{k}.xml'))
                      for k in ('elibrary', 'crossref', 'metafora')},
             is_admin=current_user.is_admin,
+            site_record=os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_site_push.json')),
         )
 
     @app.route('/admin/publish/issue/<int:issue_id>/section/add', methods=['POST'])
@@ -426,6 +427,64 @@ def register_publish_routes(app):
         db.session.commit()
         flash('Статья удалена из черновика.', 'success')
         return redirect(url_for('admin_publish_issue_detail', issue_id=issue_id))
+
+    def _site_push_record_path(issue_id):
+        return os.path.join(PUB_EXPORTS_FOLDER, f'{int(issue_id)}_site_push.json')
+
+    def _site_push_record_save(issue, created):
+        """Что создала запись на сайт: по этому файлу работает «Откатить запись на сайт»."""
+        try:
+            os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+            record = {
+                'at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+                'nomera_id': created['nomera_id'], 'nomera_created': created['nomera_created'],
+                'sections': [{'id': k, 'created': v} for k, v in created['sections'].items()],
+                'articles': [{'art_id': a.site_art_id, 'doi': a.doi} for a in issue.articles if a.site_art_id],
+            }
+            with open(_site_push_record_path(issue.id), 'w', encoding='utf-8') as f:
+                json.dump(record, f, ensure_ascii=False, indent=1)
+        except OSError as e:
+            flash(f'Запись на сайт выполнена, но не удалось сохранить сведения для отката: {e}', 'warning')
+
+    @app.route('/admin/publish/issue/<int:issue_id>/site-rollback', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_site_rollback(issue_id):
+        """Отменяет запись выпуска на сайт: удаляет записанные статьи и созданные при записи пустые раздел и
+        выпуск. Только по сохранённым сведениям о том, что именно было записано."""
+        issue = PubIssue.query.get_or_404(issue_id)
+        back = redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        if not issue.is_pushed:
+            flash('Выпуск не записан на сайт — откатывать нечего.', 'error')
+            return back
+        try:
+            with open(_site_push_record_path(issue.id), encoding='utf-8') as f:
+                record = json.load(f)
+        except (OSError, ValueError):
+            flash('Нет сведений о том, что именно было записано, поэтому автоматически откатить нельзя — '
+                  'удалять нужно вручную на сайте.', 'error')
+            return back
+        try:
+            with site_db.get_engine().begin() as conn:
+                deleted, skipped, removed = site_db.rollback_push(conn, record)
+        except Exception as e:
+            flash(f'Откат не выполнен: {e}', 'error')
+            return back
+        if skipped:
+            flash(f'Часть статей не удалена, потому что на сайте под их номерами уже лежит другое '
+                  f'({len(skipped)} шт.) — проверьте вручную.', 'warning')
+        for art in issue.articles:
+            art.site_art_id, art.pushed_at = None, None
+        issue.pushed_at, issue.site_num_id = None, None
+        db.session.commit()
+        for kind in ('crossref',):
+            try:
+                os.remove(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_{kind}.xml'))
+            except OSError:
+                pass
+        os.replace(_site_push_record_path(issue.id), _site_push_record_path(issue.id) + '.done')
+        flash(f'Запись на сайт отменена: статей удалено {len(deleted)}'
+              + (f', раздел и выпуск, созданные при записи, убраны' if removed.get('nomera') else '') + '.', 'success')
+        return back
 
     def _site_precheck(issue):
         """Проверка перед записью на сайт (только чтение): в какую БД пишем, что не так, какие будут DOI."""
@@ -567,6 +626,9 @@ def register_publish_routes(app):
                 return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
         engine = site_db.get_engine()
+        # Что эта запись создала на сайте (выпуск, разделы): таблицы сайта MyISAM, откатить транзакцией
+        # нельзя — поэтому создаваемое запоминаем и при любом сбое убираем сами (см. site_db.delete_created).
+        created = {'nomera_id': None, 'nomera_created': False, 'sections': {}}
         try:
             with engine.begin() as conn:
                 journal_row = site_db.get_journal_by_issn(conn, issue.issn)
@@ -575,14 +637,16 @@ def register_publish_routes(app):
                     return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
                 jr_num = journal_row[0]
 
-                num_id, _created = site_db.find_or_create_nomera(conn, jr_num, issue.year, issue.number)
+                num_id, nomera_created = site_db.find_or_create_nomera(conn, jr_num, issue.year, issue.number)
+                created['nomera_id'], created['nomera_created'] = num_id, nomera_created
                 seq_start = site_db.count_articles_in_issue(conn, num_id)
 
                 prepared = []
                 for i, art in enumerate(issue.articles, start=1):
-                    razd_id, _ = site_db.find_or_create_section(
+                    razd_id, section_created = site_db.find_or_create_section(
                         conn, num_id, art.section_ru or 'Без раздела', art.section_en or ''
                     )
+                    created['sections'][razd_id] = created['sections'].get(razd_id, False) or section_created
                     doi = art.doi or publish_doi.build_doi(issue.issn, issue.year, issue.number, seq_start + i)
 
                     authors_ru = [
@@ -641,6 +705,8 @@ def register_publish_routes(app):
                     if too_long:
                         details = ', '.join(f'{col} ({length} символов при пределе {limit})'
                                             for col, length, limit in too_long)
+                        site_db.delete_created(conn, created['nomera_id'], created['nomera_created'],
+                                               [k for k, v in created['sections'].items() if v])
                         flash(f'Статья №{i} «{art.title_ru[:60]}»: не влезает в поля сайта — '
                               f'{details}. Ничего не отправлено, сократите текст.', 'error')
                         return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
@@ -656,16 +722,27 @@ def register_publish_routes(app):
                 except Exception:
                     # Ручная компенсация вместо ROLLBACK (см. выше про MyISAM).
                     site_db.delete_articles(conn, inserted_ids)
+                    site_db.delete_created(conn, created['nomera_id'], created['nomera_created'],
+                                           [k for k, v in created['sections'].items() if v])
                     raise
 
                 issue.site_num_id = num_id
         except Exception as e:
             db.session.rollback()
+            # Сбой мог случиться до вставки статей (например, при создании раздела) — убираем созданное.
+            try:
+                if created['nomera_id']:
+                    with engine.begin() as conn:
+                        site_db.delete_created(conn, created['nomera_id'], created['nomera_created'],
+                                               [k for k, v in created['sections'].items() if v])
+            except Exception:
+                pass
             flash(f'Ошибка при записи в БД сайта: {e}', 'error')
             return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
 
         issue.pushed_at = datetime.now(timezone.utc)
         db.session.commit()
+        _site_push_record_save(issue, created)
 
         # Генерируем и сохраняем CrossRef/eLibrary XML
         os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)

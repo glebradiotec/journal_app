@@ -423,3 +423,145 @@ def test_issue_page_has_all_destinations_and_no_preview_link(client, issue):
     for label in ("Сайт radiotec.ru", "eLibrary", "CrossRef", "Метафора"):
         assert label in html
     assert "/preview" not in html and "generate-" not in html
+
+
+# ---------------------------------------------------------------- безопасная запись на сайт (структура базы сайта как на радиотехнике)
+
+SITE_DDL = [
+    "CREATE TABLE journals (journ_id INTEGER PRIMARY KEY, menu_name TEXT, journ_name TEXT, link TEXT, issn TEXT)",
+    "CREATE TABLE nomera (num_id INTEGER PRIMARY KEY, jr_num INTEGER, num_year INTEGER, num_num TEXT, num_descript TEXT,"
+    " num_act INTEGER, file TEXT, price INTEGER, num_descript_eng TEXT)",
+    "CREATE TABLE razdel_numbers (razd_id INTEGER PRIMARY KEY, number INTEGER, razd_name TEXT, post INTEGER, jr_in_jr TEXT,"
+    " r_sort INTEGER, razd_name_eng TEXT)",
+    "CREATE TABLE articles (art_id INTEGER PRIMARY KEY, razd_id INTEGER, art_page TEXT, authors TEXT, art_name TEXT,"
+    " descript TEXT, literature TEXT, authors_eng TEXT, art_name_eng TEXT, descript_eng TEXT, literature_eng TEXT,"
+    " keyword TEXT, keyword_eng TEXT, article_type INTEGER, udk TEXT, doi TEXT, citata TEXT, data_recieved TEXT,"
+    " data_approved TEXT, data_accepted TEXT, citata_eng TEXT, rubr_vak TEXT, article_text TEXT, file TEXT, price INTEGER)",
+]
+
+
+@pytest.fixture()
+def site(tmp_path, monkeypatch, issue):
+    """Подставная «база сайта» в SQLite с той же структурой; админом вместо обычного сотрудника."""
+    import routes_publish
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import StaticPool
+    # AUTOCOMMIT: как таблицы сайта (MyISAM), откатить сбой транзакцией нельзя — только удалением вручную
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False},
+                           isolation_level="AUTOCOMMIT")
+    with engine.begin() as c:
+        for ddl in SITE_DDL:
+            c.execute(text(ddl))
+        c.execute(text("INSERT INTO journals VALUES (1, 'Нелинейный мир', 'Нелинейный мир', 'nm', '2070-0970')"))
+    monkeypatch.setattr(routes_publish.site_db, "get_engine", lambda: engine)
+    monkeypatch.setattr(routes_publish.site_db, "is_production_configured", lambda: True)
+    admin = User(username="adm", display_name="adm", role="admin", password_hash="x")
+    db.session.add(admin)
+    db.session.commit()
+    return engine, admin
+
+
+def _count(engine, table):
+    from sqlalchemy import text
+    with engine.connect() as c:
+        return c.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
+
+
+def test_push_records_what_it_created_and_rollback_removes_exactly_that(client, issue, site):
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Новый раздел"
+    db.session.commit()
+    assert client.post(f"/admin/publish/issue/{issue.id}/confirm").status_code == 302
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (1, 1, 1)
+    rec = json.load(open(hub.PUB_EXPORTS_FOLDER + f"/{issue.id}_site_push.json", encoding="utf-8"))
+    assert rec["nomera_created"] is True and rec["sections"][0]["created"] is True and len(rec["articles"]) == 1
+    assert PubIssue.query.get(issue.id).pushed_at is not None
+
+    client.post(f"/admin/publish/issue/{issue.id}/site-rollback")
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (0, 0, 0)
+    iss = PubIssue.query.get(issue.id)
+    assert iss.pushed_at is None and PubArticle.query.one().site_art_id is None
+
+
+def test_rollback_does_not_touch_issue_or_section_that_existed_before(client, issue, site):
+    from sqlalchemy import text
+    engine, admin = site
+    _login(client, admin)
+    with engine.begin() as c:
+        c.execute(text("INSERT INTO nomera (num_id, jr_num, num_year, num_num, num_descript, num_act, file, price, num_descript_eng)"
+                       " VALUES (7, 1, 2025, '3', '', 1, '', 0, '')"))
+        c.execute(text("INSERT INTO razdel_numbers VALUES (9, 7, 'Старый раздел', 1, 'off', 1, '')"))
+    PubArticle.query.one().section_ru = "Старый раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert _count(engine, "articles") == 1
+    client.post(f"/admin/publish/issue/{issue.id}/site-rollback")
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (1, 1, 0)
+
+
+def test_failed_push_leaves_nothing_behind(client, issue, site, monkeypatch):
+    """Слишком длинное поле у статьи: выпуск и раздел уже созданы, но после отказа их быть не должно."""
+    import routes_publish
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    monkeypatch.setattr(routes_publish.site_db, "column_limits", lambda conn, table="articles": {"art_name": 3})
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (0, 0, 0)
+    assert PubIssue.query.get(issue.id).pushed_at is None
+
+
+def test_failure_during_insert_removes_inserted_articles_and_created_rows(client, issue, site, monkeypatch):
+    import routes_publish
+    engine, admin = site
+    _login(client, admin)
+    publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-03", pages="14-20"), None)
+    db.session.commit()
+    real = routes_publish.site_db.insert_article
+    calls = []
+
+    def flaky(conn, fields):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("обрыв связи")
+        return real(conn, fields)
+
+    monkeypatch.setattr(routes_publish.site_db, "insert_article", flaky)
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (0, 0, 0)
+    assert PubIssue.query.get(issue.id).pushed_at is None
+
+
+def test_rollback_is_admin_only_and_needs_a_pushed_issue(client, issue, site):
+    client.post(f"/admin/publish/issue/{issue.id}/site-rollback")        # сотрудник (не админ) — отказ
+    assert PubIssue.query.get(issue.id).pushed_at is None
+    _, admin = site
+    _login(client, admin)
+    r = client.post(f"/admin/publish/issue/{issue.id}/site-rollback")   # не записан — откатывать нечего
+    assert r.status_code == 302
+
+
+def test_rollback_skips_article_replaced_on_the_site(client, issue, site):
+    """Если под сохранённым номером на сайте уже другая статья (её правили), чужое не удаляется."""
+    from sqlalchemy import text
+    engine, admin = site
+    _login(client, admin)
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    with engine.begin() as c:
+        c.execute(text("UPDATE articles SET doi = 'https://doi.org/10.1000/другая'"))
+    client.post(f"/admin/publish/issue/{issue.id}/site-rollback")
+    assert _count(engine, "articles") == 1
+
+
+# ---------------------------------------------------------------- подключение к боевой базе: инструмент
+
+def test_site_connect_url_encodes_special_characters_and_masks_the_password():
+    import importlib.util, os as _os
+    spec = importlib.util.spec_from_file_location("site_connect", _os.path.join(_os.path.dirname(__file__), "..", "tools", "site_connect.py"))
+    sc = importlib.util.module_from_spec(spec); spec.loader.exec_module(sc)
+    url = sc.build_url("db.example.ru", "3306", "rt user", "p@ss:w/o#rd", "radiotec_main4")
+    assert url == "mysql+pymysql://rt+user:p%40ss%3Aw%2Fo%23rd@db.example.ru:3306/radiotec_main4?charset=utf8mb4"
+    assert "p%40ss" not in sc.mask(url) and sc.mask(url).startswith("mysql+pymysql://rt+user:***@db.example.ru")
+    assert sc.mask("") == ""

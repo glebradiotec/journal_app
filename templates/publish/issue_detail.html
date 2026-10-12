@@ -111,7 +111,13 @@
                         <div class="pub-dest-text">Статьи записываются в базу сайта; после этого у них появляются страницы и ID для CrossRef. Запись подтверждает администратор.</div>
                     </div>
                     <div class="pub-dest-actions">
-                        {% if not stage.on_site %}<button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="siteCheckBtn">Проверить и записать…</button>{% endif %}
+                        {% if not stage.on_site %}<button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="siteCheckBtn">Проверить и записать…</button>
+                        {% elif is_admin %}
+                        <form method="POST" action="{{ url_for('admin_publish_issue_site_rollback', issue_id=issue.id) }}" style="display:inline;"
+                              onsubmit="return confirm('Отменить запись на сайт? Записанные статьи будут удалены из базы сайта, а созданные при записи пустые раздел и выпуск убраны.');">
+                            <button type="submit" class="pub-btn pub-btn-danger pub-btn-sm" {% if not site_record %}disabled title="Нет сведений о том, что именно было записано"{% endif %}>Откатить запись на сайт</button>
+                        </form>
+                        {% endif %}
                     </div>
                     <div id="sitePanel" class="pub-site-panel" style="display:none;">
                         <div id="sitePanelBody"></div>
