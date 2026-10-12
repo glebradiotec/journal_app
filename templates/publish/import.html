@@ -303,10 +303,32 @@
     }
     inFiles.addEventListener('change', function() { fromInput(inFiles); });
     inFolder.addEventListener('change', function() { fromInput(inFolder); });
-    drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('pub-drop-active'); });
-    drop.addEventListener('dragleave', function() { drop.classList.remove('pub-drop-active'); });
-    drop.addEventListener('drop', function(e) {
+    // Файлы принимаются в ЛЮБОМ месте страницы: если бросить мимо рамки, браузер по умолчанию
+    // открывает файл вместо страницы, и загрузка выглядит сломанной. Поэтому слушаем window.
+    function hasFiles(e) {
+        var t = e.dataTransfer && e.dataTransfer.types;
+        return !!t && Array.prototype.indexOf.call(t, 'Files') !== -1;
+    }
+    var dragDepth = 0;
+    function onEnter(e) {
+        if (!hasFiles(e)) return;
+        dragDepth++;
+        drop.classList.add('pub-drop-active');
+    }
+    function onLeave(e) {
+        if (!hasFiles(e)) return;
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (!dragDepth) drop.classList.remove('pub-drop-active');
+    }
+    function onOver(e) {
+        if (!hasFiles(e)) return;
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    }
+    function onDrop(e) {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth = 0;
         drop.classList.remove('pub-drop-active');
         var items = e.dataTransfer.items;
         if (items && items.length && items[0].webkitGetAsEntry) {
@@ -314,7 +336,21 @@
         } else {
             upload(Array.prototype.map.call(e.dataTransfer.files, function(f) { return { file: f, path: f.name }; }));
         }
-    });
+    }
+    window.addEventListener('dragenter', onEnter);
+    window.addEventListener('dragleave', onLeave);
+    window.addEventListener('dragover', onOver);
+    window.addEventListener('drop', onDrop);
+    // После перехода по ссылке внутри раздела страница не перезагружается, и обработчики прошлой
+    // страницы остались бы на window — снимаем их, когда этой страницы уже нет.
+    var cleanup = setInterval(function() {
+        if (document.getElementById('impDrop') === drop) return;
+        clearInterval(cleanup);
+        window.removeEventListener('dragenter', onEnter);
+        window.removeEventListener('dragleave', onLeave);
+        window.removeEventListener('dragover', onOver);
+        window.removeEventListener('drop', onDrop);
+    }, 1000);
 })();
 </script>
 {% endblock %}
