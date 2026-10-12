@@ -37,6 +37,35 @@ def _engine(url):
     return create_engine(url, connect_args={"connect_timeout": 10} if url.startswith("mysql") else {})
 
 
+def fix_env_permissions(path):
+    """.env содержит пароль, поэтому закрыт от посторонних (640), но приложение запущено НЕ от root
+    (служба journal.service работает от www-data) и должно его читать: выдаём права группе службы.
+    Раньше здесь стояло 600 — служба переставала стартовать (502). Читаемость проверяем от имени службы."""
+    import grp
+    import subprocess
+    user = group = ""
+    try:
+        out = subprocess.run(["systemctl", "show", "-p", "User", "-p", "Group", "journal.service"],
+                             capture_output=True, text=True).stdout
+        props = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+        user, group = props.get("User", ""), props.get("Group", "")
+    except OSError:
+        pass
+    if group:
+        try:
+            os.chown(path, -1, grp.getgrnam(group).gr_gid)
+        except (KeyError, OSError) as e:
+            return False, f"не удалось выдать группе «{group}» доступ к .env: {e}"
+        os.chmod(path, 0o640)
+    else:
+        os.chmod(path, 0o644)  # служба не определена (локальный запуск) — как у прежнего файла
+    if user:
+        check = subprocess.run(["runuser", "-u", user, "--", "test", "-r", path], capture_output=True)
+        if check.returncode != 0:
+            return False, f"пользователь службы «{user}» не может прочитать .env — приложение не запустилось бы"
+    return True, ""
+
+
 def ping(url=None):
     from sqlalchemy import text
     import publish_config
@@ -101,8 +130,13 @@ def setup():
     shutil.copy2(ENV_PATH, ENV_PATH + ".bak_before_site") if os.path.exists(ENV_PATH) else None
     lines = [l for l in current.splitlines() if not l.startswith("SITE_DATABASE_URL=")]
     open(ENV_PATH, "w", encoding="utf-8").write("\n".join(lines).rstrip("\n") + f"\nSITE_DATABASE_URL={url}\n")
-    os.chmod(ENV_PATH, 0o600)
-    print("Записано в .env (права 600), копия прежнего файла — .env.bak_before_site.")
+    ok, why = fix_env_permissions(ENV_PATH)
+    print("Записано в .env, копия прежнего файла — .env.bak_before_site.")
+    if not ok:
+        print("ВНИМАНИЕ:", why)
+        shutil.copy2(ENV_PATH + ".bak_before_site", ENV_PATH)
+        print("Прежний .env возвращён, ничего не применено.")
+        return 1
     try:
         import subprocess
         pid = subprocess.run(["systemctl", "show", "-p", "MainPID", "--value", "journal.service"],
