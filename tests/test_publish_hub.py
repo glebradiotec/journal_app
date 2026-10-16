@@ -615,6 +615,55 @@ def _eight_authors(article):
     return article
 
 
+def test_footnote_numbers_are_separated_from_organisation_and_email():
+    """На странице сайта «1,2МГТУ» читалось слитно — между номерами и текстом должен быть пробел."""
+    import publish_format_html as F
+    authors = [{"surname": "Иванов", "initials": "И.И.", "org": "МГТУ им. Н.Э. Баумана", "town": "Москва",
+                "country": "Россия", "email": "ivanov@bmstu.ru"},
+               {"surname": "Петров", "initials": "П.П.", "org": "МГТУ им. Н.Э. Баумана; ФГБУ «ГВКГ»", "town": "Москва",
+                "country": "Россия", "email": "petrov@mail.ru"}]
+    html = F.format_authors_html(authors, "ru")
+    assert "<p>1,2 МГТУ им. Н.Э. Баумана (Москва, Россия)</p>" in html
+    assert "<p>2 ФГБУ &laquo;ГВКГ&raquo; (Москва, Россия)</p>" in html
+    assert "<p>1 ivanov@bmstu.ru, 2 petrov@mail.ru</p>" in html
+
+
+def test_fix_authors_tool_repairs_only_untouched_rows_and_only_with_apply(client, issue, site, monkeypatch, capsys):
+    import re
+    import sys
+    from sqlalchemy import text
+    sys.path.insert(0, "tools")
+    import site_fix_authors
+    engine, admin = site
+    _login(client, admin)
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+
+    def stored():
+        with engine.connect() as c:
+            return tuple(c.execute(text("SELECT authors, authors_eng FROM articles")).one())
+
+    fixed = stored()
+    assert re.search(r"<p>1 \S", fixed[0]) and "1 ivanov@msu.ru" in fixed[0]
+    unspace = lambda h: re.sub(r"(<p>\d+(?:,\d+)*|, \d+) (?=\S)", r"\1", h)    # как записывали раньше: номер вплотную
+    legacy = tuple(unspace(h) for h in fixed)
+    assert legacy != fixed
+    with engine.begin() as c:
+        c.execute(text("UPDATE articles SET authors = :a, authors_eng = :e"), {"a": legacy[0], "e": legacy[1]})
+    monkeypatch.setattr(sys, "argv", ["site_fix_authors"])
+    site_fix_authors.main()
+    assert stored() == legacy and "исправил бы" in capsys.readouterr().out      # без --apply в базу не пишем
+
+    monkeypatch.setattr(sys, "argv", ["site_fix_authors", "--apply"])
+    site_fix_authors.main()
+    assert stored() == fixed
+
+    with engine.begin() as c:                                                    # блок правили руками — не трогаем
+        c.execute(text("UPDATE articles SET authors = :a, authors_eng = :e"),
+                  {"a": legacy[0] + "<p>Добавлено вручную</p>", "e": legacy[1]})
+    site_fix_authors.main()
+    assert stored()[0].endswith("Добавлено вручную</p>") and "правили вручную" in capsys.readouterr().out
+
+
 def test_citation_is_cut_to_first_authors_only_when_it_does_not_fit():
     import publish_format_html as F
     authors = [{"surname": n, "initials": "А.Б."} for n in ["Рязанов", "Сучилин", "Чичерин", "Недосекин", "Дручевский"]]

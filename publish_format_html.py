@@ -17,8 +17,9 @@ def format_authors_html(authors, lang):
     сносок, затем по абзацу на каждую организацию с номерами тех авторов, которые в ней работают:
 
         <p><strong>И.О.&nbsp;Фамилия</strong>1, <strong>И.О.&nbsp;Фамилия</strong>2</p>
-        <p>1Организация (Город, Страна)</p>
-        <p>1,2Другая организация (Город, Страна)</p>
+        <p>1 Организация (Город, Страна)</p>
+        <p>1,2 Другая организация (Город, Страна)</p>
+        <p>1 ivanov@mail.ru, 2 petrov@mail.ru</p>
 
     У автора может быть несколько мест работы — в org они склеены через «; » (см. разбор статьи).
     Город берётся один на автора, поэтому у автора с организациями в разных городах у обеих
@@ -48,10 +49,12 @@ def format_authors_html(authors, lang):
     if names:
         blocks.append(f"<p>{', '.join(names)}</p>")
     for org, idx_list in orgs:
-        blocks.append(f"<p>{','.join(str(i) for i in idx_list)}{org}</p>")
+        # Номер сноски и название организации разделяет пробел (как в статьях, внесённых вручную):
+        # без него «1,2МГТУ» на странице сайта читается как одно слово.
+        blocks.append(f"<p>{','.join(str(i) for i in idx_list)} {org}</p>")
 
     # E-mail-ы сайт хранит последним абзацем блока, с номером автора перед адресом.
-    emails = [f"{idx}{_esc(a.get('email'))}" for idx, a in enumerate(authors, start=1) if a.get("email")]
+    emails = [f"{idx} {_esc(a.get('email'))}" for idx, a in enumerate(authors, start=1) if a.get("email")]
     if emails:
         blocks.append(f"<p>{', '.join(emails)}</p>")
     return "\n\n".join(blocks)
