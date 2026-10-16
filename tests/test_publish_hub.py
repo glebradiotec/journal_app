@@ -561,6 +561,9 @@ def test_uneven_keyword_counts_are_flagged_and_block_only_elibrary(client, issue
     assert r.status_code == 302 and "zip" not in (r.headers.get("Content-Type") or "")
     with client.session_transaction() as s:
         assert "ключевых слов не поровну" in dict((c, m) for c, m in s["_flashes"])["error"]
+    page = client.get(f"/admin/publish/issue/{issue.id}").get_data(as_text=True)
+    assert "Ключевых слов не поровну" in page and "русских 2, английских 3" in page           # список остаётся на странице
+    assert f"/article/{art.id}" in page.split("Ключевых слов не поровну", 1)[1].split("</ul>", 1)[0]
     assert client.get(f"/admin/publish/issue/{issue.id}/export/metafora").status_code == 200   # Метафоре поровну не нужно
     art.keywords_en = "one, two"
     db.session.commit()

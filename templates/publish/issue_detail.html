@@ -137,6 +137,16 @@
                     <div class="pub-dest-info">
                         <div class="pub-dest-name">eLibrary</div>
                         <div class="pub-dest-text">Архив с XML для загрузки в eLibrary. Собирается в момент нажатия из текущих данных выпуска.</div>
+                        {% if kw_uneven %}
+                        <div class="pub-warning-box" style="margin-top: 10px;">
+                            <strong>Ключевых слов не поровну — XML не соберётся.</strong> eLibrary сопоставляет русские и английские слова по номеру, поэтому их должно быть поровну. Откройте статью и поправьте:
+                            <ul style="margin: 8px 0 0; padding-left: 18px;">
+                                {% for k in kw_uneven %}
+                                <li><a href="{{ url_for('admin_publish_article_edit', article_id=k.art.id) }}">№{{ k.n }} {{ (k.art.title_ru or '')[:70] }}</a> — {{ k.note.split(' — ')[0] }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="pub-dest-actions">
                         <a href="{{ url_for('admin_publish_export', issue_id=issue.id, kind='elibrary') }}" class="pub-btn pub-btn-secondary pub-btn-sm">Скачать XML</a>

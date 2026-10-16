@@ -366,6 +366,8 @@ def register_publish_routes(app):
             exports={k: os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_{k}.xml'))
                      for k in ('elibrary', 'crossref', 'metafora')},
             is_admin=current_user.is_admin,
+            kw_uneven=[{'n': i, 'art': a, 'note': keyword_count_note(a)}
+                       for i, a in enumerate(issue.articles, start=1) if keyword_count_note(a)],
             site_record=os.path.exists(os.path.join(PUB_EXPORTS_FOLDER, f'{issue.id}_site_push.json')),
         )
 
@@ -661,11 +663,10 @@ def register_publish_routes(app):
             return back
         if kind == 'elibrary':
             # eLibrary сопоставляет русские и английские ключевые слова по номеру — их должно быть поровну.
-            uneven = [f'№{i} «{a.title_ru[:50]}»: {keyword_count_note(a)}'
-                      for i, a in enumerate(issue.articles, start=1) if keyword_count_note(a)]
+            uneven = [a for a in issue.articles if keyword_count_note(a)]
             if uneven:
-                flash('XML для eLibrary не собран: у некоторых статей ключевых слов не поровну. Откройте статью '
-                      '(по названию в таблице), поправьте ключевые слова и скачайте снова. ' + '; '.join(uneven), 'error')
+                flash(f'XML для eLibrary не собран: у статей ключевых слов не поровну ({len(uneven)}). '
+                      'Список со ссылками — в карточке eLibrary ниже.', 'error')
                 return back
         issue_view = _IssueView(issue)
         name = issue.journal_name or issue.issn
