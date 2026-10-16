@@ -6,6 +6,7 @@ XML (export_crossref.py/export_elibrary.py).
 рабочий процесс, не пересекающийся с существующим учётом статей.
 """
 from models import db, _utcnow
+from article_template_parser import split_keywords
 
 
 class PubIssue(db.Model):
@@ -97,11 +98,11 @@ class PubArticle(db.Model):
 
     @property
     def keywords_ru_list(self):
-        return [k.strip() for k in (self.keywords_ru or '').split(',') if k.strip()]
+        return split_keywords(self.keywords_ru or '')
 
     @property
     def keywords_en_list(self):
-        return [k.strip() for k in (self.keywords_en or '').split(',') if k.strip()]
+        return split_keywords(self.keywords_en or '')
 
     @property
     def references_list(self):

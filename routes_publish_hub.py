@@ -89,6 +89,14 @@ def issue_stage(issue):
     }
 
 
+def keyword_count_note(art):
+    """Строка-замечание, если русских и английских ключевых слов не поровну (для eLibrary их должно быть поровну)."""
+    n_ru, n_en = len(art.keywords_ru_list), len(art.keywords_en_list)
+    if n_ru and n_en and n_ru != n_en:
+        return f'ключевых слов: русских {n_ru}, английских {n_en} — для eLibrary их должно быть поровну'
+    return ''
+
+
 def _json_error(message, status=400, **extra):
     return jsonify({'error': message, **extra}), status
 
@@ -215,13 +223,15 @@ def register_publish_hub_routes(app):
                    'authors': len(data['authors']), 'refs': len(data['refs']),
                    'edit_url': url_for('admin_publish_article_edit', article_id=art.id)}
             hit = metafora_check.find_pdf(pdfs, art.doi)
+            kw_note = keyword_count_note(art)
             if len(hit) != 1:
                 row.update(pdf='', errors=['нет PDF этой статьи — сверить не с чем' if not hit
-                                           else f'по DOI подходит несколько PDF: {", ".join(hit)}'], warnings=[])
+                                           else f'по DOI подходит несколько PDF: {", ".join(hit)}'],
+                           warnings=[kw_note] if kw_note else [])
             else:
                 seen.add(hit[0])
                 errors, warnings = metafora_check.check_article(data, pdfs[hit[0]])
-                row.update(pdf=hit[0], errors=errors, warnings=warnings)
+                row.update(pdf=hit[0], errors=errors, warnings=warnings + ([kw_note] if kw_note else []))
             rows.append(row)
         orphans = [k for k, v in pdfs.items() if k not in seen and publish_import._DOI_RE.search(v['p1'])]
         return jsonify({'articles': rows, 'problems': problems, 'orphan_pdfs': orphans,

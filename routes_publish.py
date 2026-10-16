@@ -17,7 +17,7 @@ from models import db
 from models_publish import PubIssue, PubArticle, PubAuthor, PubSection
 from routes_admin import admin_required
 from routes_publish_hub import (
-    publish_required, register_publish_hub_routes, issue_stage, mf_load_state)
+    publish_required, register_publish_hub_routes, issue_stage, mf_load_state, keyword_count_note)
 import pdf_parser
 import article_template_parser
 import publish_config
@@ -660,6 +660,14 @@ def register_publish_routes(app):
         if not issue.articles:
             flash('В выпуске нет статей.', 'error')
             return back
+        if kind == 'elibrary':
+            # eLibrary сопоставляет русские и английские ключевые слова по номеру — их должно быть поровну.
+            uneven = [f'№{i} «{a.title_ru[:50]}»: {keyword_count_note(a)}'
+                      for i, a in enumerate(issue.articles, start=1) if keyword_count_note(a)]
+            if uneven:
+                flash('XML для eLibrary не собран: у некоторых статей ключевых слов не поровну. Откройте статью '
+                      '(по названию в таблице), поправьте ключевые слова и скачайте снова. ' + '; '.join(uneven), 'error')
+                return back
         issue_view = _IssueView(issue)
         name = issue.journal_name or issue.issn
         try:

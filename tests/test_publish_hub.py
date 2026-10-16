@@ -545,6 +545,28 @@ def test_crossref_export_before_site_push_explains_instead_of_failing(client, is
     assert r.status_code == 302 and r.headers["Location"].endswith(f"/admin/publish/issue/{issue.id}")
 
 
+def test_keywords_with_commas_in_brackets_survive_storage():
+    art = PubArticle(keywords_ru="протоколы маршрутизации (EGP, IGP), гибкий алгоритм", keywords_en="a (b, c); d")
+    assert art.keywords_ru_list == ["протоколы маршрутизации (EGP, IGP)", "гибкий алгоритм"]
+    assert art.keywords_en_list == ["a (b, c)", "d"]
+
+
+def test_uneven_keyword_counts_are_flagged_and_block_only_elibrary(client, issue):
+    art = PubArticle.query.one()
+    art.keywords_ru, art.keywords_en = "один, два", "one, two, three"
+    db.session.commit()
+    row = client.get(f"/admin/publish/issue/{issue.id}/check").get_json()["articles"][0]
+    assert any("русских 2, английских 3" in w for w in row["warnings"])
+    r = client.get(f"/admin/publish/issue/{issue.id}/export/elibrary")
+    assert r.status_code == 302 and "zip" not in (r.headers.get("Content-Type") or "")
+    with client.session_transaction() as s:
+        assert "ключевых слов не поровну" in dict((c, m) for c, m in s["_flashes"])["error"]
+    assert client.get(f"/admin/publish/issue/{issue.id}/export/metafora").status_code == 200   # Метафоре поровну не нужно
+    art.keywords_en = "one, two"
+    db.session.commit()
+    assert client.get(f"/admin/publish/issue/{issue.id}/export/elibrary").status_code == 200
+
+
 def test_unknown_export_kind_is_404(client, issue):
     assert client.get(f"/admin/publish/issue/{issue.id}/export/other").status_code == 404
 

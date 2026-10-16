@@ -85,11 +85,11 @@ def test_headings_typed_without_spaces_are_still_found():
 
 def test_keywords_are_split_outside_brackets_by_comma_or_semicolon():
     """«(EGP, IGP)» — одно слово; в английской строке авторы нередко ставят «;» вместо «,»."""
-    assert P._split_keywords("протоколы маршрутизации (EGP, IGP), гибкий алгоритм, «а, б», x") == [
+    assert P.split_keywords("протоколы маршрутизации (EGP, IGP), гибкий алгоритм, «а, б», x") == [
         "протоколы маршрутизации (EGP, IGP)", "гибкий алгоритм", "«а, б»", "x"]
-    assert P._split_keywords("Flexible methods; Information system; space apparatuses, transponder; UAVs (a; b)") == [
+    assert P.split_keywords("Flexible methods; Information system; space apparatuses, transponder; UAVs (a; b)") == [
         "Flexible methods", "Information system", "space apparatuses", "transponder", "UAVs (a; b)"]
-    assert P._split_keywords("  один,  два  слова ,, ") == ["один", "два слова"]
+    assert P.split_keywords("  один,  два  слова ,, ") == ["один", "два слова"]
 
 
 def test_parsed_keywords_use_that_splitting():
@@ -100,6 +100,18 @@ def test_parsed_keywords_use_that_splitting():
     result, _ = P.parse_article_text(text)
     assert result["keywords_ru"] == ["протоколы маршрутизации (EGP, IGP)", "гибкий алгоритм"]
     assert result["keywords_en"] == ["routing protocols (EGP, IGP)", "flexible algorithm", "agile"]
+
+
+def test_abbreviations_are_glued_only_when_they_come_from_the_previous_word_and_counts_then_match():
+    ru = ["машинное обучение", "глубокое машинное обучение", "обучение с подкреплением"]
+    en = ["machine learning", "ML", "deep machine learning", "DML", "reinforcement learning"]
+    assert P.equalize_keywords(ru, en) == (ru, ["machine learning (ML)", "deep machine learning (DML)", "reinforcement learning"])
+    # «УЗИ» — самостоятельное слово, не сокращение предыдущего: ничего не склеиваем
+    ru2 = ["ультразвуковая информация", "УЗИ", "шум"]
+    assert P.equalize_keywords(ru2, ["ultrasound information", "noise"]) == (ru2, ["ultrasound information", "noise"])
+    # склейка не помогла бы выровнять числа — списки остаются как есть
+    assert P.equalize_keywords(["а", "б"], ["a", "ML", "x", "y"]) == (["а", "б"], ["a", "ML", "x", "y"])
+    assert P.equalize_keywords(["а"], ["a"]) == (["а"], ["a"])
 
 
 def test_author_with_single_initial_is_kept():

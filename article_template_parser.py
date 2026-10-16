@@ -76,7 +76,7 @@ def _canon_heading(line):
     return line
 
 
-def _split_keywords(line):
+def split_keywords(line):
     """«a, b (c, d); e» -> ['a', 'b (c, d)', 'e']. Разделитель — запятая или точка с запятой ВНЕ скобок и кавычек
     «…»: запятая внутри скобок («протоколы маршрутизации (EGP, IGP)») — часть самого слова, а в английской строке
     авторы нередко ставят «;» вместо «,»."""
@@ -93,6 +93,40 @@ def _split_keywords(line):
             cur.append(ch)
     parts.append("".join(cur))
     return [re.sub(r"\s+", " ", p).strip() for p in parts if p.strip()]
+
+
+_ABBREV_RE = re.compile(r"^[A-ZА-ЯЁ]{2,6}$")
+
+
+def _is_initialism_of(abbr, phrase):
+    """«ML» — аббревиатура от «machine learning»: буквы совпадают с первыми буквами слов фразы."""
+    words = [w for w in re.split(r"[\s\-]+", re.sub(r"\(.*?\)", " ", phrase)) if w]
+    return abbr.lower() == "".join(w[0] for w in words).lower()
+
+
+def equalize_keywords(ru, en):
+    """В eLibrary русских и английских ключевых слов должно быть поровну. Частая причина расхождения — аббревиатуры в
+    английской строке отдельными словами («machine learning, ML, deep machine learning, DML»), а в русской их нет:
+    тогда «ML» вклеивается в предыдущее слово — «machine learning (ML)». Вклеиваются ТОЛЬКО аббревиатуры, образованные
+    от предыдущего слова (настоящие ключевые слова вроде «УЗИ» или «IMS» остаются), и только если после этого числа
+    сошлись; иначе списки остаются как есть — разные слова у автора решает человек."""
+    if not ru or not en or len(ru) == len(en):
+        return ru, en
+
+    def merged(words):
+        out = []
+        for w in words:
+            if out and _ABBREV_RE.match(w) and _is_initialism_of(w, out[-1]):
+                out[-1] = f"{out[-1]} ({w})"
+            else:
+                out.append(w)
+        return out
+
+    longer_is_en = len(en) > len(ru)
+    cand = merged(en if longer_is_en else ru)
+    if len(cand) == len(ru if longer_is_en else en):
+        return (ru, cand) if longer_is_en else (cand, en)
+    return ru, en
 
 
 def _lines(text):
@@ -747,7 +781,7 @@ def parse_article_text(text):
         # _slice_text считает его продолжением последнего ключевого слова.
         kw_lines = [l for l in lines[i_keywords_h + 1:i_citation_h] if l.strip()]
         if kw_lines:
-            result["keywords_ru"] = _split_keywords(kw_lines[0])
+            result["keywords_ru"] = split_keywords(kw_lines[0])
             result["funding_ru"] = " ".join(kw_lines[1:]).strip()
 
     i_intro = _find_eq(lines, "Введение", i_citation_h or 0) if i_citation_h is not None else None
@@ -849,7 +883,7 @@ def parse_article_text(text):
             # См. комментарий у русского блока ключевых слов выше — та же логика.
             kw_lines_en = [l for l in lines[i_keywords_en_h + 1:i_forcit_h] if l.strip()]
             if kw_lines_en:
-                result["keywords_en"] = _split_keywords(kw_lines_en[0])
+                result["keywords_en"] = split_keywords(kw_lines_en[0])
                 result["funding_en"] = " ".join(kw_lines_en[1:]).strip()
 
         if i_forcit_h is not None:
@@ -908,6 +942,7 @@ def parse_article_text(text):
     if soft is None and result["references"] and result["references_en"]:
         result["references"], result["references_en"] = _reconcile_reference_lists(
             result["references"], result["references_en"])
+    result["keywords_ru"], result["keywords_en"] = equalize_keywords(result.get("keywords_ru") or [], result.get("keywords_en") or [])
     n_ru, n_en = len(result["references"]), len(result["references_en"])
     if n_ru and n_en and n_ru != n_en:
         warnings.append(
