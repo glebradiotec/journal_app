@@ -91,7 +91,8 @@ def issue_stage(issue):
 
 def keyword_count_note(art):
     """Строка-замечание, если русских и английских ключевых слов не поровну (для eLibrary их должно быть поровну)."""
-    n_ru, n_en = len(art.keywords_ru_list), len(art.keywords_en_list)
+    ru, en = art.keywords_pair
+    n_ru, n_en = len(ru), len(en)
     if n_ru and n_en and n_ru != n_en:
         return f'ключевых слов: русских {n_ru}, английских {n_en} — для eLibrary их должно быть поровну'
     return ''

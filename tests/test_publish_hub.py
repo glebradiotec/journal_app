@@ -567,6 +567,21 @@ def test_uneven_keyword_counts_are_flagged_and_block_only_elibrary(client, issue
     assert client.get(f"/admin/publish/issue/{issue.id}/export/elibrary").status_code == 200
 
 
+def test_exports_equalize_keywords_of_drafts_saved_before_the_fix(client, issue):
+    """Черновик с уже сохранёнными «machine learning, ML» выгружается в eLibrary без блокировки и с вклеенной аббревиатурой."""
+    import io
+    import zipfile
+    art = PubArticle.query.one()
+    art.keywords_ru, art.keywords_en = "машинное обучение, глубокое обучение", "machine learning, ML, deep learning, DL"
+    db.session.commit()
+    assert art.keywords_pair == (["машинное обучение", "глубокое обучение"], ["machine learning (ML)", "deep learning (DL)"])
+    assert art.keywords_en_list == ["machine learning", "ML", "deep learning", "DL"]        # на сайт уходит как есть
+    r = client.get(f"/admin/publish/issue/{issue.id}/export/elibrary")
+    assert r.status_code == 200
+    xml = zipfile.ZipFile(io.BytesIO(r.data)).read(zipfile.ZipFile(io.BytesIO(r.data)).namelist()[0]).decode("utf-8")
+    assert "machine learning (ML)" in xml and ">ML<" not in xml
+
+
 def test_unknown_export_kind_is_404(client, issue):
     assert client.get(f"/admin/publish/issue/{issue.id}/export/other").status_code == 404
 

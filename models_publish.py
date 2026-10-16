@@ -6,7 +6,7 @@ XML (export_crossref.py/export_elibrary.py).
 рабочий процесс, не пересекающийся с существующим учётом статей.
 """
 from models import db, _utcnow
-from article_template_parser import split_keywords
+from article_template_parser import equalize_keywords, split_keywords
 
 
 class PubIssue(db.Model):
@@ -103,6 +103,13 @@ class PubArticle(db.Model):
     @property
     def keywords_en_list(self):
         return split_keywords(self.keywords_en or '')
+
+    @property
+    def keywords_pair(self):
+        """(русские, английские) ключевые слова для XML: то же, что *_list, но с выровненным числом (аббревиатуры вклеены —
+        см. article_template_parser.equalize_keywords). Выравнивается при выгрузке, поэтому работает и для черновиков,
+        сохранённых до этой правки. На сайт слова уходят как есть (keywords_*_list)."""
+        return equalize_keywords(self.keywords_ru_list, self.keywords_en_list)
 
     @property
     def references_list(self):

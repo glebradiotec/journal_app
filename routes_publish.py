@@ -78,8 +78,7 @@ class _ArticleView:
         self.abstract_ru = art.abstract_ru or ''
         self.abstract_en = art.abstract_en or ''
         self.fulltext_ru = art.fulltext_ru or ''
-        self.keywords_ru = art.keywords_ru_list
-        self.keywords_en = art.keywords_en_list
+        self.keywords_ru, self.keywords_en = art.keywords_pair
         self.references = art.references_list
         self.references_en = art.references_en_list
         self.funding_ru = art.funding_ru or ''
