@@ -145,3 +145,29 @@ def format_citation_html(authors, title, journal_name, year, volume, number, pag
         parts.append(f"DOI:{sep}https://doi.org/{_esc(doi)}")
 
     return f"<p>{' '.join(parts)}</p>"
+
+
+# Первые N авторов + «и др.»: так строка «Для цитирования» умещается в колонку сайта (varchar(400)).
+_CITATION_KEEP = (3, 1)
+
+
+def format_citation_fit(authors, title, journal_name, year, volume, number, pages, doi, lang="ru", max_len=None):
+    """format_citation_html, а если строка длиннее max_len — список авторов в ней сокращается до первых трёх
+    («Иванов И.И., Петров П.П., Сидоров С.С. и др.»), затем до первого. Сами авторы статьи не меняются.
+    -> (html, показано_авторов, сокращено). Если и с одним автором не влезает — вернёт самый короткий вариант,
+    длину проверяет вызывающий (длинное название сокращать нельзя)."""
+    named = [a for a in authors if a.get("surname")]
+    full = format_citation_html(authors, title, journal_name, year, volume, number, pages, doi, lang)
+    if not max_len or len(full) <= max_len or len(named) <= 1:
+        return full, len(named), False
+    et_al = " и др." if lang == "ru" else " et al."
+    best = (full, len(named), False)
+    for keep in _CITATION_KEEP:
+        if keep >= len(named):
+            continue
+        html = format_citation_html(named[:keep], title, journal_name, year, volume, number, pages, doi, lang)
+        html = html.replace("</em>", et_al + "</em>", 1)
+        best = (html, keep, True)
+        if len(html) <= max_len:
+            break
+    return best

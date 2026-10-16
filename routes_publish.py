@@ -198,6 +198,63 @@ def _issue_sort(number):
 HIDDEN_SITE_JOURNAL_IDS = {2, 10, 13, 19, 20}
 
 
+def _site_fields(art, issue, doi, journal_row, razd_id=0, limits=None):
+    """Поля строки таблицы articles сайта для статьи. Одна сборка на проверку перед записью и на саму запись,
+    чтобы они не расходились. -> (fields, notes): notes — что пришлось сократить (строки «Для цитирования»)."""
+    authors_ru = [
+        {'surname': a.surname_ru, 'initials': a.initials_ru, 'org': a.org_ru, 'town': a.town_ru,
+         'country': a.country_ru, 'position': a.position_ru, 'email': a.email}
+        for a in art.authors
+    ]
+    authors_en = [
+        {'surname': a.surname_en, 'initials': a.initials_en, 'org': a.org_en, 'town': a.town_en,
+         'country': a.country_en, 'position': a.position_en, 'email': a.email}
+        for a in art.authors
+    ]
+    limits = limits or {}
+    notes = []
+    citata, shown_ru, cut_ru = publish_format_html.format_citation_fit(
+        authors_ru, art.title_ru, journal_row[1], issue.year, issue.volume, issue.number, art.pages, doi,
+        lang='ru', max_len=limits.get('citata'))
+    citata_eng, shown_en, cut_en = publish_format_html.format_citation_fit(
+        authors_en, art.title_en, _journal_name_en(journal_row), issue.year, issue.volume, issue.number,
+        art.pages, doi, lang='en', max_len=limits.get('citata_eng'))
+    if cut_ru:
+        notes.append(f'«Для цитирования» (русская) не влезает в {limits.get("citata")} знаков — будут указаны '
+                     f'первые авторы ({shown_ru} из {len(authors_ru)}) и «и др.»')
+    if cut_en:
+        notes.append(f'«Для цитирования» (английская) не влезает в {limits.get("citata_eng")} знаков — будут '
+                     f'указаны первые авторы ({shown_en} из {len(authors_en)}) и «et al.»')
+    fields = {
+        'razd_id': razd_id,
+        'art_page': art.pages or '',
+        'authors': publish_format_html.format_authors_html(authors_ru, 'ru'),
+        'art_name': art.title_ru,
+        'descript': publish_format_html.format_paragraphs_html(art.abstract_ru),
+        'literature': publish_format_html.format_references_html(art.references_list),
+        'authors_eng': publish_format_html.format_authors_html(authors_en, 'en'),
+        'art_name_eng': art.title_en or '',
+        'descript_eng': publish_format_html.format_paragraphs_html(art.abstract_en),
+        'literature_eng': publish_format_html.format_references_html(art.references_en_list),
+        'keyword': publish_format_html.format_keywords(art.keywords_ru_list),
+        'keyword_eng': publish_format_html.format_keywords(art.keywords_en_list),
+        'article_type': ARTICLE_TYPE_CODE_TO_ID.get(art.art_type, 0),
+        'udk': art.udk or '',
+        # На сайте DOI хранится ссылкой целиком (так и заносят руками), а у нас в PubArticle — «голый» DOI.
+        'doi': f'https://doi.org/{doi}',
+        'citata': citata,
+        'data_recieved': art.date_received or '',
+        'data_approved': art.date_approved or '',
+        'data_accepted': art.date_accepted or '',
+        'citata_eng': citata_eng,
+        'rubr_vak': '',
+        'article_text': '',
+        'file': '',
+        'price': art.price or publish_config.DEFAULT_ARTICLE_PRICE,
+    }
+    return fields, notes
+
+
 def register_publish_routes(app):
     register_publish_hub_routes(app)
 
@@ -549,19 +606,15 @@ def register_publish_routes(app):
             try:
                 with engine.connect() as conn:
                     limits = site_db.column_limits(conn)
+                # Те же поля, что уйдут при записи, и те же пределы колонок — проверка не расходится с записью.
                 for i, (art, doi) in enumerate(zip(issue.articles, computed_dois), start=1):
-                    citata = publish_format_html.format_citation_html(
-                        [{'surname': a.surname_ru, 'initials': a.initials_ru} for a in art.authors],
-                        art.title_ru, journal_row[1], issue.year, issue.volume, issue.number,
-                        art.pages, doi, lang='ru')
-                    for col, value in (('citata', citata), ('art_name', art.title_ru or ''),
-                                       ('art_page', art.pages or ''), ('udk', art.udk or '')):
-                        limit = limits.get(col)
-                        if limit and len(value) > limit:
-                            warnings.append(
-                                f'Статья №{i} «{art.title_ru[:60]}»: поле {col} длиннее, чем '
-                                f'допускает сайт ({len(value)} из {limit}) — отправка будет отклонена.'
-                            )
+                    fields, notes = _site_fields(art, issue, doi, journal_row, 0, limits)
+                    label = f'Статья №{i} «{art.title_ru[:60]}»'
+                    for note in notes:
+                        warnings.append(f'{label}: {note}.')
+                    for col, length, limit in site_db.check_field_lengths(limits, fields):
+                        warnings.append(f'{label}: поле {col} длиннее, чем допускает сайт ({length} из {limit}) — '
+                                        'отправка будет отклонена, сократите текст.')
             except Exception:
                 pass
 
@@ -654,6 +707,7 @@ def register_publish_routes(app):
                 created['nomera_id'], created['nomera_created'] = num_id, nomera_created
                 seq_start = site_db.count_articles_in_issue(conn, num_id)
 
+                limits = site_db.column_limits(conn)
                 prepared = []
                 for i, art in enumerate(issue.articles, start=1):
                     razd_id, section_created = site_db.find_or_create_section(
@@ -662,57 +716,12 @@ def register_publish_routes(app):
                     created['sections'][razd_id] = created['sections'].get(razd_id, False) or section_created
                     doi = art.doi or publish_doi.build_doi(issue.issn, issue.year, issue.number, seq_start + i)
 
-                    authors_ru = [
-                        {'surname': a.surname_ru, 'initials': a.initials_ru, 'org': a.org_ru,
-                         'town': a.town_ru, 'country': a.country_ru,
-                         'position': a.position_ru, 'email': a.email}
-                        for a in art.authors
-                    ]
-                    authors_en = [
-                        {'surname': a.surname_en, 'initials': a.initials_en, 'org': a.org_en,
-                         'town': a.town_en, 'country': a.country_en,
-                         'position': a.position_en, 'email': a.email}
-                        for a in art.authors
-                    ]
-
-                    fields = {
-                        'razd_id': razd_id,
-                        'art_page': art.pages or '',
-                        'authors': publish_format_html.format_authors_html(authors_ru, 'ru'),
-                        'art_name': art.title_ru,
-                        'descript': publish_format_html.format_paragraphs_html(art.abstract_ru),
-                        'literature': publish_format_html.format_references_html(art.references_list),
-                        'authors_eng': publish_format_html.format_authors_html(authors_en, 'en'),
-                        'art_name_eng': art.title_en or '',
-                        'descript_eng': publish_format_html.format_paragraphs_html(art.abstract_en),
-                        'literature_eng': publish_format_html.format_references_html(art.references_en_list),
-                        'keyword': publish_format_html.format_keywords(art.keywords_ru_list),
-                        'keyword_eng': publish_format_html.format_keywords(art.keywords_en_list),
-                        'article_type': ARTICLE_TYPE_CODE_TO_ID.get(art.art_type, 0),
-                        'udk': art.udk or '',
-                        # На сайте DOI хранится ссылкой целиком (так и заносят руками),
-                        # а у нас в PubArticle — «голый» DOI.
-                        'doi': f'https://doi.org/{doi}',
-                        'citata': publish_format_html.format_citation_html(
-                            authors_ru, art.title_ru, journal_row[1], issue.year,
-                            issue.volume, issue.number, art.pages, doi, lang='ru'),
-                        'data_recieved': art.date_received or '',
-                        'data_approved': art.date_approved or '',
-                        'data_accepted': art.date_accepted or '',
-                        'citata_eng': publish_format_html.format_citation_html(
-                            authors_en, art.title_en, _journal_name_en(journal_row), issue.year,
-                            issue.volume, issue.number, art.pages, doi, lang='en'),
-                        'rubr_vak': '',
-                        'article_text': '',
-                        'file': '',
-                        'price': art.price or publish_config.DEFAULT_ARTICLE_PRICE,
-                    }
+                    fields, _notes = _site_fields(art, issue, doi, journal_row, razd_id, limits)
                     prepared.append((art, doi, fields))
 
                 # Таблицы сайта — MyISAM, транзакций на них нет, поэтому сначала проверяем все
                 # статьи целиком и только потом пишем: иначе ошибка на середине выпуска оставит
                 # часть статей на сайте без возможности отката.
-                limits = site_db.column_limits(conn)
                 for i, (art, _doi, fields) in enumerate(prepared, start=1):
                     too_long = site_db.check_field_lengths(limits, fields)
                     if too_long:

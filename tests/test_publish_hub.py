@@ -608,6 +608,66 @@ def _count(engine, table):
         return c.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
 
 
+def _eight_authors(article):
+    base = article["authors"][0]
+    names = ["Рязанов", "Сучилин", "Чичерин", "Недосекин", "Дручевский", "Онуфриевич", "Сидоров", "Ветрова"]
+    article["authors"] = [dict(base, surname_ru=n, surname_en=f"Surname{i}", orcid="", spin="") for i, n in enumerate(names)]
+    return article
+
+
+def test_citation_is_cut_to_first_authors_only_when_it_does_not_fit():
+    import publish_format_html as F
+    authors = [{"surname": n, "initials": "А.Б."} for n in ["Рязанов", "Сучилин", "Чичерин", "Недосекин", "Дручевский"]]
+    args = (authors, "Длинное название статьи " * 4, "Журнал", 2026, "18", "3", "5-21", "10.18127/x-01")
+    full, shown, cut = F.format_citation_fit(*args, max_len=None)
+    assert (shown, cut) == (5, False) and "и др." not in full
+    html, shown, cut = F.format_citation_fit(*args, max_len=len(full) - 1)
+    assert (shown, cut) == (3, True) and len(html) < len(full)
+    assert "Чичерин А.Б. и др.</em>" in html and "Недосекин" not in html
+    html, shown, _ = F.format_citation_fit(*args, max_len=10)            # не влезает вовсе — самый короткий вариант
+    assert shown == 1 and "Рязанов А.Б. и др.</em>" in html
+    en, _, cut = F.format_citation_fit([dict(a, surname="Ab") for a in authors], "T", "J", 2026, "1", "1", "1-2", "d",
+                                       lang="en", max_len=60)
+    assert cut and "et al.</em>" in en
+
+
+def test_site_check_looks_at_all_fields_and_reports_cut_citation(client, issue, site, monkeypatch):
+    import routes_publish
+    engine, admin = site
+    _login(client, admin)
+    art = PubArticle.query.one()
+    publish_import.make_article(issue.id, _eight_authors(dict(ARTICLE, doi="10.18127/j20700970-202503-05", title_en="E" * 40)), None)
+    db.session.commit()
+    monkeypatch.setattr(routes_publish.site_db, "column_limits",
+                        lambda conn, table="articles": {"citata": 260, "citata_eng": 260, "art_name_eng": 30})
+    w = client.get(f"/admin/publish/issue/{issue.id}/site-check").get_json()["warnings"]
+    text = "\n".join(w)
+    assert "Статья №2" in text and "первые авторы (3 из 8)" in text           # русская строка сокращена, а не отклонена
+    assert "поле art_name_eng длиннее" in text                                  # английское название проверяется тоже
+    assert not any(x.startswith("Статья №1") and "citata" in x for x in w)    # короткая статья — без замечаний
+
+
+def test_push_writes_the_cut_citation_that_the_check_announced(client, issue, site, monkeypatch):
+    import routes_publish
+    from sqlalchemy import text
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    for a in PubArticle.query.all():
+        db.session.delete(a)
+    db.session.commit()
+    publish_import.make_article(issue.id, _eight_authors(dict(ARTICLE, title_en="T")), None)
+    db.session.commit()
+    monkeypatch.setattr(routes_publish.site_db, "column_limits",
+                        lambda conn, table="articles": {"citata": 220, "citata_eng": 220})
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    with engine.connect() as c:
+        citata, citata_eng, authors = c.execute(text("SELECT citata, citata_eng, authors FROM articles")).one()
+    assert len(citata) <= 220 and citata.count("и др.") == 1 and "Сидоров" not in citata
+    assert "et al." in citata_eng
+    assert authors.count("Сидоров") == 1                                        # авторы статьи на сайте остаются полными
+
+
 def test_push_records_what_it_created_and_rollback_removes_exactly_that(client, issue, site):
     engine, admin = site
     _login(client, admin)
