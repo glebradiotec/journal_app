@@ -302,3 +302,23 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 .pub-dest-text { font-size: 12.5px; color: var(--color-fg-muted); margin-top: 4px; line-height: 1.45; max-width: 620px; }
 .pub-dest-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 800px) { .pub-dest { flex-direction: column; align-items: flex-start; } }
+
+/* ---- Ключевые слова: таблица пар ru ↔ en в форме статьи ---- */
+.kw-summary { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; }
+.kw-summary-ok { background: rgba(26,127,55,0.1); color: #1a7f37; }
+.kw-summary-bad { background: rgba(207,34,46,0.08); color: #cf222e; }
+.kw-table { border: 1px solid var(--color-border-default); border-radius: 10px; overflow: hidden; }
+.kw-row { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 10px; align-items: start; padding: 7px 10px; border-top: 1px solid var(--color-border-muted); }
+.kw-head { border-top: 0; background: var(--color-canvas-subtle); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-fg-muted); }
+.kw-row-bad { background: rgba(207,34,46,0.06); }
+.kw-num { font-size: 12px; color: var(--color-fg-muted); padding-top: 9px; text-align: right; }
+.kw-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.kw-cell .kw-input { flex: 1 1 200px; min-width: 0; padding: 6px 9px; font-size: 13.5px; }
+.kw-missing { color: #cf222e; font-size: 13px; font-weight: 600; padding-top: 8px; }
+.kw-found { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.kw-found-yes { background: rgba(26,127,55,0.1); color: #1a7f37; }
+.kw-found-no { background: rgba(207,34,46,0.1); color: #cf222e; }
+.kw-btns { display: inline-flex; gap: 3px; }
+.kw-btn { width: 24px; height: 24px; border: 1px solid var(--color-border-default); border-radius: 6px; background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
+.kw-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); }
+@media (max-width: 720px) { .kw-row { grid-template-columns: 26px 1fr; } .kw-row > .kw-cell:last-child { grid-column: 2; } }

@@ -111,9 +111,13 @@
                                 <label class="pub-label">Аннотация (ru)</label>
                                 <textarea name="abstract_ru" id="f_abstract_ru" class="pub-textarea" style="min-height:150px;">{{ (article.abstract_ru if article else '') or '' }}</textarea>
                             </div>
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Ключевые слова (ru) <span class="pub-hint">через запятую</span></label>
-                                <textarea name="keywords_ru" id="f_keywords_ru" class="pub-textarea" style="min-height:70px;">{{ (article.keywords_ru if article else '') or '' }}</textarea>
+                            <div class="pub-field pub-field-full" id="kwBox">
+                                <label class="pub-label">Ключевые слова: русские ↔ английские <span class="pub-hint">слова стоят парами по номеру; для eLibrary их должно быть поровну</span></label>
+                                <div class="kw-summary" id="kwSummary"></div>
+                                <div class="kw-table" id="kwTable"></div>
+                                <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="kwAddRow" style="margin-top:8px;">+ Добавить строку</button>
+                                <textarea name="keywords_ru" id="f_keywords_ru" style="display:none;">{{ (article.keywords_ru if article else '') or '' }}</textarea>
+                                <textarea name="keywords_en" id="f_keywords_en" style="display:none;">{{ (article.keywords_en if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Финансирование (ru)</label>
@@ -175,10 +179,6 @@
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Аннотация (en)</label>
                                 <textarea name="abstract_en" id="f_abstract_en" class="pub-textarea" style="min-height:150px;">{{ (article.abstract_en if article else '') or '' }}</textarea>
-                            </div>
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Ключевые слова (en) <span class="pub-hint">через запятую</span></label>
-                                <textarea name="keywords_en" id="f_keywords_en" class="pub-textarea" style="min-height:70px;">{{ (article.keywords_en if article else '') or '' }}</textarea>
                             </div>
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">Финансирование (en)</label>
@@ -309,6 +309,111 @@ function deleteArticle() {
     });
 })();
 
+// ---- Ключевые слова: таблица пар «русское ↔ английское» поверх двух скрытых полей ----
+(function() {
+    var taRu = document.getElementById('f_keywords_ru'), taEn = document.getElementById('f_keywords_en');
+    var table = document.getElementById('kwTable'), summary = document.getElementById('kwSummary');
+    if (!taRu || !taEn || !table) return;
+
+    // Запятая или «;» вне скобок и кавычек — разделитель (так же режет парсер на сервере).
+    function splitKw(line) {
+        var parts = [], depth = 0, cur = '';
+        for (var i = 0; i < (line || '').length; i++) {
+            var ch = line[i];
+            if ('([«'.indexOf(ch) !== -1) depth++;
+            else if (')]»'.indexOf(ch) !== -1) depth = Math.max(0, depth - 1);
+            if ((ch === ',' || ch === ';') && depth === 0) { parts.push(cur); cur = ''; } else cur += ch;
+        }
+        parts.push(cur);
+        return parts.map(function(p) { return p.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+    }
+    // Сколько раз слово встречается в тексте (по основам слов — «антенные решётки» найдётся в «антенных решёток»).
+    function occurrences(word, text) {
+        var stems = word.toLowerCase().replace(/\(.*?\)/g, ' ').split(/[^a-zа-яё0-9]+/i).filter(function(w) { return w.length > 1; })
+            .map(function(w) { return w.length > 4 ? w.slice(0, Math.max(4, w.length - 3)) : w; });
+        if (!stems.length) return 0;
+        var low = text.toLowerCase();
+        return Math.min.apply(null, stems.map(function(st) { return low.split(st).length - 1; }));
+    }
+    function context(lang) {
+        var get = function(id) { var e = document.getElementById(id); return e ? e.value : ''; };
+        return lang === 'ru' ? get('f_title_ru') + ' ' + get('f_abstract_ru') : get('f_title_en') + ' ' + get('f_abstract_en');
+    }
+
+    var ru = [], en = [];
+    function sync() {
+        taRu.value = ru.filter(Boolean).join(', ');      // пустое слово (только что вставленное «+») не сохраняется
+        taEn.value = en.filter(Boolean).join(', ');
+    }
+    function cell(lang, list, i) {
+        var td = document.createElement('div');
+        td.className = 'kw-cell' + (i >= list.length ? ' kw-missing' : '');
+        if (i >= list.length) {
+            td.textContent = '— нет пары —';
+            return td;
+        }
+        var input = document.createElement('input');
+        input.type = 'text'; input.className = 'pub-input kw-input'; input.value = list[i];
+        input.addEventListener('change', function() {
+            var v = splitKw(input.value);              // запятая в поле — это уже два слова
+            list.splice.apply(list, [i, 1].concat(v));
+            sync(); render();
+        });
+        td.appendChild(input);
+        input.placeholder = 'введите слово';
+        var n = list[i] ? occurrences(list[i], context(lang)) : 1;
+        var tag = document.createElement('span');
+        tag.className = 'kw-found ' + (n ? 'kw-found-yes' : 'kw-found-no');
+        tag.textContent = n ? 'в тексте ×' + n : 'нет в аннотации';
+        tag.title = 'Сколько раз слово встречается в заглавии и аннотации этой статьи';
+        td.appendChild(tag);
+        var btns = document.createElement('span');
+        btns.className = 'kw-btns';
+        [['↑', 'выше', function() { if (i > 0) { var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t; } }],
+         ['↓', 'ниже', function() { if (i < list.length - 1) { var t = list[i + 1]; list[i + 1] = list[i]; list[i] = t; } }],
+         ['✕', 'убрать слово (следующие поднимутся на место)', function() { list.splice(i, 1); }],
+         ['+', 'вставить пустое слово ниже', function() { list.splice(i + 1, 0, ''); }]].forEach(function(b) {
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'kw-btn'; btn.textContent = b[0]; btn.title = b[1];
+            btn.addEventListener('click', function() { b[2](); sync(); render(); });
+            btns.appendChild(btn);
+        });
+        td.appendChild(btns);
+        return td;
+    }
+    function render() {
+        table.innerHTML = '';
+        var head = document.createElement('div');
+        head.className = 'kw-row kw-head';
+        ['№', 'Русские', 'Английские'].forEach(function(t) { var d = document.createElement('div'); d.textContent = t; head.appendChild(d); });
+        table.appendChild(head);
+        var rows = Math.max(ru.length, en.length);
+        for (var i = 0; i < rows; i++) {
+            var row = document.createElement('div');
+            row.className = 'kw-row' + ((i >= ru.length || i >= en.length) ? ' kw-row-bad' : '');
+            var num = document.createElement('div'); num.className = 'kw-num'; num.textContent = i + 1;
+            row.appendChild(num);
+            row.appendChild(cell('ru', ru, i));
+            row.appendChild(cell('en', en, i));
+            table.appendChild(row);
+        }
+        var nRu = ru.filter(Boolean).length, nEn = en.filter(Boolean).length;
+        var same = nRu === nEn;
+        summary.className = 'kw-summary ' + (same ? 'kw-summary-ok' : 'kw-summary-bad');
+        summary.textContent = 'Русских: ' + nRu + ' · английских: ' + nEn + (same ? ' — поровну ✓' : ' — не поровну: ' +
+            (nRu > nEn ? 'в русском на ' + (nRu - nEn) + ' больше' : 'в английском на ' + (nEn - nRu) + ' больше') +
+            '. Уберите лишнее слово (✕) — следующие поднимутся и пары выровняются.');
+    }
+    window.kwReload = function() { ru = splitKw(taRu.value); en = splitKw(taEn.value); render(); };
+    document.getElementById('kwAddRow').addEventListener('click', function() {
+        ru.push('новое слово'); en.push('new word'); sync(); render();
+    });
+    ['f_abstract_ru', 'f_abstract_en', 'f_title_ru', 'f_title_en'].forEach(function(id) {
+        var e = document.getElementById(id); if (e) e.addEventListener('change', render);
+    });
+    window.kwReload();
+})();
+
 // ---- Автозаполнение по файлу ----
 (function() {
     var dropzone = document.getElementById('dropzone');
@@ -339,6 +444,7 @@ function deleteArticle() {
                 document.getElementById('f_fulltext_ru').value = p.fulltext_ru || '';
                 document.getElementById('f_keywords_ru').value = (p.keywords_ru || []).join(', ');
                 document.getElementById('f_keywords_en').value = (p.keywords_en || []).join(', ');
+                if (window.kwReload) window.kwReload();
                 document.getElementById('f_funding_ru').value = p.funding_ru || '';
                 document.getElementById('f_funding_en').value = p.funding_en || '';
                 document.getElementById('f_references_text').value = (p.references || []).join('\n');

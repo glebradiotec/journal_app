@@ -585,6 +585,21 @@ def test_exports_equalize_keywords_of_drafts_saved_before_the_fix(client, issue)
     assert "machine learning (ML)" in xml and ">ML<" not in xml
 
 
+def test_article_form_has_keyword_pair_table_and_still_saves_the_two_fields(client, issue):
+    art = PubArticle.query.one()
+    art.keywords_ru, art.keywords_en = "один, два", "one, two, three"
+    db.session.commit()
+    html = client.get(f"/admin/publish/article/{art.id}/edit").get_data(as_text=True)
+    assert 'id="kwBox"' in html and 'id="kwTable"' in html
+    assert html.count('name="keywords_ru"') == 1 and html.count('name="keywords_en"') == 1   # то, что уходит на сервер
+    assert "one, two, three" in html                                                           # таблица строится из них
+    r = client.post(f"/admin/publish/article/{art.id}/edit", data={
+        "title_ru": "Тест", "keywords_ru": "один, два (а, б)", "keywords_en": "one, two (a, b)", "pub_author_count": "0"})
+    assert r.status_code == 302
+    art = PubArticle.query.get(art.id)
+    assert art.keywords_ru_list == ["один", "два (а, б)"] and art.keywords_en_list == ["one", "two (a, b)"]
+
+
 def test_unknown_export_kind_is_404(client, issue):
     assert client.get(f"/admin/publish/issue/{issue.id}/export/other").status_code == 404
 
