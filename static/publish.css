@@ -313,12 +313,14 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 .kw-row-bad { background: rgba(207,34,46,0.06); }
 .kw-num { font-size: 12px; color: var(--color-fg-muted); padding-top: 9px; text-align: right; }
 .kw-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.kw-cell .kw-input { flex: 1 1 200px; min-width: 0; padding: 6px 9px; font-size: 13.5px; }
+.kw-cell { flex-wrap: nowrap; }
+.kw-cell .kw-input { flex: 1 1 0; min-width: 0; padding: 6px 9px; font-size: 13.5px; line-height: 1.35; resize: none; overflow: hidden; min-height: 0; }
 .kw-missing { color: #cf222e; font-size: 13px; font-weight: 600; padding-top: 8px; }
-.kw-found { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+.kw-found { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; flex: 0 0 82px; text-align: center; min-height: 15px; }
 .kw-found-yes { background: rgba(26,127,55,0.1); color: #1a7f37; }
 .kw-found-no { background: rgba(207,34,46,0.1); color: #cf222e; }
+.kw-found-part { background: rgba(154,103,0,0.12); color: #9a6700; }
 .kw-btns { display: inline-flex; gap: 3px; }
 .kw-btn { width: 24px; height: 24px; border: 1px solid var(--color-border-default); border-radius: 6px; background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
 .kw-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); }
-@media (max-width: 720px) { .kw-row { grid-template-columns: 26px 1fr; } .kw-row > .kw-cell:last-child { grid-column: 2; } }
+@media (max-width: 720px) { .kw-cell { flex-wrap: wrap; } .kw-row { grid-template-columns: 26px 1fr; } .kw-row > .kw-cell:last-child { grid-column: 2; } }

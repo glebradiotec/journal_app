@@ -327,13 +327,15 @@ function deleteArticle() {
         parts.push(cur);
         return parts.map(function(p) { return p.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
     }
-    // Сколько раз слово встречается в тексте (по основам слов — «антенные решётки» найдётся в «антенных решёток»).
+    // Есть ли слово в тексте — по основам слов («антенные решётки» найдётся в «антенных решёток»).
+    // -> {all: сколько раз встречается слово целиком (самая редкая из его основ), some: сколько основ найдено, of: сколько всего}.
     function occurrences(word, text) {
         var stems = word.toLowerCase().replace(/\(.*?\)/g, ' ').split(/[^a-zа-яё0-9]+/i).filter(function(w) { return w.length > 1; })
             .map(function(w) { return w.length > 4 ? w.slice(0, Math.max(4, w.length - 3)) : w; });
-        if (!stems.length) return 0;
         var low = text.toLowerCase();
-        return Math.min.apply(null, stems.map(function(st) { return low.split(st).length - 1; }));
+        var counts = stems.map(function(st) { return low.split(st).length - 1; });
+        return { all: counts.length ? Math.min.apply(null, counts) : 0,
+                 some: counts.filter(function(c) { return c > 0; }).length, of: counts.length };
     }
     function context(lang) {
         var get = function(id) { var e = document.getElementById(id); return e ? e.value : ''; };
@@ -345,6 +347,7 @@ function deleteArticle() {
         taRu.value = ru.filter(Boolean).join(', ');      // пустое слово (только что вставленное «+») не сохраняется
         taEn.value = en.filter(Boolean).join(', ');
     }
+    function fit(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
     function cell(lang, list, i) {
         var td = document.createElement('div');
         td.className = 'kw-cell' + (i >= list.length ? ' kw-missing' : '');
@@ -352,27 +355,35 @@ function deleteArticle() {
             td.textContent = '— нет пары —';
             return td;
         }
-        var input = document.createElement('input');
-        input.type = 'text'; input.className = 'pub-input kw-input'; input.value = list[i];
+        var input = document.createElement('textarea');
+        input.rows = 1; input.className = 'pub-input kw-input'; input.value = list[i];
+        input.placeholder = 'введите слово';
+        input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+        input.addEventListener('input', function() { fit(input); });
         input.addEventListener('change', function() {
             var v = splitKw(input.value);              // запятая в поле — это уже два слова
             list.splice.apply(list, [i, 1].concat(v));
             sync(); render();
         });
         td.appendChild(input);
-        input.placeholder = 'введите слово';
-        var n = list[i] ? occurrences(list[i], context(lang)) : 1;
+        setTimeout(function() { fit(input); }, 0);
         var tag = document.createElement('span');
-        tag.className = 'kw-found ' + (n ? 'kw-found-yes' : 'kw-found-no');
-        tag.textContent = n ? 'в тексте ×' + n : 'нет в аннотации';
-        tag.title = 'Сколько раз слово встречается в заглавии и аннотации этой статьи';
+        if (!list[i]) {
+            tag.className = 'kw-found';
+        } else {
+            var o = occurrences(list[i], context(lang));
+            if (o.all) { tag.className = 'kw-found kw-found-yes'; tag.textContent = 'в тексте ×' + o.all; }
+            else if (o.some) { tag.className = 'kw-found kw-found-part'; tag.textContent = 'частично'; }
+            else { tag.className = 'kw-found kw-found-no'; tag.textContent = 'нет в тексте'; }
+            tag.title = 'Заглавие и аннотация этой статьи: «×N» — слово встречается целиком, «частично» — найдена только часть слов';
+        }
         td.appendChild(tag);
         var btns = document.createElement('span');
         btns.className = 'kw-btns';
-        [['↑', 'выше', function() { if (i > 0) { var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t; } }],
-         ['↓', 'ниже', function() { if (i < list.length - 1) { var t = list[i + 1]; list[i + 1] = list[i]; list[i] = t; } }],
-         ['✕', 'убрать слово (следующие поднимутся на место)', function() { list.splice(i, 1); }],
-         ['+', 'вставить пустое слово ниже', function() { list.splice(i + 1, 0, ''); }]].forEach(function(b) {
+        [['↑', 'поменять местами с верхним', function() { if (i > 0) { var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t; } }],
+         ['↓', 'поменять местами с нижним', function() { if (i < list.length - 1) { var t = list[i + 1]; list[i + 1] = list[i]; list[i] = t; } }],
+         ['✕', 'убрать слово — следующие поднимутся на его место', function() { list.splice(i, 1); }],
+         ['+', 'вставить пропуск НАД этим словом — оно и следующие сдвинутся вниз; впишите в пропуск недостающее слово', function() { list.splice(i, 0, ''); }]].forEach(function(b) {
             var btn = document.createElement('button');
             btn.type = 'button'; btn.className = 'kw-btn'; btn.textContent = b[0]; btn.title = b[1];
             btn.addEventListener('click', function() { b[2](); sync(); render(); });
@@ -401,9 +412,13 @@ function deleteArticle() {
         var same = nRu === nEn;
         summary.className = 'kw-summary ' + (same ? 'kw-summary-ok' : 'kw-summary-bad');
         summary.textContent = 'Русских: ' + nRu + ' · английских: ' + nEn + (same ? ' — поровну ✓' : ' — не поровну: ' +
-            (nRu > nEn ? 'в русском на ' + (nRu - nEn) + ' больше' : 'в английском на ' + (nEn - nRu) + ' больше') +
-            '. Уберите лишнее слово (✕) — следующие поднимутся и пары выровняются.');
+            (nRu > nEn ? 'в русском на ' + (nRu - nEn) + ' больше. ' : 'в английском на ' + (nEn - nRu) + ' больше. ') +
+            'Найдите строку, с которой пары сбились: если слова не хватает — нажмите «+» (вставится пропуск выше) и впишите его; ' +
+            'если слово лишнее — «✕».');
+        requestAnimationFrame(function() { fitAll(); setTimeout(fitAll, 60); });   // высота — когда строки уже в разметке
     }
+    function fitAll() { table.querySelectorAll('textarea').forEach(fit); }
+    window.addEventListener('resize', fitAll);
     window.kwReload = function() { ru = splitKw(taRu.value); en = splitKw(taEn.value); render(); };
     document.getElementById('kwAddRow').addEventListener('click', function() {
         ru.push('новое слово'); en.push('new word'); sync(); render();
