@@ -83,6 +83,25 @@ def test_headings_typed_without_spaces_are_still_found():
     assert len(result["references"]) == len(result["references_en"]) == 2
 
 
+def test_keywords_are_split_outside_brackets_by_comma_or_semicolon():
+    """«(EGP, IGP)» — одно слово; в английской строке авторы нередко ставят «;» вместо «,»."""
+    assert P._split_keywords("протоколы маршрутизации (EGP, IGP), гибкий алгоритм, «а, б», x") == [
+        "протоколы маршрутизации (EGP, IGP)", "гибкий алгоритм", "«а, б»", "x"]
+    assert P._split_keywords("Flexible methods; Information system; space apparatuses, transponder; UAVs (a; b)") == [
+        "Flexible methods", "Information system", "space apparatuses", "transponder", "UAVs (a; b)"]
+    assert P._split_keywords("  один,  два  слова ,, ") == ["один", "два слова"]
+
+
+def test_parsed_keywords_use_that_splitting():
+    text = HEADER.format(**DEFAULTS)
+    assert "слово один, слово два" in text
+    text = text.replace("слово один, слово два", "протоколы маршрутизации (EGP, IGP), гибкий алгоритм")
+    text = text.replace("word one, word two", "routing protocols (EGP, IGP); flexible algorithm, agile")
+    result, _ = P.parse_article_text(text)
+    assert result["keywords_ru"] == ["протоколы маршрутизации (EGP, IGP)", "гибкий алгоритм"]
+    assert result["keywords_en"] == ["routing protocols (EGP, IGP)", "flexible algorithm", "agile"]
+
+
 def test_author_with_single_initial_is_kept():
     result, _ = parse(authors="Б. Балбашио1, А.А. Скрылев2", authors_en="B. Balbashio1, A.A. Skrylev2",
                       citation="Балбашио Б., Скрылев А.А.")

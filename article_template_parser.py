@@ -76,6 +76,25 @@ def _canon_heading(line):
     return line
 
 
+def _split_keywords(line):
+    """«a, b (c, d); e» -> ['a', 'b (c, d)', 'e']. Разделитель — запятая или точка с запятой ВНЕ скобок и кавычек
+    «…»: запятая внутри скобок («протоколы маршрутизации (EGP, IGP)») — часть самого слова, а в английской строке
+    авторы нередко ставят «;» вместо «,»."""
+    parts, depth, cur = [], 0, []
+    for ch in line:
+        if ch in "([«":
+            depth += 1
+        elif ch in ")]»":
+            depth = max(0, depth - 1)
+        if ch in ",;" and depth == 0:
+            parts.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    parts.append("".join(cur))
+    return [re.sub(r"\s+", " ", p).strip() for p in parts if p.strip()]
+
+
 def _lines(text):
     return [_canon_heading(l.strip().translate(_SUPERSCRIPT_DIGITS)) for l in text.split("\n")]
 
@@ -728,7 +747,7 @@ def parse_article_text(text):
         # _slice_text считает его продолжением последнего ключевого слова.
         kw_lines = [l for l in lines[i_keywords_h + 1:i_citation_h] if l.strip()]
         if kw_lines:
-            result["keywords_ru"] = [k.strip() for k in kw_lines[0].split(",") if k.strip()]
+            result["keywords_ru"] = _split_keywords(kw_lines[0])
             result["funding_ru"] = " ".join(kw_lines[1:]).strip()
 
     i_intro = _find_eq(lines, "Введение", i_citation_h or 0) if i_citation_h is not None else None
@@ -830,7 +849,7 @@ def parse_article_text(text):
             # См. комментарий у русского блока ключевых слов выше — та же логика.
             kw_lines_en = [l for l in lines[i_keywords_en_h + 1:i_forcit_h] if l.strip()]
             if kw_lines_en:
-                result["keywords_en"] = [k.strip() for k in kw_lines_en[0].split(",") if k.strip()]
+                result["keywords_en"] = _split_keywords(kw_lines_en[0])
                 result["funding_en"] = " ".join(kw_lines_en[1:]).strip()
 
         if i_forcit_h is not None:
