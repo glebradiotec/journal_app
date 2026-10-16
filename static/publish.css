@@ -310,12 +310,12 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 .kw-table { border: 1px solid var(--color-border-default); border-radius: 10px; overflow: hidden; }
 .kw-row { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 10px; align-items: start; padding: 7px 10px; border-top: 1px solid var(--color-border-muted); }
 .kw-head { border-top: 0; background: var(--color-canvas-subtle); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-fg-muted); }
-.kw-row-bad { background: rgba(207,34,46,0.06); }
+.kw-row-bad { background: rgba(154,103,0,0.07); }
 .kw-num { font-size: 12px; color: var(--color-fg-muted); padding-top: 9px; text-align: right; }
 .kw-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .kw-cell { flex-wrap: nowrap; }
 .kw-cell .kw-input { flex: 1 1 0; min-width: 0; padding: 6px 9px; font-size: 13.5px; line-height: 1.35; resize: none; overflow: hidden; min-height: 0; }
-.kw-missing { color: #cf222e; font-size: 13px; font-weight: 600; padding-top: 8px; }
+.kw-missing { color: #9a6700; font-size: 13px; font-weight: 600; padding-top: 8px; }
 .kw-found { font-size: 11px; padding: 1px 7px; border-radius: 999px; white-space: nowrap; flex: 0 0 82px; text-align: center; min-height: 15px; }
 .kw-found-yes { background: rgba(26,127,55,0.1); color: #1a7f37; }
 .kw-found-no { background: rgba(207,34,46,0.1); color: #cf222e; }
@@ -324,3 +324,4 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 .kw-btn { width: 24px; height: 24px; border: 1px solid var(--color-border-default); border-radius: 6px; background: var(--color-canvas-default); color: var(--color-fg-muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
 .kw-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); }
 @media (max-width: 720px) { .kw-cell { flex-wrap: wrap; } .kw-row { grid-template-columns: 26px 1fr; } .kw-row > .kw-cell:last-child { grid-column: 2; } }
+.kw-num-ok { color: #1a7f37; font-weight: 700; }
