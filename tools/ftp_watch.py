@@ -1,0 +1,456 @@
+#!/usr/bin/env python3
+"""Слежение за папкой на FTP: не появились ли новые номера журналов. Сводка — в Telegram.
+
+  setup           спрашивает хост, логин, пароль ЗДЕСЬ, в терминале; проверяет подключение и показывает папки;
+                  записывает FTP_* в .env (старый .env сохраняется). Пароль не печатается и никуда не уходит, кроме FTP и .env.
+  ls [глубина]    ТОЛЬКО ЧТЕНИЕ: дерево папок на FTP (по умолчанию 2 уровня).
+  check [--dry]   проверка папки; сравнение с прошлым разом; сводка в Telegram. С --dry — только показать на экране,
+                  ничего не отправлять и не запоминать.
+  install         ставит расписание (systemd-таймер): 10:00 и 14:00 по Москве. Нужны права root.
+
+Папка на FTP — только чтение: утилита ничего не загружает, не удаляет и не переименовывает.
+Запуск на сервере:  cd /var/www/journal_app && venv/bin/python3 tools/ftp_watch.py setup
+"""
+import ftplib
+import getpass
+import html
+import json
+import os
+import re
+import shutil
+import ssl
+import sys
+from collections import defaultdict
+from datetime import datetime
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+ENV_PATH = os.path.join(ROOT, ".env")
+SNAPSHOT_PATH = os.path.join(ROOT, "instance", "ftp_snapshot.json")
+MAX_DEPTH = 5
+TELEGRAM_LIMIT = 3800
+
+_MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+
+
+# ---------------------------------------------------------------- настройки
+
+def config(env=None):
+    """Настройки из окружения (.env подгружает вызывающий). -> dict или None, если FTP не настроен."""
+    env = os.environ if env is None else env
+    host = (env.get("FTP_HOST") or "").strip()
+    if not host:
+        return None
+    return {
+        "host": host, "port": int(env.get("FTP_PORT") or 21), "user": env.get("FTP_USER") or "anonymous",
+        "password": env.get("FTP_PASSWORD") or "", "tls": (env.get("FTP_TLS") or "auto").lower(),
+        "root": (env.get("FTP_ROOT") or "/").strip() or "/", "encoding": env.get("FTP_ENCODING") or "utf-8",
+    }
+
+
+def env_quote(value):
+    """Значение для .env в двойных кавычках: пароли с #, пробелами и кавычками иначе ломают файл."""
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def write_env(path, updates):
+    """Дописывает/заменяет переменные в .env, остальное не трогает."""
+    current = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    keys = tuple(updates)
+    lines = [l for l in current.splitlines() if not any(l.startswith(k + "=") for k in keys)]
+    lines += [f"{k}={env_quote(v)}" for k, v in updates.items()]
+    open(path, "w", encoding="utf-8").write("\n".join(lines).rstrip("\n") + "\n")
+
+
+# ---------------------------------------------------------------- FTP
+
+def connect(cfg):
+    """Подключение. tls=auto: сначала шифрованное (FTPS), если сервер не умеет — обычное с предупреждением.
+    -> (ftp, 'FTPS'|'FTP')."""
+    last = None
+    if cfg["tls"] in ("auto", "yes", "on", "true", "1"):
+        try:
+            ftp = ftplib.FTP_TLS(timeout=30, context=ssl._create_unverified_context())
+            ftp.encoding = cfg["encoding"]
+            ftp.connect(cfg["host"], cfg["port"])
+            ftp.auth()
+            ftp.login(cfg["user"], cfg["password"])
+            ftp.prot_p()
+            return ftp, "FTPS"
+        except (ftplib.all_errors, ssl.SSLError, OSError) as e:
+            last = e
+            if cfg["tls"] != "auto":
+                raise
+    ftp = ftplib.FTP(timeout=30)
+    ftp.encoding = cfg["encoding"]
+    ftp.connect(cfg["host"], cfg["port"])
+    ftp.login(cfg["user"], cfg["password"])
+    return ftp, "FTP"
+
+
+_UNIX = re.compile(r"^(?P<perm>[-dlbcps][rwxsStT-]{9})\s+\d+\s+\S+\s+\S+\s+(?P<size>\d+)\s+"
+                   r"(?P<mon>[A-Za-z]{3})\s+(?P<day>\d{1,2})\s+(?P<year_time>\d{4}|\d{1,2}:\d{2})\s+(?P<name>.+)$")
+_DOS = re.compile(r"^(?P<date>\d{2}-\d{2}-\d{2,4})\s+(?P<time>\d{1,2}:\d{2}(?:AM|PM)?)\s+(?P<size><DIR>|\d+)\s+(?P<name>.+)$", re.I)
+
+
+def parse_list_line(line, now=None):
+    """Строка ответа LIST (unix- или DOS-формат) -> dict(name, is_dir, size, mtime 'YYYYMMDDHHMMSS') или None."""
+    now = now or datetime.now()
+    m = _UNIX.match(line.strip())
+    if m:
+        name = m["name"].split(" -> ")[0]
+        mon, day = _MONTHS.get(m["mon"].lower(), 1), int(m["day"])
+        yt = m["year_time"]
+        if ":" in yt:
+            hh, mm = map(int, yt.split(":"))
+            year = now.year - (1 if (mon, day) > (now.month, now.day) else 0)
+        else:
+            year, hh, mm = int(yt), 0, 0
+        return {"name": name, "is_dir": m["perm"][0] == "d", "size": int(m["size"]),
+                "mtime": f"{year:04d}{mon:02d}{day:02d}{hh:02d}{mm:02d}00"}
+    m = _DOS.match(line.strip())
+    if m:
+        mo, d, y = m["date"].split("-")
+        y = int(y) + (2000 if int(y) < 70 else 1900) if len(y) == 2 else int(y)
+        t = m["time"].upper()
+        hh, mm = map(int, re.sub(r"[AP]M", "", t).split(":"))
+        if t.endswith("PM") and hh < 12:
+            hh += 12
+        if t.endswith("AM") and hh == 12:
+            hh = 0
+        return {"name": m["name"], "is_dir": m["size"] == "<DIR>", "size": 0 if m["size"] == "<DIR>" else int(m["size"]),
+                "mtime": f"{y:04d}{int(mo):02d}{int(d):02d}{hh:02d}{mm:02d}00"}
+    return None
+
+
+def list_dir(ftp, path):
+    """Содержимое папки: MLSD, а если сервер её не знает — LIST. -> [dict(name, is_dir, size, mtime)]."""
+    out = []
+    try:
+        for name, facts in ftp.mlsd(path, facts=["type", "size", "modify"]):
+            kind = (facts.get("type") or "").lower()
+            if kind in ("cdir", "pdir") or name in (".", ".."):
+                continue
+            out.append({"name": name, "is_dir": kind == "dir", "size": int(facts.get("size") or 0),
+                        "mtime": (facts.get("modify") or "")[:14]})
+        return out
+    except ftplib.error_perm:
+        pass                                           # 500/502: MLSD не поддерживается
+    lines = []
+    ftp.cwd(path)
+    ftp.retrlines("LIST", lines.append)
+    for line in lines:
+        e = parse_list_line(line)
+        if e and e["name"] not in (".", ".."):
+            out.append(e)
+    return out
+
+
+def scan(ftp, root, max_depth=MAX_DEPTH):
+    """Обход папки в ширину. -> {'files': {путь_от_корня: [размер, mtime]}, 'dirs': [путь, …]}."""
+    files, dirs = {}, []
+    queue = [("", 0)]
+    while queue:
+        rel, depth = queue.pop(0)
+        full = root.rstrip("/") + ("/" + rel if rel else "")
+        for e in sorted(list_dir(ftp, full or "/"), key=lambda x: x["name"]):
+            p = f"{rel}/{e['name']}" if rel else e["name"]
+            if e["is_dir"]:
+                dirs.append(p)
+                if depth + 1 < max_depth:
+                    queue.append((p, depth + 1))
+            else:
+                files[p] = [e["size"], e["mtime"]]
+    return {"files": files, "dirs": sorted(dirs)}
+
+
+# ---------------------------------------------------------------- сравнение и сводка
+
+def diff(old, new):
+    """Что изменилось с прошлой проверки: новые, изменённые, пропавшие файлы (пути)."""
+    of, nf = (old or {}).get("files", {}), new["files"]
+    added = sorted(p for p in nf if p not in of)
+    changed = sorted(p for p in nf if p in of and nf[p] != of[p])
+    removed = sorted(p for p in of if p not in nf)
+    return {"added": added, "changed": changed, "removed": removed}
+
+
+def _group(path):
+    """Журнал / выпуск по пути: «Радиотехника/8/DOC/a.doc» -> («Радиотехника», «8»)."""
+    parts = path.split("/")
+    return (parts[0], parts[1] if len(parts) > 2 else "")
+
+
+def _kinds(paths):
+    c = defaultdict(int)
+    for p in paths:
+        ext = p.rsplit(".", 1)[-1].lower() if "." in p.rsplit("/", 1)[-1] else "без расширения"
+        c["doc" if ext in ("doc", "docx", "rtf") else ext] += 1
+    return ", ".join(f"{k} {v}" for k, v in sorted(c.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _num_key(s):
+    m = re.match(r"\d+", s or "")
+    return (0, int(m.group(0)), s) if m else (1, 0, s or "")
+
+
+def latest_per_journal(snapshot):
+    """Для каждого журнала: самый большой номер выпуска (по имени папки) и время последнего файла в нём."""
+    best = {}
+    for path, (size, mtime) in snapshot["files"].items():
+        journal, issue = _group(path)
+        if not issue:
+            continue
+        cur = best.get(journal)
+        key = _num_key(issue)
+        if cur is None or key > cur[0]:
+            best[journal] = [key, issue, mtime]
+        elif key == cur[0] and mtime > cur[2]:
+            cur[2] = mtime
+    return {j: (v[1], v[2]) for j, v in best.items()}
+
+
+def _fmt_mtime(m):
+    try:
+        return datetime.strptime(m[:12], "%Y%m%d%H%M").strftime("%d.%m %H:%M")
+    except ValueError:
+        return "—"
+
+
+def build_summary(root_label, new_snap, old_snap, when=None):
+    """Текст сводки для Telegram (HTML). -> str."""
+    when = when or datetime.now()
+    esc = html.escape
+    head = f"📂 <b>FTP «{esc(root_label)}»</b> — сводка {when.strftime('%d.%m %H:%M')}"
+    nfiles, ndirs = len(new_snap["files"]), len(new_snap["dirs"])
+    lines = [head]
+    if old_snap is None:
+        lines.append(f"Первая проверка: слежение включено. В папке {nfiles} файлов, {ndirs} подпапок.")
+    else:
+        d = diff(old_snap, new_snap)
+        if not (d["added"] or d["changed"] or d["removed"]):
+            lines.append("Новых и изменённых файлов нет.")
+        else:
+            groups = defaultdict(lambda: {"added": [], "changed": [], "removed": []})
+            for kind in ("added", "changed", "removed"):
+                for p in d[kind]:
+                    groups[_group(p)][kind].append(p)
+            lines.append("Что нового с прошлой проверки:")
+            for (journal, issue), g in sorted(groups.items(), key=lambda kv: (kv[0][0], _num_key(kv[0][1]))):
+                title = f"{journal} / {issue}" if issue else journal
+                bits = []
+                if g["added"]:
+                    bits.append(f"+{len(g['added'])} новых ({_kinds(g['added'])})")
+                if g["changed"]:
+                    bits.append(f"изменено {len(g['changed'])}")
+                if g["removed"]:
+                    bits.append(f"удалено {len(g['removed'])}")
+                lines.append(f"• <b>{esc(title)}</b>: " + "; ".join(bits))
+    latest = latest_per_journal(new_snap)
+    if latest:
+        lines.append("")
+        lines.append("Последний выпуск по журналам (по папкам):")
+        for journal, (issue, mtime) in sorted(latest.items()):
+            lines.append(f"  {esc(journal)} — №{esc(issue)} ({_fmt_mtime(mtime)})")
+    text = "\n".join(lines)
+    if len(text) > TELEGRAM_LIMIT:
+        text = text[:TELEGRAM_LIMIT].rsplit("\n", 1)[0] + "\n… (сводка обрезана)"
+    return text
+
+
+# ---------------------------------------------------------------- Telegram, снимок
+
+def send_telegram(text, env=None):
+    """Отправка в Telegram токеном и чатом приложения (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID). -> (ok, пояснение)."""
+    import requests
+    env = os.environ if env is None else env
+    token, chat = env.get("TELEGRAM_BOT_TOKEN", ""), env.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat:
+        return False, "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в .env"
+    try:
+        r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                          data={"chat_id": chat, "text": text, "parse_mode": "HTML", "disable_web_page_preview": "true"},
+                          timeout=20)
+    except requests.RequestException as e:
+        return False, f"не удалось связаться с Telegram: {type(e).__name__}"      # текст ошибки может содержать токен
+    if r.status_code != 200:
+        return False, f"Telegram ответил {r.status_code}: {r.text[:150].replace(token, '***')}"
+    return True, ""
+
+
+def load_snapshot(path=SNAPSHOT_PATH):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def save_snapshot(snap, path=SNAPSHOT_PATH):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(snap, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+# ---------------------------------------------------------------- команды
+
+def _load_env():
+    from dotenv import load_dotenv
+    load_dotenv(ENV_PATH)
+
+
+def run_check(dry=False, cfg=None, ftp_factory=None, snapshot_path=SNAPSHOT_PATH, send=send_telegram, now=None):
+    """Одна проверка. -> (код выхода, текст сводки)."""
+    cfg = cfg or config()
+    if not cfg:
+        return 2, "FTP не настроен: выполните «tools/ftp_watch.py setup»."
+    ftp, mode = (ftp_factory or connect)(cfg)
+    try:
+        new = scan(ftp, cfg["root"])
+    finally:
+        try:
+            ftp.quit()
+        except Exception:  # noqa: BLE001
+            pass
+    new["checked_at"] = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
+    new["mode"] = mode
+    old = load_snapshot(snapshot_path)
+    text = build_summary(cfg["root"].strip("/") or "/", new, old, when=now)
+    if dry:
+        return 0, text
+    ok, why = send(text)
+    if not ok:
+        # не запоминаем снимок: иначе новое «потеряется» — в следующий раз оно снова попадёт в сводку
+        return 1, text + f"\n\n[Telegram: {why}]"
+    save_snapshot(new, snapshot_path)
+    return 0, text
+
+
+def cmd_check(args):
+    _load_env()
+    code, text = run_check(dry="--dry" in args)
+    print(re.sub(r"</?b>", "", html.unescape(text)))
+    return code
+
+
+def cmd_ls(args):
+    _load_env()
+    cfg = config()
+    if not cfg:
+        print("FTP не настроен.")
+        return 2
+    depth = int(args[0]) if args else 2
+    ftp, mode = connect(cfg)
+    print(f"Подключено ({mode}), папка: {cfg['root']}")
+    snap = scan(ftp, cfg["root"], max_depth=depth)
+    ftp.quit()
+    for d in snap["dirs"]:
+        n = sum(1 for p in snap["files"] if p.startswith(d + "/"))
+        print(f"  {d}/" + (f"   [{n} файлов]" if n else ""))
+    for p in sorted(p for p in snap["files"] if "/" not in p):
+        print(f"  {p}")
+    print(f"\nВсего: {len(snap['files'])} файлов на глубине до {depth}, {len(snap['dirs'])} папок.")
+    return 0
+
+
+def cmd_setup(args):
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from site_connect import fix_env_permissions
+    current = open(ENV_PATH, encoding="utf-8").read() if os.path.exists(ENV_PATH) else ""
+    if re.search(r"^FTP_HOST=", current, re.M) and input("FTP уже настроен. Заменить? [y/N] ").strip().lower() != "y":
+        print("Ничего не изменено.")
+        return 1
+    print("Подключение к FTP. Пароль при вводе не показывается.")
+    host = input("Адрес FTP (например 109.197.26.84): ").strip().replace("ftp://", "").strip("/")
+    port = input("Порт [21]: ").strip() or "21"
+    user = input("Логин: ").strip()
+    password = getpass.getpass("Пароль: ")
+    if not (host and user and password):
+        print("Нужны адрес, логин и пароль. Ничего не изменено.")
+        return 1
+    cfg = {"host": host, "port": int(port), "user": user, "password": password, "tls": "auto", "root": "/", "encoding": "utf-8"}
+    print("\nПроверяю подключение…")
+    try:
+        ftp, mode = connect(cfg)
+        top = [e for e in list_dir(ftp, "/")]
+        ftp.quit()
+    except Exception as e:  # noqa: BLE001
+        print("Подключиться не удалось:", str(e).replace(password, "***")[:300])
+        print("Ничего не изменено: .env не тронут.")
+        return 1
+    print(f"Подключено. Режим: {mode}" + (" (шифрованное соединение)" if mode == "FTPS" else
+          " — ВНИМАНИЕ: сервер не поддерживает шифрование, пароль и файлы идут открытым текстом"))
+    print("В корне FTP:")
+    for e in top:
+        print(f"   {'папка' if e['is_dir'] else 'файл '}  {e['name']}")
+    root = input("\nКакую папку отслеживать (например «журналы текущие»; Enter — корень): ").strip()
+    root = "/" + root.strip("/") if root else "/"
+    if root != "/":
+        try:
+            ftp, _ = connect(cfg)
+            n = len(list_dir(ftp, root))
+            ftp.quit()
+        except Exception as e:  # noqa: BLE001
+            print(f"Папка «{root}» не открывается: {str(e).replace(password, '***')[:200]}")
+            return 1
+        print(f"Папка найдена, в ней {n} элементов.")
+    if input("\nЗаписать в .env? [y/N] ").strip().lower() != "y":
+        print("Ничего не изменено.")
+        return 1
+    if os.path.exists(ENV_PATH):
+        shutil.copy2(ENV_PATH, ENV_PATH + ".bak_before_ftp")
+    write_env(ENV_PATH, {"FTP_HOST": host, "FTP_PORT": port, "FTP_USER": user, "FTP_PASSWORD": password,
+                         "FTP_TLS": "auto", "FTP_ROOT": root, "FTP_ENCODING": "utf-8"})
+    ok, why = fix_env_permissions(ENV_PATH)
+    if not ok:
+        print("ВНИМАНИЕ:", why)
+        shutil.copy2(ENV_PATH + ".bak_before_ftp", ENV_PATH)
+        print("Прежний .env возвращён, ничего не применено.")
+        return 1
+    print("Записано в .env (копия прежнего — .env.bak_before_ftp). Приложение перезагружать не нужно.")
+    print("Дальше: «ftp_watch.py ls» — посмотреть структуру, «ftp_watch.py check --dry» — пробная сводка.")
+    return 0
+
+
+UNIT_SERVICE = """[Unit]
+Description=Слежение за папкой на FTP (сводка в Telegram)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+WorkingDirectory={root}
+ExecStart={root}/venv/bin/python3 {root}/tools/ftp_watch.py check
+"""
+UNIT_TIMER = """[Unit]
+Description=Слежение за FTP: 10:00 и 14:00 по Москве
+
+[Timer]
+OnCalendar=*-*-* 10,14:00:00 Europe/Moscow
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"""
+
+
+def cmd_install(args):
+    import subprocess
+    if os.geteuid() != 0:
+        print("Нужны права root.")
+        return 1
+    for name, body in (("ftp-watch.service", UNIT_SERVICE.format(root=ROOT)), ("ftp-watch.timer", UNIT_TIMER)):
+        with open(f"/etc/systemd/system/{name}", "w", encoding="utf-8") as f:
+            f.write(body)
+    subprocess.run(["systemctl", "daemon-reload"], check=True)
+    subprocess.run(["systemctl", "enable", "--now", "ftp-watch.timer"], check=True)
+    print(subprocess.run(["systemctl", "list-timers", "ftp-watch.timer", "--no-pager"], capture_output=True, text=True).stdout)
+    return 0
+
+
+if __name__ == "__main__":
+    cmd, rest = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
+    handler = {"setup": cmd_setup, "ls": cmd_ls, "check": cmd_check, "install": cmd_install}.get(cmd)
+    sys.exit(handler(rest) if handler else (print(__doc__) or 2))
