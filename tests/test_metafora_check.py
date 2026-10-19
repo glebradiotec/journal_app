@@ -40,5 +40,5 @@ def test_unnumbered_list_with_extra_tail_warns():
 def test_pdf_numbering_does_not_count_the_tail_of_a_split_url_as_a_reference():
     """В печатном PDF вёрстка разорвала адрес и дала хвосту свой номер («6. _Rate (дата обращения…)») — это не ссылка."""
     seg = "1. \nПервая. 2021.\n2. \nВторая. 2022.\n3. \nURL: https://x.net/Resp\n4. \n_Rate (дата обращения: 16.07.2025).\n5. \nПятая. 2023.\n"
-    assert metafora_check._numbered(seg) == 4
-    assert metafora_check._numbered("1. A\n2. B\n3. C\n") == 3 and metafora_check._numbered(None) is None
+    assert mc._numbered(seg) == 4
+    assert mc._numbered("1. A\n2. B\n3. C\n") == 3 and mc._numbered(None) is None
