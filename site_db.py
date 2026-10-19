@@ -230,3 +230,40 @@ def rollback_push(conn, record):
     created_sections = [x["id"] for x in record.get("sections") or [] if x.get("created")]
     removed = delete_created(conn, record.get("nomera_id"), record.get("nomera_created"), created_sections)
     return deleted, skipped, removed
+
+
+# ---------------------------------------------------------------- порядок статей на сайте
+
+REORDER_TEMP_BASE = 60000   # art_id на сайте — smallint unsigned (до 65535); выше любого занятого номера
+
+
+def reorder_plan(articles):
+    """Сайт выводит статьи выпуска по art_id. Номера, которые выпуск уже занимает, раздаются заново по порядку статей
+    выпуска (по первой странице). -> [(статья, номер сейчас, номер должен быть)] только для тех, у кого номер меняется."""
+    mine = [a for a in articles if a.site_art_id]
+    ids = sorted(a.site_art_id for a in mine)
+    return [(a, a.site_art_id, new) for a, new in zip(mine, ids) if a.site_art_id != new]
+
+
+def reorder_apply(conn, articles):
+    """Переставляет номера на сайте по reorder_plan. Перед записью проверяет, что под каждым номером лежит статья с тем же
+    DOI, что в черновике, — иначе не пишет ничего и возвращает текст причины. -> (число переставленных, причина отказа)."""
+    moves = reorder_plan(articles)
+    if not moves:
+        return 0, ""
+    for a in articles:
+        if not a.site_art_id:
+            continue
+        got = conn.execute(text("SELECT doi FROM articles WHERE art_id = :i"), {"i": a.site_art_id}).scalar()
+        if not (got or "").endswith(a.doi or "\0"):
+            return 0, f"на сайте под номером {a.site_art_id} лежит не та статья ({got}), ожидалась {a.doi}"
+    if conn.execute(text("SELECT COUNT(*) FROM articles WHERE art_id >= :b"), {"b": REORDER_TEMP_BASE}).scalar():
+        return 0, "временные номера на сайте заняты"
+    # В два шага через временные номера: два соседних номера нельзя поменять местами напрямую.
+    for k, (_a, old, _new) in enumerate(moves):
+        conn.execute(text("UPDATE articles SET art_id = :t WHERE art_id = :o"), {"t": REORDER_TEMP_BASE + k, "o": old})
+    for k, (_a, _old, new) in enumerate(moves):
+        conn.execute(text("UPDATE articles SET art_id = :n WHERE art_id = :t"), {"n": new, "t": REORDER_TEMP_BASE + k})
+    for a, _old, new in moves:
+        a.site_art_id = new
+    return len(moves), ""

@@ -254,6 +254,23 @@ def _site_fields(art, issue, doi, journal_row, razd_id=0, limits=None):
     return fields, notes
 
 
+def site_push_record_sync_ids(issue):
+    """После перестановки номеров на сайте: в записи для отката (instance/publish_exports/<id>_site_push.json) у статей
+    ставятся их новые art_id — откат ищет статьи по номеру и DOI."""
+    path = os.path.join(PUB_EXPORTS_FOLDER, f'{int(issue.id)}_site_push.json')
+    try:
+        with open(path, encoding='utf-8') as f:
+            record = json.load(f)
+        by_doi = {a.doi: a.site_art_id for a in issue.articles if a.site_art_id}
+        for x in record.get('articles') or []:
+            x['art_id'] = by_doi.get(x['doi'], x['art_id'])
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(record, f, ensure_ascii=False, indent=1)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def register_publish_routes(app):
     register_publish_hub_routes(app)
 
@@ -498,6 +515,31 @@ def register_publish_routes(app):
         db.session.commit()
         flash('Статья удалена из черновика.', 'success')
         return redirect(url_for('admin_publish_issue_detail', issue_id=issue_id))
+
+    @app.route('/admin/publish/issue/<int:issue_id>/site-reorder', methods=['POST'])
+    @admin_required
+    def admin_publish_issue_site_reorder(issue_id):
+        """Ставит статьи выпуска на сайте в порядок страниц (сайт выводит их по art_id, а дописанные позже получили большие
+        номера). Раздаёт заново номера, которые выпуск уже занимает; чужие номера и сами статьи не трогаются."""
+        issue = PubIssue.query.get_or_404(issue_id)
+        back = redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        if not issue.is_pushed:
+            flash('Выпуск не записан на сайт — переставлять нечего.', 'error')
+            return back
+        try:
+            with site_db.get_engine().begin() as conn:
+                moved, why = site_db.reorder_apply(conn, issue.articles)
+        except Exception as e:
+            flash(f'Порядок на сайте не изменён: {e}', 'error')
+            return back
+        if why:
+            flash(f'Порядок на сайте не изменён: {why}.', 'error')
+            return back
+        db.session.commit()
+        site_push_record_sync_ids(issue)
+        flash(f'Статьи на сайте поставлены по порядку страниц (номеров переставлено: {moved}). '
+              'У этих статей изменились адреса страниц.' if moved else 'Порядок на сайте уже верный.', 'success')
+        return back
 
     def _site_push_record_path(issue_id):
         return os.path.join(PUB_EXPORTS_FOLDER, f'{int(issue_id)}_site_push.json')

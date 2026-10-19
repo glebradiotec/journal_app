@@ -116,6 +116,12 @@
                         {% if not stage.on_site %}<button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="siteCheckBtn">Проверить и записать…</button>
                         {% elif stage.site_pending %}<button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="siteCheckBtn">Дописать на сайт недостающие статьи ({{ stage.site_pending }})…</button>
                         {% endif %}
+                        {% if stage.on_site and is_admin and stage.site_misordered %}
+                        <form method="POST" action="{{ url_for('admin_publish_issue_site_reorder', issue_id=issue.id) }}" style="display:inline;"
+                              onsubmit="return confirm('Поставить статьи на сайте по порядку страниц? У {{ stage.site_misordered }} статей изменятся номера, а значит и адреса их страниц на сайте. Сами статьи не меняются и не удаляются.');">
+                            <button type="submit" class="pub-btn pub-btn-secondary pub-btn-sm" title="Статьи дописывали позже, и на сайте они идут не по порядку страниц">Поставить статьи на сайте по порядку страниц</button>
+                        </form>
+                        {% endif %}
                         {% if stage.on_site and is_admin %}
                         <form method="POST" action="{{ url_for('admin_publish_issue_site_rollback', issue_id=issue.id) }}" style="display:inline;"
                               onsubmit="return confirm('Отменить запись на сайт? Записанные статьи будут удалены из базы сайта, а созданные при записи пустые раздел и выпуск убраны.');">

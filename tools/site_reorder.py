@@ -12,7 +12,6 @@ art_id, которые выпуск УЖЕ занимает на сайте, и 
 пишет ничего. Запускать на сервере приложения из папки проекта.
 """
 import argparse
-import json
 import os
 import sys
 
@@ -20,21 +19,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import app as flask_app  # noqa: E402  (сначала app: он читает .env, потом остальное)
-from sqlalchemy import text  # noqa: E402
 
 import site_db  # noqa: E402
 from models import db  # noqa: E402
 from models_publish import PubIssue  # noqa: E402
-from routes_publish_hub import PUB_EXPORTS_FOLDER  # noqa: E402
-
-TEMP_BASE = 60000   # art_id на сайте — smallint unsigned (до 65535); выше любого занятого номера
-
-
-def plan(articles):
-    """[(статья, номер сейчас, номер должен быть)] — номера занимаемые выпуском раздаются по порядку статей в выпуске."""
-    mine = [a for a in articles if a.site_art_id]
-    ids = sorted(a.site_art_id for a in mine)
-    return [(a, a.site_art_id, new) for a, new in zip(mine, ids)]
+import routes_publish  # noqa: E402
 
 
 def main():
@@ -51,47 +40,26 @@ def main():
         if issue is None:
             print("Такого выпуска нет.")
             return 1
-        rows = plan(issue.articles)
-        moves = [(a, old, new) for a, old, new in rows if old != new]
-        print(f"{issue.journal_name} {issue.year} №{issue.number}: статей на сайте {len(rows)}")
-        for a, old, new in rows:
-            print(f"  {a.pages:>8}  {a.doi[-5:]}  art_id {old}" + (f" -> {new}" if old != new else ""))
+        mine = [x for x in issue.articles if x.site_art_id]
+        moves = {x.id: (old, new) for x, old, new in site_db.reorder_plan(issue.articles)}
+        print(f"{issue.journal_name} {issue.year} №{issue.number}: статей на сайте {len(mine)}")
+        for x in mine:
+            old, new = moves.get(x.id, (x.site_art_id, x.site_art_id))
+            print(f"  {x.pages:>8}  {x.doi[-5:]}  art_id {old}" + (f" -> {new}" if old != new else ""))
         if not moves:
             print("\nПорядок уже верный, менять нечего.")
             return 0
+        print(f"\nменяется номеров: {len(moves)} из {len(mine)}")
+        if not args.apply:
+            print("Чтобы записать: добавьте --apply")
+            return 0
         with site_db.get_engine().begin() as conn:
-            for a, old, _new in rows:
-                got = conn.execute(text("SELECT doi FROM articles WHERE art_id = :i"), {"i": old}).scalar()
-                if not (got or "").endswith(a.doi or "\0"):
-                    print(f"\nОСТАНОВЛЕНО: на сайте под номером {old} лежит не та статья ({got}), ожидалась {a.doi}. Ничего не записано.")
-                    return 1
-            busy = conn.execute(text("SELECT COUNT(*) FROM articles WHERE art_id >= :b"), {"b": TEMP_BASE}).scalar()
-            if busy:
-                print("\nОСТАНОВЛЕНО: временные номера заняты. Ничего не записано.")
-                return 1
-            print(f"\nменяется номеров: {len(moves)} из {len(rows)}")
-            if not args.apply:
-                print("Чтобы записать: добавьте --apply")
-                return 0
-            # В два шага через временные номера: два соседних номера нельзя поменять местами напрямую.
-            for k, (a, old, _new) in enumerate(moves):
-                conn.execute(text("UPDATE articles SET art_id = :t WHERE art_id = :o"), {"t": TEMP_BASE + k, "o": old})
-            for k, (a, _old, new) in enumerate(moves):
-                conn.execute(text("UPDATE articles SET art_id = :n WHERE art_id = :t"), {"n": new, "t": TEMP_BASE + k})
-        for a, _old, new in moves:
-            a.site_art_id = new
+            done, why = site_db.reorder_apply(conn, issue.articles)
+        if why:
+            print(f"\nОСТАНОВЛЕНО: {why}. Ничего не записано.")
+            return 1
         db.session.commit()
-        rec_path = os.path.join(PUB_EXPORTS_FOLDER, f"{issue.id}_site_push.json")
-        try:
-            with open(rec_path, encoding="utf-8") as f:
-                rec = json.load(f)
-            by_doi = {a.doi: a.site_art_id for a in issue.articles if a.site_art_id}
-            for x in rec.get("articles") or []:
-                x["art_id"] = by_doi.get(x["doi"], x["art_id"])
-            with open(rec_path, "w", encoding="utf-8") as f:
-                json.dump(rec, f, ensure_ascii=False, indent=1)
-        except (OSError, ValueError):
-            print("Внимание: запись для отката не обновлена (её нет или она не читается).")
+        routes_publish.site_push_record_sync_ids(issue)
         print("Готово: номера переставлены на сайте, в черновике и в записи для отката.")
     return 0
 

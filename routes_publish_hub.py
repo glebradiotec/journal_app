@@ -17,6 +17,7 @@ import export_metafora
 import metafora_api
 import metafora_check
 import publish_import
+import site_db
 from models import db
 from models_publish import PubIssue
 
@@ -113,6 +114,7 @@ def issue_stage(issue):
         'pdfs': len(publish_import.list_issue_pdfs(issue.id)),
         'on_site': issue.is_pushed,
         'site_pending': sum(1 for a in issue.articles if not a.is_pushed) if issue.is_pushed else 0,
+        'site_misordered': len(site_db.reorder_plan(issue.articles)) if issue.is_pushed else 0,
         'mf_sent': bool(state.get('file_uid')),
         'mf_processed': state.get('status_code') == 3,
         'mf_failed': state.get('status_code') == 4,

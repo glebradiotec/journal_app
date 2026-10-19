@@ -1069,6 +1069,47 @@ def test_reorder_tool_puts_late_added_article_in_page_order_only_with_apply(clie
     assert _count(engine, "articles") == 0
 
 
+def test_reorder_button_appears_only_when_order_is_wrong_and_fixes_it(client, issue, site):
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    page = lambda: client.get(f"/admin/publish/issue/{issue.id}").get_data(as_text=True)
+    assert "site-reorder" not in page()                                                # порядок верный — кнопки нет
+    late = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-01", pages="2-4"), None)
+    late.section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert "site-reorder" in page()                                                    # дописана позже — кнопка есть
+    client.post(f"/admin/publish/issue/{issue.id}/site-reorder")
+    from sqlalchemy import text
+    with engine.connect() as c:
+        assert [r[0] for r in c.execute(text("SELECT art_page FROM articles ORDER BY art_id"))] == ["2-4", "5-13"]
+    assert "site-reorder" not in page()
+    rec = json.load(open(hub.PUB_EXPORTS_FOLDER + f"/{issue.id}_site_push.json", encoding="utf-8"))
+    assert {x["art_id"] for x in rec["articles"]} == {a.site_art_id for a in PubArticle.query.all()}
+
+
+def test_reorder_is_admin_only(client, issue, site, staff):
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    late = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-01", pages="2-4"), None)
+    late.section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    from flask import g
+    g.pop("_login_user", None)                                                         # Flask-Login помнит пользователя в g
+    _login(client, staff)
+    client.post(f"/admin/publish/issue/{issue.id}/site-reorder")
+    from sqlalchemy import text
+    with engine.connect() as c:
+        assert [r[0] for r in c.execute(text("SELECT art_page FROM articles ORDER BY art_id"))] == ["5-13", "2-4"]
+
+
 def test_reorder_tool_stops_when_site_holds_a_different_article(client, issue, site, monkeypatch, capsys):
     import sys
     from sqlalchemy import text
