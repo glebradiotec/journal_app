@@ -240,6 +240,22 @@ def register_publish_hub_routes(app):
         except publish_import.ImportError_ as e:
             return _json_error(str(e))
 
+    @app.route('/admin/publish/issue/<int:issue_id>/pdf/remove', methods=['POST'])
+    @publish_required
+    def admin_publish_issue_pdf_remove(issue_id):
+        """Убирает из выпуска лишний PDF — тот, чей DOI не принадлежит ни одной статье (колонка редактора, реклама).
+        PDF статьи так не убрать: на него указывает DOI статьи. Ничего не отправленное не затрагивается."""
+        issue = PubIssue.query.get_or_404(issue_id)
+        name = metafora_check.nfc((request.get_json(silent=True) or {}).get('name') or '')
+        folder = publish_import.issue_pdf_dir(issue_id)
+        pdfs = metafora_check.load_pdfs(folder)
+        if name not in pdfs:
+            return _json_error('Такого PDF в выпуске нет.', 404)
+        if any(name in metafora_check.find_pdf(pdfs, a.doi) for a in issue.articles):
+            return _json_error('Это PDF статьи выпуска — убрать его нельзя.', 409)
+        os.remove(pdfs[name]['path'])
+        return jsonify({'removed': name})
+
     @app.route('/admin/publish/issue/<int:issue_id>/check')
     @publish_required
     def admin_publish_issue_check(issue_id):

@@ -432,6 +432,22 @@ def test_nothing_to_accept_without_mismatch(client, issue, pdf_mismatch):
     assert r.status_code == 409
 
 
+def test_orphan_pdf_can_be_removed_but_an_article_pdf_cannot(client, issue, monkeypatch, tmp_path):
+    folder = tmp_path / "pdf"
+    folder.mkdir()
+    (folder / "redaktor.pdf").write_bytes(b"x")
+    (folder / "article.pdf").write_bytes(b"x")
+    monkeypatch.setattr(publish_import, "issue_pdf_dir", lambda iid: str(folder))
+    monkeypatch.setattr(metafora_check, "load_pdfs", lambda f: {
+        k: {"path": str(folder / k), "p1": "", "all": "", "n": 1} for k in ("redaktor.pdf", "article.pdf")})
+    monkeypatch.setattr(metafora_check, "find_pdf", lambda pdfs, doi: ["article.pdf"])
+    r = client.post(f"/admin/publish/issue/{issue.id}/pdf/remove", json={"name": "article.pdf"})
+    assert r.status_code == 409 and (folder / "article.pdf").exists()
+    assert client.post(f"/admin/publish/issue/{issue.id}/pdf/remove", json={"name": "нет.pdf"}).status_code == 404
+    r = client.post(f"/admin/publish/issue/{issue.id}/pdf/remove", json={"name": "redaktor.pdf"})
+    assert r.status_code == 200 and not (folder / "redaktor.pdf").exists() and (folder / "article.pdf").exists()
+
+
 def test_remove_deletes_file_and_forgets_state(client, issue, mf):
     client.post(f"/admin/publish/issue/{issue.id}/metafora/start", json={})
     r = client.post(f"/admin/publish/issue/{issue.id}/metafora/remove")

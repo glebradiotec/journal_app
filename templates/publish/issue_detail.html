@@ -464,7 +464,21 @@
             });
             (d.problems || []).forEach(function(p) { box.appendChild(el('div', 'pub-warning-box', p)); });
             if (d.orphan_pdfs && d.orphan_pdfs.length) {
-                box.appendChild(el('div', 'pub-warning-box', 'Есть PDF статей, для которых в выпуске нет статьи: ' + d.orphan_pdfs.join(', ') + '. Возможно, статья не загружена.'));
+                var ob = el('div', 'pub-warning-box', 'Есть PDF, для которых в выпуске нет статьи (колонка редактора, реклама или статья не загружена):');
+                d.orphan_pdfs.forEach(function(name) {
+                    var line = el('div', null, name + ' '), rm = el('button', 'pub-btn pub-btn-ghost pub-btn-sm', 'Убрать этот PDF');
+                    rm.type = 'button';
+                    rm.addEventListener('click', function() {
+                        if (!confirm('Убрать «' + name + '» из выпуска? Это не статья выпуска; в Метафору и на сайт такой PDF не уходит.')) return;
+                        rm.disabled = true;
+                        api('POST', '/pdf/remove', { name: name }).then(function(r) {
+                            if (!r.ok) { rm.disabled = false; showToast(r.data.error || 'Не получилось', 'error'); return; }
+                            runCheck();
+                        });
+                    });
+                    line.appendChild(rm); ob.appendChild(line);
+                });
+                box.appendChild(ob);
             }
             checkOk = d.ok;
             var step = document.getElementById('stepCheck');
