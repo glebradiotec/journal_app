@@ -77,7 +77,7 @@ def connect(cfg):
             ftp.login(cfg["user"], cfg["password"])
             ftp.prot_p()
             return ftp, "FTPS"
-        except (ftplib.all_errors, ssl.SSLError, OSError) as e:
+        except ftplib.all_errors as e:        # плоский кортеж: вложенный в except не допускается (ssl.SSLError и так OSError)
             last = e
             if cfg["tls"] != "auto":
                 raise

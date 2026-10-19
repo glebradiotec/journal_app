@@ -124,6 +124,54 @@ def test_dry_run_neither_sends_nor_remembers(tmp_path):
     assert code == 0 and "Первая проверка" in text and not sent and not os.path.exists(snap)
 
 
+class _PlainFTP:
+    """Обычный FTP, который принимает вход; запоминает, чем и как подключались."""
+    instances = []
+
+    def __init__(self, *a, **k):
+        self.logged = None
+        _PlainFTP.instances.append(self)
+
+    def connect(self, host, port):
+        self.addr = (host, port)
+
+    def login(self, user, password):
+        self.logged = (user, password)
+
+
+class _TLSRefuses(_PlainFTP):
+    def auth(self):
+        raise ftplib.error_perm("500 AUTH not understood")      # сервер не умеет шифрование
+
+
+def test_connect_falls_back_to_plain_ftp_when_server_has_no_tls(monkeypatch):
+    """Ровно то, что случилось в setup: отказ в шифровании не должен ронять подключение."""
+    _PlainFTP.instances.clear()
+    monkeypatch.setattr(fw.ftplib, "FTP_TLS", _TLSRefuses)
+    monkeypatch.setattr(fw.ftplib, "FTP", _PlainFTP)
+    ftp, mode = fw.connect(dict(CFG, tls="auto"))
+    assert mode == "FTP" and ftp.logged == ("u", "p") and ftp.addr == ("h", 21)
+
+
+def test_connect_with_tls_required_refuses_instead_of_falling_back(monkeypatch):
+    monkeypatch.setattr(fw.ftplib, "FTP_TLS", _TLSRefuses)
+    monkeypatch.setattr(fw.ftplib, "FTP", _PlainFTP)
+    with pytest.raises(ftplib.error_perm):
+        fw.connect(dict(CFG, tls="yes"))
+
+
+def test_connect_uses_tls_when_the_server_supports_it(monkeypatch):
+    class _TLSOk(_PlainFTP):
+        def auth(self):
+            pass
+
+        def prot_p(self):
+            pass
+    monkeypatch.setattr(fw.ftplib, "FTP_TLS", _TLSOk)
+    _, mode = fw.connect(dict(CFG, tls="auto"))
+    assert mode == "FTPS"
+
+
 def test_snapshot_is_saved_only_after_telegram_accepted_the_summary(tmp_path):
     snap = str(tmp_path / "snap.json")
     code, text = fw.run_check(cfg=CFG, ftp_factory=_factory(tree()), snapshot_path=snap, send=lambda t: (False, "нет сети"))
