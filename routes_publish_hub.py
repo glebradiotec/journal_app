@@ -356,6 +356,40 @@ def register_publish_hub_routes(app):
                                  'status_text': metafora_api.FILE_STATUS_TEXT[1], 'articles': []})
         return jsonify({'file_uid': file_uid})
 
+    @app.route('/admin/publish/issue/<int:issue_id>/metafora/remove', methods=['POST'])
+    @publish_required
+    def admin_publish_metafora_remove(issue_id):
+        """Убирает выпуск из Метафоры целиком (удаляется загруженный файл и его публикации) — пока ничего не подписано.
+        Черновик здесь остаётся как был; после этого его можно заменить новой загрузкой или отправить заново."""
+        PubIssue.query.get_or_404(issue_id)
+        state = mf_load_state(issue_id)
+        file_uid = state.get('file_uid')
+        if not file_uid:
+            return _json_error('Выпуск в Метафору не отправлялся.', 404)
+        try:
+            # Состав берём и из Метафоры, и из сохранённого состояния: подпись проверяем по живым данным.
+            uids = set(a['uid'] for a in state.get('articles') or [])
+            gone = False
+            try:
+                uids.update(metafora_api.file_status(file_uid)['articles'])
+            except metafora_api.MetaforaError as e:
+                if e.status != 404:
+                    raise
+                gone = True   # файл уже убрали в самой Метафоре — остаётся забыть о нём здесь
+            signed = [u for u, s in metafora_api.publications_status(sorted(uids)).items() if s]
+            if signed:
+                return _json_error(f'В Метафоре подписано публикаций этого выпуска: {len(signed)}. Подписанное убрать нельзя — '
+                                   'сначала снимите подпись в Метафоре.', 409)
+            if not gone:
+                metafora_api.delete_file(file_uid)
+        except metafora_api.MetaforaError as e:
+            return _json_error(str(e), 502)
+        try:
+            os.remove(mf_state_path(issue_id))
+        except OSError:
+            pass
+        return jsonify({'removed': True, 'articles': len(uids)})
+
     @app.route('/admin/publish/issue/<int:issue_id>/metafora/poll')
     @publish_required
     def admin_publish_metafora_poll(issue_id):

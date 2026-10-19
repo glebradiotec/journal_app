@@ -195,7 +195,8 @@
                     <button type="button" class="pub-btn pub-btn-secondary" id="mfVerify">Сверить загруженное с PDF</button>
                     {% if stage.mf_signed < stage.mf_articles %}<button type="button" class="pub-btn pub-btn-primary" id="mfSign">Подписать публикации</button>{% endif %}
                     {% endif %}
-                    {% if not stage.mf_signed %}<button type="button" class="pub-btn pub-btn-secondary" id="mfReplace">Заменить в Метафоре</button>{% endif %}
+                    {% if not stage.mf_signed %}<button type="button" class="pub-btn pub-btn-secondary" id="mfReplace">Заменить в Метафоре</button>
+                    <button type="button" class="pub-btn pub-btn-danger" id="mfRemove">Убрать из Метафоры</button>{% endif %}
                     {% endif %}
                     <a href="{{ url_for('admin_publish_export', issue_id=issue.id, kind='metafora') }}" class="pub-btn pub-btn-secondary">Скачать XML</a>
                 </div>
@@ -509,7 +510,7 @@
     }
     function lock(on) {
         running = on;
-        ['mfSend', 'mfResume', 'mfVerify', 'mfSign', 'mfReplace'].forEach(function(id) { var b = document.getElementById(id); if (b) b.disabled = on; });
+        ['mfSend', 'mfResume', 'mfVerify', 'mfSign', 'mfReplace', 'mfRemove'].forEach(function(id) { var b = document.getElementById(id); if (b) b.disabled = on; });
     }
 
     function pollUntilProcessed(tries) {
@@ -597,6 +598,19 @@
     if ((b = document.getElementById('mfReplace'))) b.addEventListener('click', function() {
         if (!checkOk) { showToast('Сначала устраните расхождения с PDF', 'error'); return; }
         if (confirm('Заменить выпуск в Метафоре? Загруженный файл и его публикации будут удалены и загружены заново из текущего черновика.')) send(true);
+    });
+    if ((b = document.getElementById('mfRemove'))) b.addEventListener('click', function() {
+        if (running) return;
+        if (!confirm('Убрать выпуск из Метафоры? Загруженный файл и все его публикации будут удалены там. ' +
+                     'Черновик здесь останется, его можно заменить новой загрузкой или отправить заново. Подписанное убрать нельзя.')) return;
+        lock(true);
+        document.getElementById('mfProblems').innerHTML = '';
+        progress(0, 1, 'Убираю выпуск из Метафоры…');
+        api('POST', '/metafora/remove').then(function(res) {
+            if (!res.ok) { fail(res); lock(false); return; }
+            showToast('Выпуск убран из Метафоры', 'success');
+            setTimeout(function() { window.location.reload(); }, 700);
+        });
     });
     if ((b = document.getElementById('mfResume'))) b.addEventListener('click', function() {
         if (running) return;

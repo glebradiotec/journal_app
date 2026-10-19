@@ -392,6 +392,41 @@ def test_replace_is_refused_when_something_is_signed(client, issue, mf):
     assert r.status_code == 409 and mf.deleted == [] and mf.uploaded == []
 
 
+def test_remove_deletes_file_and_forgets_state(client, issue, mf):
+    client.post(f"/admin/publish/issue/{issue.id}/metafora/start", json={})
+    r = client.post(f"/admin/publish/issue/{issue.id}/metafora/remove")
+    assert r.status_code == 200 and mf.deleted == ["file-1"] and hub.mf_load_state(issue.id) == {}
+    assert publish_import.replace_blocker(issue) == ""   # теперь черновик можно заменить новой загрузкой
+
+
+def test_remove_button_shown_only_while_nothing_is_signed(client, issue, mf):
+    hub.mf_save_state(issue.id, {"file_uid": "f1", "status_code": 3, "articles": [{"uid": "a1", "doi": ARTICLE["doi"]}]})
+    assert 'id="mfRemove"' in client.get(f"/admin/publish/issue/{issue.id}").get_data(as_text=True)
+    hub.mf_save_state(issue.id, {"file_uid": "f1", "status_code": 3,
+                                 "articles": [{"uid": "a1", "doi": ARTICLE["doi"], "signed_at": "2026-10-09T12:00:00+03:00"}]})
+    assert 'id="mfRemove"' not in client.get(f"/admin/publish/issue/{issue.id}").get_data(as_text=True)
+
+
+def test_remove_is_refused_when_something_is_signed(client, issue, mf):
+    hub.mf_save_state(issue.id, {"file_uid": "f1", "articles": [{"uid": "a1", "doi": ARTICLE["doi"]}]})
+    mf.signed["a1"] = "2026-10-09T12:00:00+03:00"
+    r = client.post(f"/admin/publish/issue/{issue.id}/metafora/remove")
+    assert r.status_code == 409 and mf.deleted == [] and hub.mf_load_state(issue.id)["file_uid"] == "f1"
+
+
+def test_remove_checks_signature_by_metafora_not_only_by_saved_state(client, issue, mf):
+    """В сохранённом состоянии статей может не быть (файл ещё не обработан при записи) — подпись смотрим в Метафоре."""
+    mf.add_existing(ARTICLE["doi"], file_uid="f1", signed_at="2026-10-09T12:00:00+03:00")
+    mf.signed["uid-" + ARTICLE["doi"][-3:]] = "2026-10-09T12:00:00+03:00"
+    hub.mf_save_state(issue.id, {"file_uid": "f1", "articles": []})
+    r = client.post(f"/admin/publish/issue/{issue.id}/metafora/remove")
+    assert r.status_code == 409 and mf.deleted == []
+
+
+def test_remove_without_sending_is_404(client, issue, mf):
+    assert client.post(f"/admin/publish/issue/{issue.id}/metafora/remove").status_code == 404
+
+
 def test_start_refuses_invalid_xml(client, issue, mf):
     PubArticle.query.one().pages = ""
     db.session.commit()
