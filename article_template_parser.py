@@ -291,7 +291,7 @@ def _strip_field_codes(text):
     return _FIELD_MERGEFORMAT_RE.sub("", text)
 
 
-_CITATION_NAME_RE = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁ]\.\s?(?:[А-ЯЁ]\.)?")  # и «Маслов. И.В.»
+_CITATION_NAME_RE = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁABCEHKMOPTXY]\.\s?(?:[А-ЯЁABCEHKMOPTXY]\.)?")  # и «Маслов. И.В.»; инициал бывает латинским «C.Н.» (C — английская)
 
 
 def _count_citation_authors(citation, title):

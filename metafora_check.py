@@ -130,7 +130,7 @@ def find_pdf(pdfs, doi):
     return first or [k for k, v in pdfs.items() if doi in v["all"].lower()]
 
 
-_NAME = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁ]\.\s?(?:[А-ЯЁ]\.)?")  # терпит опечатку «Маслов. И.В.»
+_NAME = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁABCEHKMOPTXY]\.\s?(?:[А-ЯЁABCEHKMOPTXY]\.)?")  # терпит опечатку «Маслов. И.В.» и латинскую букву в инициале («C.Н.»)
 _ORCID = re.compile(r"\d{4}-\d{4}-\d{4}-\d{3}[\dXx]")
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
