@@ -154,6 +154,19 @@ def _numbered(seg):
     return exp or None
 
 
+def _unnumbered_ok(refs, nsec):
+    """Список в PDF набран без номеров (в макете бывает у английского): число ссылок по нумерации не
+    посчитать. Тогда сверяем иначе: ссылки идут в разделе по порядку, и после последней ничего лишнего."""
+    pos, last = [], -1
+    for r in refs:
+        p = nsec.find(norm(r)[:45], last + 1)
+        if p < 0:
+            return False
+        pos.append(p)
+        last = p
+    return len(nsec) - pos[-1] <= len(norm(refs[-1])) + 20
+
+
 def check_article(a, P):
     """Сверка одной статьи с её PDF -> (ошибки, заметки)."""
     errs, warn = [], []
@@ -248,7 +261,8 @@ def check_article(a, P):
         if f"{d_}.{mo_}.{y}" not in P["all"]:
             errs.append(f"дата «{lab}» {d_}.{mo_}.{y} не найдена в PDF")
 
-    s_ru = _section(P["all"], r"Список источников", r"Информация об автор")
+    # В макете заголовок бывает с латинской «C» («Cписок») — как и в рукописях (`_canon_heading`).
+    s_ru = _section(P["all"], r"[СC]писок\s+(?:источников|литературы)", r"Информация об автор")
     s_en = _section(P["all"], r"(?mi)^\s*References\s*$", r"(?i)Information about the author")
     c_ru, c_en = _numbered(s_ru), _numbered(s_en)
     for lab, lst, sec, cnt_pdf in (("русск.", a["refs"], s_ru, c_ru), ("англ.", a["refs_en"], s_en, c_en)):
@@ -271,7 +285,7 @@ def check_article(a, P):
             errs.append(f"{len(miss)} {lab} ссылок не совпали со списком в PDF, напр.: {miss[0]}")
         if cnt_pdf and cnt_pdf != len(lst):
             errs.append(f"{lab} ссылок {len(lst)}, по нумерации PDF {cnt_pdf}")
-        if not cnt_pdf:
+        if not cnt_pdf and not _unnumbered_ok(good, nsec):
             warn.append(f"нумерацию {lab} ссылок в PDF посчитать не удалось")
     a["_counts"] = (len(a["refs"]), len(a["refs_en"]), c_ru, c_en)
 
