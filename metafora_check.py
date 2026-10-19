@@ -150,7 +150,9 @@ def _numbered(seg):
     if seg is None:
         return None
     exp = count = 0
-    for m in re.finditer(r"(?m)^\s*(\d{1,3})\.\s*(\S?)", seg):
+    # Первый символ текста пункта смотрим заглядыванием вперёд, не съедая его: иначе «282.⏎4.⏎Condé» (число с переноса
+    # строки «P. 278–⏎282.») проглатывает «4» следующего номера.
+    for m in re.finditer(r"(?m)^\s*(\d{1,3})\.\s(?=\s*(\S?))", seg):
         if int(m.group(1)) == exp + 1:
             exp += 1
             count += m.group(2) != "_"

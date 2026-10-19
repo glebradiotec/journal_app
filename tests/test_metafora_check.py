@@ -42,3 +42,9 @@ def test_pdf_numbering_does_not_count_the_tail_of_a_split_url_as_a_reference():
     seg = "1. \nПервая. 2021.\n2. \nВторая. 2022.\n3. \nURL: https://x.net/Resp\n4. \n_Rate (дата обращения: 16.07.2025).\n5. \nПятая. 2023.\n"
     assert mc._numbered(seg) == 4
     assert mc._numbered("1. A\n2. B\n3. C\n") == 3 and mc._numbered(None) is None
+
+
+def test_pdf_numbering_ignores_a_page_range_wrapped_to_line_start():
+    """«P. 278–⏎282.» — число с переноса строки в начале строки не должно проглатывать номер следующего пункта."""
+    seg = "1. \nПервая. 2021.\n2. \nВторая. 2022.\n3. \nТретья // 2025. P. 278–\n282. \n4. \nЧетвёртая. 2023.\n5. \nПятая.\n6. \nШестая.\n"
+    assert mc._numbered(seg) == 6
