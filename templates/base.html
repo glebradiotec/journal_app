@@ -998,8 +998,23 @@
     window.__syncCrumbs = function() {
         var slot = document.getElementById('gh-crumbs');
         if (!slot) return;
-        var src = document.querySelector('#main-content [data-gh-crumbs], main [data-gh-crumbs]');
-        slot.innerHTML = src ? src.innerHTML : '';
+        var root = document.getElementById('main-content') || document.querySelector('main') || document;
+        var src = root.querySelector('[data-gh-crumbs]');
+        if (src) { slot.innerHTML = src.innerHTML; return; }
+        // Страницы учёта статей рисуют свою строку <ul class="breadcrumbs"> — переносим её звенья в плашку, а строку прячем.
+        var ul = root.querySelector('ul.breadcrumbs');
+        if (!ul) { slot.innerHTML = ''; return; }
+        var esc = function(x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+        var out = [];
+        Array.prototype.forEach.call(ul.children, function(li, i) {
+            var a = li.querySelector('a');
+            var text = li.textContent.replace(/\s+/g, ' ').trim();
+            if (i === 0 && a && a.getAttribute('href') === '/') return;          // «Главная» уже есть в плашке слева
+            if (a) out.push('<a class="gh-crumb" href="' + esc(a.getAttribute('href')) + '">' + esc(text) + '</a>');
+            else out.push('<span class="gh-crumb gh-crumb-current">' + esc(text) + '</span>');
+        });
+        slot.innerHTML = out.join('<span class="gh-sep">›</span>');
+        ul.classList.add('gh-crumbs-src');
     };
     window.__syncCrumbs();
     </script>

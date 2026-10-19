@@ -621,6 +621,13 @@ def test_every_section_page_describes_its_path_for_the_shared_header(client, iss
         assert "pub-crumbs" not in html, url                       # отдельной строки крошек на странице больше нет
 
 
+def test_staff_pages_with_their_own_breadcrumb_row_are_picked_up_by_the_shared_header(client, staff, dirs):
+    """Страницы учёта статей рисуют <ul class="breadcrumbs">; base.html переносит её звенья в плашку (#gh-crumbs) и прячет строку."""
+    html = client.get("/journals").get_data(as_text=True)
+    assert 'id="gh-crumbs"' in html and 'class="breadcrumbs"' in html
+    assert "ul.breadcrumbs" in html and "gh-crumbs-src" in html      # сам перенос — в base.html / header.html
+
+
 def test_journal_page_has_one_primary_action_in_the_page_header(client, issue):
     html = client.get(f"/admin/publish/journal/{issue.issn}").get_data(as_text=True)
     assert html.count("pub-btn-primary") == 1 and "pub-pagehead-actions" in html
