@@ -5,6 +5,8 @@ XML (export_crossref.py/export_elibrary.py).
 Намеренно ОТДЕЛЬНЫЕ таблицы от Article/Issue/ArticleAuthor (models.py) — это самостоятельный
 рабочий процесс, не пересекающийся с существующим учётом статей.
 """
+from sqlalchemy import Integer, cast
+
 from models import db, _utcnow
 from article_template_parser import equalize_keywords, split_keywords
 
@@ -30,8 +32,10 @@ class PubIssue(db.Model):
     site_num_id = db.Column(db.Integer, nullable=True)
     pushed_at = db.Column(db.DateTime, nullable=True)
 
+    # По первой странице, а не по порядку добавления: статья, дополненная в выпуск позже, встаёт на своё место
+    # (так же её увидят XML для Метафоры/eLibrary и запись на сайт, где порядок задаёт номер art_id).
     articles = db.relationship('PubArticle', backref='issue', cascade='all, delete-orphan',
-                                order_by='PubArticle.id')
+                                order_by=lambda: (cast(PubArticle.pages, Integer), PubArticle.id))
     sections = db.relationship('PubSection', backref='issue', cascade='all, delete-orphan',
                                 order_by='PubSection.id')
 

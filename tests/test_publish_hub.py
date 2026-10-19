@@ -1026,6 +1026,71 @@ def test_failed_append_keeps_the_already_written_articles(client, issue, site, m
     assert PubIssue.query.get(issue.id).pushed_at is not None
 
 
+def test_articles_of_issue_are_listed_by_first_page_not_by_time_added(issue):
+    late = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-01", pages="2-4"), None)
+    db.session.commit()
+    assert [a.pages for a in PubIssue.query.get(issue.id).articles] == ["2-4", "5-13"] and late.id > PubArticle.query.first().id
+
+
+def test_reorder_tool_puts_late_added_article_in_page_order_only_with_apply(client, issue, site, monkeypatch, capsys):
+    import sys
+    from sqlalchemy import text
+    sys.path.insert(0, "tools")
+    import site_reorder
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")                          # статья со страницами 5-13
+    late = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-01", pages="2-4"), None)
+    late.section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")                          # дописана позже -> номер больше
+
+    def on_site():
+        with engine.connect() as c:
+            return [tuple(r) for r in c.execute(text("SELECT art_page, art_id FROM articles ORDER BY art_id"))]
+
+    before = on_site()
+    assert [p for p, _ in before] == ["5-13", "2-4"]
+    monkeypatch.setattr(sys, "argv", ["site_reorder", str(issue.id)])
+    site_reorder.main()
+    assert on_site() == before and "--apply" in capsys.readouterr().out               # без --apply в базу не пишем
+    monkeypatch.setattr(sys, "argv", ["site_reorder", str(issue.id), "--apply"])
+    assert site_reorder.main() == 0
+    after = on_site()
+    assert [p for p, _ in after] == ["2-4", "5-13"] and sorted(i for _, i in after) == sorted(i for _, i in before)
+    db.session.expire_all()                                                           # утилита работает в своей сессии
+    ids = {a.doi[-2:]: a.site_art_id for a in PubArticle.query.all()}
+    assert ids["01"] == after[0][1] and ids["02"] == after[1][1]                      # черновик знает новые номера
+    rec = json.load(open(hub.PUB_EXPORTS_FOLDER + f"/{issue.id}_site_push.json", encoding="utf-8"))
+    assert {x["art_id"] for x in rec["articles"]} == {i for _, i in after}            # и запись для отката тоже
+    client.post(f"/admin/publish/issue/{issue.id}/site-rollback")                     # откат после перестановки убирает обе
+    assert _count(engine, "articles") == 0
+
+
+def test_reorder_tool_stops_when_site_holds_a_different_article(client, issue, site, monkeypatch, capsys):
+    import sys
+    from sqlalchemy import text
+    sys.path.insert(0, "tools")
+    import site_reorder
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    late = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-01", pages="2-4"), None)
+    late.section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    with engine.begin() as c:
+        c.execute(text("UPDATE articles SET doi = 'чужой' WHERE art_page = '5-13'"))
+    monkeypatch.setattr(sys, "argv", ["site_reorder", str(issue.id), "--apply"])
+    assert site_reorder.main() == 1 and "ОСТАНОВЛЕНО" in capsys.readouterr().out
+    with engine.connect() as c:
+        assert [r[0] for r in c.execute(text("SELECT art_page FROM articles ORDER BY art_id"))] == ["5-13", "2-4"]
+
+
 def test_push_with_nothing_missing_is_refused(client, issue, site):
     engine, admin = site
     _login(client, admin)
