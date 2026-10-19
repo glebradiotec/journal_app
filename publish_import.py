@@ -258,6 +258,68 @@ def replace_blocker(issue):
     return ""
 
 
+def missing_articles(issue, parsed_list):
+    """Разобранные статьи, которых в черновике выпуска ещё нет (по DOI)."""
+    have = {(a.doi or "").strip().lower() for a in issue.articles}
+    return [p for p in parsed_list if (p.get("doi") or "").strip().lower() not in have]
+
+
+def append_to_issue(token, issue, user_id):
+    """Дополняет существующий черновик статьями из загрузки, которых в нём нет (и их PDF). Уже лежащие в черновике статьи,
+    их правки, запись на сайт и Метафору не трогаются — поэтому годится и для выпуска, уже записанного на сайт.
+    -> число добавленных статей."""
+    parsed_list = sorted(load_parsed(token), key=_doi_order)
+    new = missing_articles(issue, parsed_list)
+    if not new:
+        raise ImportError_("В загруженных файлах нет статей, которых ещё нет в выпуске.")
+    try:
+        os.makedirs(MANUSCRIPT_ROOT, exist_ok=True)
+        doc_dir = os.path.join(session_dir(token), "doc")
+        added = []
+        for parsed in new:
+            art = make_article(issue.id, parsed, user_id)
+            src = os.path.join(doc_dir, parsed.get("_file") or "")
+            if os.path.isfile(src):
+                dst = _unique_path(MANUSCRIPT_ROOT, f"issue{issue.id}_{parsed['_file']}")
+                shutil.copy2(src, dst)
+                art.manuscript_file = os.path.basename(dst)
+            added.append(art)
+        _assign_new_sections(issue, added, load_sections(token))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    src_pdf, dst_pdf = session_pdf_dir(token), issue_pdf_dir(issue.id)
+    if os.path.isdir(src_pdf):
+        os.makedirs(dst_pdf, exist_ok=True)
+        have = set(os.listdir(dst_pdf))
+        for name in os.listdir(src_pdf):
+            if name not in have:   # PDF, что уже лежит в выпуске (например, добавленный раньше вручную), второй раз не кладём
+                shutil.move(os.path.join(src_pdf, name), os.path.join(dst_pdf, name))
+    shutil.rmtree(session_dir(token), ignore_errors=True)
+    return len(new)
+
+
+def _assign_new_sections(issue, arts, sections):
+    """Раздел для добавленных статей — по первой странице, из титульного PDF; раздел с таким названием в выпуске уже есть —
+    берём его, иначе создаём."""
+    if not sections or not sections.get("sections"):
+        return
+    by_page = {int(pg): idx for pg, idx in sections.get("pages") or []}
+    have = {sec.title_ru: sec for sec in issue.sections}
+    for art in arts:
+        m = re.match(r"\s*(\d+)", art.pages or "")
+        idx = by_page.get(int(m.group(1))) if m else None
+        if idx is None or not 0 <= idx < len(sections["sections"]):
+            continue
+        sec = sections["sections"][idx]
+        if sec["title_ru"] not in have:
+            row = PubSection(issue_id=issue.id, title_ru=sec["title_ru"], title_en=sec.get("title_en") or "")
+            db.session.add(row)
+            have[sec["title_ru"]] = row
+        art.section_ru, art.section_en = have[sec["title_ru"]].title_ru, have[sec["title_ru"]].title_en or ""
+
+
 def create_issue(token, fields, user_id, replace=False):
     """Создаёт черновик выпуска из разобранных статей сессии. -> PubIssue.
     replace=True: уже существующий черновик такого же выпуска удаляется и заменяется новым (в одной транзакции —

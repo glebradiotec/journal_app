@@ -112,6 +112,7 @@ def issue_stage(issue):
         'articles': len(issue.articles),
         'pdfs': len(publish_import.list_issue_pdfs(issue.id)),
         'on_site': issue.is_pushed,
+        'site_pending': sum(1 for a in issue.articles if not a.is_pushed) if issue.is_pushed else 0,
         'mf_sent': bool(state.get('file_uid')),
         'mf_processed': state.get('status_code') == 3,
         'mf_failed': state.get('status_code') == 4,
@@ -128,6 +129,13 @@ def keyword_count_note(art):
     if n_ru and n_en and n_ru != n_en:
         return f'ключевых слов: русских {n_ru}, английских {n_en} — для eLibrary их должно быть поровну'
     return ''
+
+
+def _int_or_none(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def _json_error(message, status=400, **extra):
@@ -199,7 +207,8 @@ def register_publish_hub_routes(app):
             row = PubIssue.query.filter_by(issn=issue['issn'], year=issue['year'], number=issue['number']).first()
             existing = url_for('admin_publish_issue_detail', issue_id=row.id) if row else None
             if row:
-                existing_info = {'articles': len(row.articles), 'blocked': publish_import.replace_blocker(row)}
+                existing_info = {'articles': len(row.articles), 'blocked': publish_import.replace_blocker(row),
+                                 'missing': [p.get('title_ru') or p.get('_file') for p in publish_import.missing_articles(row, parsed)]}
         secs = publish_import.load_sections(token)
         return jsonify({'issue': issue, 'other_issue_files': odd, 'articles': len(parsed), 'existing_url': existing,
                         'existing': existing_info,
@@ -209,6 +218,16 @@ def register_publish_hub_routes(app):
     @publish_required
     def admin_publish_import_create(token):
         fields = request.get_json(silent=True) or {}
+        if fields.get('append'):
+            row = PubIssue.query.filter_by(issn=(fields.get('issn') or '').strip(), year=_int_or_none(fields.get('year')),
+                                           number=str(fields.get('number') or '').strip()).first()
+            if row is None:
+                return _json_error('Такого выпуска в разделе нет — дополнять нечего.', 404)
+            try:
+                added = publish_import.append_to_issue(token, row, current_user.id)
+            except publish_import.ImportError_ as e:
+                return _json_error(str(e), 400)
+            return jsonify({'url': url_for('admin_publish_issue_detail', issue_id=row.id), 'added': added})
         try:
             issue = publish_import.create_issue(token, fields, current_user.id, replace=bool(fields.get('replace')))
         except publish_import.ImportError_ as e:

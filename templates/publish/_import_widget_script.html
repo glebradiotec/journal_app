@@ -190,6 +190,15 @@
             acts.style.margin = '12px 0 0';
             var open = el('a', 'pub-btn pub-btn-secondary pub-btn-sm', 'Открыть существующий'); open.href = s.existing_url;
             acts.appendChild(open);
+            if (ex.missing && ex.missing.length) {
+                var app = el('button', 'pub-btn pub-btn-primary pub-btn-sm', 'Дополнить выпуск недостающими статьями (' + ex.missing.length + ')'); app.type = 'button';
+                app.title = ex.missing.join('\n');
+                app.addEventListener('click', function() {
+                    if (confirm('Добавить в выпуск только статьи, которых в нём нет:\n\n' + ex.missing.join('\n') +
+                            '\n\nУже лежащие в выпуске статьи, их правки, запись на сайт и отправка в Метафору не изменятся.')) createIssue(app, false, true);
+                });
+                acts.appendChild(app);
+            }
             if (!ex.blocked) {
                 var rep = el('button', 'pub-btn pub-btn-danger pub-btn-sm', 'Заменить новой загрузкой'); rep.type = 'button';
                 rep.addEventListener('click', function() {
@@ -210,14 +219,14 @@
         }
     }
 
-    function createIssue(btn, replace) {
+    function createIssue(btn, replace, append) {
         btn.disabled = true;
         fetch(BASE + '/create', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 journal_name: document.getElementById('impJournal').value, issn: document.getElementById('impIssn').value,
                 year: document.getElementById('impYear').value, number: document.getElementById('impNumber').value,
-                volume: document.getElementById('impVolume').value, replace: !!replace,
+                volume: document.getElementById('impVolume').value, replace: !!replace, append: !!append,
             }),
         }).then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
           .then(function(res) {

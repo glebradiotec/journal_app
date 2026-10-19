@@ -162,7 +162,7 @@ def test_summary_tells_whether_existing_issue_can_be_replaced(client, issue):
     token = publish_import.new_token()
     _session_with_article(token)
     ex = client.get(f"/admin/publish/import/{token}/summary").get_json()["existing"]
-    assert ex == {"articles": 1, "blocked": ""}
+    assert ex == {"articles": 1, "blocked": "", "missing": []}
     hub.mf_save_state(issue.id, {"file_uid": "f1"})
     ex = client.get(f"/admin/publish/import/{token}/summary").get_json()["existing"]
     assert "Метафору" in ex["blocked"]
@@ -186,6 +186,49 @@ def test_replace_swaps_the_draft_for_the_new_upload(client, issue, dirs):
     names = os.listdir(publish_import.issue_pdf_dir(iss.id))
     assert names == ["new.pdf"]                      # PDF старого черновика не достались новому
     assert iss.id == old_id or not os.path.exists(pdf_dir)
+
+
+def _session_with_two(token):
+    """Загрузка из двух статей: «02» уже есть в черновике, «13» — новая."""
+    _session_with_article(token)
+    extra = dict(ARTICLE, _file="13_Ib.doc", _warnings=[], doi="10.18127/j20700970-202503-13", pages="40-48",
+                 title_ru="Новая статья", authors=[dict(ARTICLE["authors"][0], surname_ru="Ибрахим", surname_en="Ibrahim")])
+    with open(os.path.join(publish_import.session_dir(token), "doc", "13_Ib.doc.json"), "w", encoding="utf-8") as f:
+        json.dump(extra, f, ensure_ascii=False)
+    os.makedirs(publish_import.session_pdf_dir(token), exist_ok=True)
+    for name in ("02.pdf", "13.pdf"):
+        open(os.path.join(publish_import.session_pdf_dir(token), name), "wb").write(b"%PDF-" + name.encode())
+
+
+def test_append_adds_only_missing_articles_even_to_a_pushed_issue(client, issue, dirs):
+    old = PubArticle.query.one()
+    old.pushed_at, old.site_art_id, old.title_ru = datetime.now(timezone.utc), 77, "Правленое название"
+    issue.pushed_at = datetime.now(timezone.utc)
+    db.session.commit()
+    pdf_dir = publish_import.issue_pdf_dir(issue.id)
+    os.makedirs(pdf_dir)
+    open(os.path.join(pdf_dir, "02.pdf"), "wb").write(b"%PDF-mine")            # PDF, уже лежащий в выпуске, не затирается
+    token = publish_import.new_token()
+    _session_with_two(token)
+    ex = client.get(f"/admin/publish/import/{token}/summary").get_json()["existing"]
+    assert ex["missing"] == ["Новая статья"] and "заменить его нельзя" in ex["blocked"]
+    r = client.post(f"/admin/publish/import/{token}/create",
+                    json={"issn": "2070-0970", "year": 2025, "number": "3", "append": True})
+    assert r.status_code == 200 and r.get_json()["added"] == 1
+    arts = {a.doi[-2:]: a for a in PubArticle.query.all()}
+    assert set(arts) == {"02", "13"} and arts["02"].title_ru == "Правленое название" and arts["02"].site_art_id == 77
+    assert arts["13"].pushed_at is None and len(arts["13"].authors) == 1
+    assert sorted(os.listdir(pdf_dir)) == ["02.pdf", "13.pdf"]
+    assert open(os.path.join(pdf_dir, "02.pdf"), "rb").read() == b"%PDF-mine"
+    assert PubIssue.query.count() == 1 and PubIssue.query.one().is_pushed
+
+
+def test_append_with_nothing_new_is_refused(client, issue, dirs):
+    token = publish_import.new_token()
+    _session_with_article(token)
+    r = client.post(f"/admin/publish/import/{token}/create",
+                    json={"issn": "2070-0970", "year": 2025, "number": "3", "append": True})
+    assert r.status_code == 400 and PubArticle.query.count() == 1
 
 
 @pytest.mark.parametrize("blocker", ["site", "metafora"])
@@ -926,6 +969,71 @@ def test_push_records_what_it_created_and_rollback_removes_exactly_that(client, 
     assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (0, 0, 0)
     iss = PubIssue.query.get(issue.id)
     assert iss.pushed_at is None and PubArticle.query.one().site_art_id is None
+
+
+def test_push_of_missing_article_leaves_written_ones_alone_and_rollback_removes_all(client, issue, site):
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    first = PubArticle.query.one()
+    first_site_id, first_when = first.site_art_id, first.pushed_at
+    assert _count(engine, "articles") == 1
+    second = publish_import.make_article(issue.id, dict(ARTICLE, doi="10.18127/j20700970-202503-03", pages="14-20"), None)
+    second.section_ru = "Раздел"
+    db.session.commit()
+
+    chk = client.get(f"/admin/publish/issue/{issue.id}/site-check").get_json()
+    assert chk["append"] is True and [a["doi"] for a in chk["articles"]] == ["10.18127/j20700970-202503-03"]
+    assert not any("уже существует" in w for w in chk["warnings"])         # записанная раньше статья не мешает проверке
+
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (1, 1, 2)
+    first = PubArticle.query.filter_by(doi=ARTICLE["doi"]).one()
+    assert first.site_art_id == first_site_id and first.pushed_at == first_when     # первая не перезаписана
+    assert all(a.is_pushed for a in PubArticle.query.all())
+    rec = json.load(open(hub.PUB_EXPORTS_FOLDER + f"/{issue.id}_site_push.json", encoding="utf-8"))
+    assert rec["nomera_created"] is True and rec["sections"][0]["created"] is True and len(rec["articles"]) == 2
+
+    client.post(f"/admin/publish/issue/{issue.id}/site-rollback")                   # откат убирает и первую, и дописанную
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (0, 0, 0)
+
+
+def test_failed_append_keeps_the_already_written_articles(client, issue, site, monkeypatch):
+    import routes_publish
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    for n in ("03", "04"):
+        a = publish_import.make_article(issue.id, dict(ARTICLE, doi=f"10.18127/j20700970-202503-{n}", pages="14-20"), None)
+        a.section_ru = "Раздел"
+    db.session.commit()
+    real, calls = routes_publish.site_db.insert_article, []
+
+    def flaky(conn, fields):
+        calls.append(1)
+        if len(calls) == 2:
+            raise RuntimeError("обрыв связи")
+        return real(conn, fields)
+
+    monkeypatch.setattr(routes_publish.site_db, "insert_article", flaky)
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert (_count(engine, "nomera"), _count(engine, "razdel_numbers"), _count(engine, "articles")) == (1, 1, 1)   # как было
+    assert [a.is_pushed for a in PubArticle.query.order_by(PubArticle.id)] == [True, False, False]
+    assert PubIssue.query.get(issue.id).pushed_at is not None
+
+
+def test_push_with_nothing_missing_is_refused(client, issue, site):
+    engine, admin = site
+    _login(client, admin)
+    PubArticle.query.one().section_ru = "Раздел"
+    db.session.commit()
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    client.post(f"/admin/publish/issue/{issue.id}/confirm")
+    assert _count(engine, "articles") == 1
 
 
 def test_rollback_does_not_touch_issue_or_section_that_existed_before(client, issue, site):

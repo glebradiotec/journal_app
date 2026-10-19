@@ -502,14 +502,27 @@ def register_publish_routes(app):
     def _site_push_record_path(issue_id):
         return os.path.join(PUB_EXPORTS_FOLDER, f'{int(issue_id)}_site_push.json')
 
-    def _site_push_record_save(issue, created):
-        """Что создала запись на сайт: по этому файлу работает «Откатить запись на сайт»."""
+    def _site_push_record_save(issue, created, merge=False):
+        """Что создала запись на сайт: по этому файлу работает «Откатить запись на сайт».
+        merge=True — дописывание в уже записанный выпуск: выпуск и разделы, созданные первой записью, остаются «созданными»
+        (откат уберёт их, если опустеют), к ним добавляются новые."""
         try:
             os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+            sections = dict(created['sections'])
+            nomera_created = created['nomera_created']
+            if merge:
+                try:
+                    with open(_site_push_record_path(issue.id), encoding='utf-8') as f:
+                        old = json.load(f)
+                except (OSError, ValueError):
+                    old = {}
+                nomera_created = nomera_created or bool(old.get('nomera_created'))
+                for sec in old.get('sections') or []:
+                    sections[sec['id']] = bool(sections.get(sec['id'])) or bool(sec.get('created'))
             record = {
                 'at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-                'nomera_id': created['nomera_id'], 'nomera_created': created['nomera_created'],
-                'sections': [{'id': k, 'created': v} for k, v in created['sections'].items()],
+                'nomera_id': created['nomera_id'], 'nomera_created': nomera_created,
+                'sections': [{'id': k, 'created': v} for k, v in sections.items()],
                 'articles': [{'art_id': a.site_art_id, 'doi': a.doi} for a in issue.articles if a.site_art_id],
             }
             with open(_site_push_record_path(issue.id), 'w', encoding='utf-8') as f:
@@ -562,6 +575,8 @@ def register_publish_routes(app):
         warnings = []
         journal_row = None
         num_id = None
+        # Выпуск уже на сайте: проверяем и дописываем только статьи, которых там ещё нет.
+        arts = [a for a in issue.articles if not a.is_pushed] if issue.is_pushed else list(issue.articles)
         production = site_db.is_production_configured()
         if not production:
             warnings.append(
@@ -588,7 +603,7 @@ def register_publish_routes(app):
             seq_start = 0
 
         computed_dois = []
-        for i, art in enumerate(issue.articles, start=1):
+        for i, art in enumerate(arts, start=1):
             if art.doi:
                 computed_dois.append(art.doi)
             else:
@@ -608,7 +623,7 @@ def register_publish_routes(app):
                 with engine.connect() as conn:
                     limits = site_db.column_limits(conn)
                 # Те же поля, что уйдут при записи, и те же пределы колонок — проверка не расходится с записью.
-                for i, (art, doi) in enumerate(zip(issue.articles, computed_dois), start=1):
+                for i, (art, doi) in enumerate(zip(arts, computed_dois), start=1):
                     fields, notes = _site_fields(art, issue, doi, journal_row, 0, limits)
                     label = f'Статья №{i} «{art.title_ru[:60]}»'
                     for note in notes:
@@ -619,14 +634,14 @@ def register_publish_routes(app):
             except Exception:
                 pass
 
-        for i, art in enumerate(issue.articles):
+        for i, art in enumerate(arts):
             if not art.fulltext_ru:
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: нет полного текста — для eLibrary будет временно подставлена аннотация.')
             if not art.abstract_ru and not art.abstract_en:
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: нет аннотации.')
             if not art.authors:
                 warnings.append(f'Статья №{i + 1} «{art.title_ru[:60]}»: не указано ни одного автора.')
-        return {'production': production, 'warnings': warnings, 'dois': computed_dois, 'journal_row': journal_row}
+        return {'production': production, 'warnings': warnings, 'dois': computed_dois, 'journal_row': journal_row, 'articles': arts}
 
     @app.route('/admin/publish/issue/<int:issue_id>/preview')
     @publish_required
@@ -643,8 +658,8 @@ def register_publish_routes(app):
             return jsonify({'error': 'В выпуске нет статей.'}), 400
         res = _site_precheck(issue)
         return jsonify({
-            'production': res['production'], 'pushed': issue.is_pushed, 'warnings': res['warnings'],
-            'articles': [{'title': art.title_ru, 'doi': doi} for art, doi in zip(issue.articles, res['dois'])],
+            'production': res['production'], 'pushed': issue.is_pushed, 'append': issue.is_pushed, 'warnings': res['warnings'],
+            'articles': [{'title': art.title_ru, 'doi': doi} for art, doi in zip(res['articles'], res['dois'])],
         })
 
     @app.route('/admin/publish/issue/<int:issue_id>/export/<kind>')
@@ -694,7 +709,12 @@ def register_publish_routes(app):
         if not issue.articles:
             flash('В выпуске нет статей.', 'error')
             return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
-        for art in issue.articles:
+        append = issue.is_pushed   # выпуск уже на сайте — дописываем только не записанные статьи, остальные не трогаем
+        todo = [a for a in issue.articles if not a.is_pushed] if append else list(issue.articles)
+        if not todo:
+            flash('Все статьи выпуска уже на сайте — дописывать нечего.', 'error')
+            return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
+        for art in todo:
             if not art.authors:
                 flash(f'У статьи «{art.title_ru[:60]}» нет авторов — отправка отменена.', 'error')
                 return redirect(url_for('admin_publish_issue_detail', issue_id=issue.id))
@@ -717,7 +737,7 @@ def register_publish_routes(app):
 
                 limits = site_db.column_limits(conn)
                 prepared = []
-                for i, art in enumerate(issue.articles, start=1):
+                for i, art in enumerate(todo, start=1):
                     razd_id, section_created = site_db.find_or_create_section(
                         conn, num_id, art.section_ru or 'Без раздела', art.section_en or ''
                     )
@@ -772,7 +792,7 @@ def register_publish_routes(app):
 
         issue.pushed_at = datetime.now(timezone.utc)
         db.session.commit()
-        _site_push_record_save(issue, created)
+        _site_push_record_save(issue, created, merge=append)
 
         # Генерируем и сохраняем CrossRef/eLibrary XML
         os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
