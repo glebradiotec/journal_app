@@ -9,6 +9,8 @@
                 <span>На главную</span>
             </a>
         </div>
+
+        <nav class="gh-crumbs" id="gh-crumbs" aria-label="Путь"></nav>
         
         <div class="gh-header-right">
             {% if current_user.is_authenticated and current_user.is_admin %}
@@ -111,6 +113,22 @@
 
 .gh-header-home-btn svg {
     flex-shrink: 0;
+}
+
+.gh-crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; margin: 0 14px 0 14px; font-size: 14px; white-space: nowrap; overflow: hidden; }
+.gh-crumbs:empty { display: none; }
+.gh-crumbs .gh-crumb { color: #6e7781; text-decoration: none; font-weight: 500; padding: 5px 9px; border-radius: 9px; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; transition: background .15s, color .15s; }
+.gh-crumbs a.gh-crumb:hover { background: rgba(91, 164, 176, 0.12); color: #2d7c88; }
+.gh-crumbs .gh-crumb-current { color: #2d7c88; background: rgba(91, 164, 176, 0.14); font-weight: 600; flex: 0 1 auto; }
+.gh-crumbs .gh-sep { color: #b6bec6; flex: 0 0 auto; }
+[data-theme="dark"] .gh-crumbs .gh-crumb { color: #9aa4ae; }
+[data-theme="dark"] .gh-crumbs a.gh-crumb:hover { background: rgba(124, 197, 208, 0.15); color: #7CC5D0; }
+[data-theme="dark"] .gh-crumbs .gh-crumb-current { color: #7CC5D0; background: rgba(124, 197, 208, 0.16); }
+[data-theme="dark"] .gh-crumbs .gh-sep { color: #56606a; }
+@media (max-width: 720px) {
+    .gh-crumbs { margin: 0 8px; }
+    .gh-crumbs .gh-crumb:not(.gh-crumb-current), .gh-crumbs .gh-sep { display: none; }
+    .gh-header-home-btn span { display: none; }
 }
 
 .gh-header-right {

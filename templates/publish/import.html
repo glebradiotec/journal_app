@@ -7,13 +7,14 @@
     {% include "publish/_sidebar.html" %}
 
     <div class="adm-main">
-        {% set hide_import_btn = true %}
         {% set crumb_last = 'Загрузка выпуска' %}
         {% include "publish/_topbar.html" %}
 
-        <div class="adm-welcome">
-            <h1 class="adm-welcome-title">Загрузка выпуска</h1>
-            <p class="adm-welcome-sub">Журнал, год и номер определятся сами — по DOI статей.</p>
+        <div class="pub-pagehead">
+            <div class="pub-pagehead-text">
+                <h1 class="adm-welcome-title">Загрузка выпуска</h1>
+                <p class="adm-welcome-sub">Журнал, год и номер определятся сами — по DOI статей.</p>
+            </div>
         </div>
 
         {% include "publish/_import_widget.html" %}

@@ -14,11 +14,13 @@
         {% for a in mf_state.articles or [] %}{% if a.doi %}{% set _ = mf_by_doi.update({a.doi: a}) %}{% endif %}{% endfor %}
         {% set can_delete = not issue.is_pushed and not mf_state.file_uid %}
 
-        <div class="adm-welcome">
-            <h1 class="adm-welcome-title">{{ issue.journal_name or issue.issn }} — {{ issue.year }} №{{ issue.number }}</h1>
-            <p class="adm-welcome-sub">
-                ISSN {{ issue.issn }}{% if issue.volume %} · том {{ issue.volume }}{% endif %}{% if issue.elibrary_titleid %} · eLibrary titleid {{ issue.elibrary_titleid }}{% endif %}
-            </p>
+        <div class="pub-pagehead">
+            <div class="pub-pagehead-text">
+                <h1 class="adm-welcome-title">{{ issue.journal_name or issue.issn }} — {{ issue.year }} №{{ issue.number }}</h1>
+                <p class="adm-welcome-sub">
+                    ISSN {{ issue.issn }}{% if issue.volume %} · том {{ issue.volume }}{% endif %}{% if issue.elibrary_titleid %} · eLibrary titleid {{ issue.elibrary_titleid }}{% endif %}
+                </p>
+            </div>
         </div>
 
         <div class="pub-steps">

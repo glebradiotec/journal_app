@@ -10,14 +10,15 @@
         {% set mobile_title = journal_name %}
         {% include "publish/_topbar.html" %}
 
-        <div class="adm-welcome">
-            <h1 class="adm-welcome-title">{{ journal_name }}</h1>
-            <p class="adm-welcome-sub">ISSN {{ issn }}</p>
-        </div>
-
-        <div class="pub-actions">
-            <a href="{{ url_for('admin_publish_import') }}" class="pub-btn pub-btn-primary">Загрузить выпуск целиком</a>
-            <a href="{{ url_for('admin_publish_issue_new', issn=issn) }}" class="pub-btn pub-btn-secondary">Создать пустой выпуск</a>
+        <div class="pub-pagehead">
+            <div class="pub-pagehead-text">
+                <h1 class="adm-welcome-title">{{ journal_name }}</h1>
+                <p class="adm-welcome-sub">ISSN {{ issn }}</p>
+            </div>
+            <div class="pub-pagehead-actions">
+                <a href="{{ url_for('admin_publish_issue_new', issn=issn) }}" class="pub-btn pub-btn-ghost">Создать пустой выпуск</a>
+                <a href="{{ url_for('admin_publish_import') }}" class="pub-btn pub-btn-primary">Загрузить выпуск</a>
+            </div>
         </div>
 
         {% if years|length > 1 %}

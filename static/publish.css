@@ -51,6 +51,13 @@
 .adm-mobile-title { font-size: 18px; font-weight: 700; color: var(--color-fg-default); }
 
 .adm-welcome { margin-bottom: 28px; }
+/* Шапка страницы раздела: заголовок слева, ОДНО главное действие справа (остальные кнопки — тихие). Путь — в общей плашке сверху. */
+.pub-pagehead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 8px 0 26px; }
+.pub-pagehead-text { min-width: 0; }
+.pub-pagehead-text .adm-welcome-title { margin-bottom: 4px; }
+.pub-pagehead-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pub-btn-ghost { background: transparent; color: var(--color-fg-muted); border-color: transparent; }
+.pub-btn-ghost:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); }
 .adm-welcome-title { font-size: 26px; font-weight: 700; color: var(--color-fg-default); margin: 0 0 6px 0; }
 .adm-welcome-sub { font-size: 15px; color: var(--color-fg-muted); margin: 0; }
 

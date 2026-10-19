@@ -658,6 +658,7 @@
                     if (homeBtn) homeBtn.style.display = path === '/' ? 'none' : '';
                     if (adminBtn) adminBtn.style.display = path !== '/' ? 'none' : '';
                     
+                    if (window.__syncCrumbs) window.__syncCrumbs();
                     window.scrollTo(0, 0);
                     return executeScripts(mainEl);
                 }).then(function() {
@@ -990,6 +991,17 @@
 
             window.openImageLightbox = openLightbox;
         })();
+    </script>
+    <script>
+    // Путь страницы (крошки) рисуется в общей плашке сверху: страница отдаёт скрытый блок [data-gh-crumbs],
+    // отсюда он копируется в #gh-crumbs — при загрузке и после каждого внутреннего перехода.
+    window.__syncCrumbs = function() {
+        var slot = document.getElementById('gh-crumbs');
+        if (!slot) return;
+        var src = document.querySelector('#main-content [data-gh-crumbs], main [data-gh-crumbs]');
+        slot.innerHTML = src ? src.innerHTML : '';
+    };
+    window.__syncCrumbs();
     </script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 """Раздел публикации: доступ, загрузка выпуска целиком, шаги отправки в Метафору.
 Метафора подменена (monkeypatch) — сеть и ключ не используются."""
 import io
+import re
 from datetime import datetime, timezone
 import os
 import json
@@ -598,6 +599,32 @@ def test_article_form_has_keyword_pair_table_and_still_saves_the_two_fields(clie
     assert r.status_code == 302
     art = PubArticle.query.get(art.id)
     assert art.keywords_ru_list == ["один", "два (а, б)"] and art.keywords_en_list == ["one", "two (a, b)"]
+
+
+def test_every_section_page_describes_its_path_for_the_shared_header(client, issue):
+    """Путь рисуется в общей плашке (base.html копирует [data-gh-crumbs]), а не отдельной строкой на странице."""
+    art = PubArticle.query.one()
+    pages = {
+        "/admin/publish": ["Публикация"],
+        f"/admin/publish/journal/{issue.issn}": ["Публикация", "Нелинейный мир"],
+        f"/admin/publish/issue/{issue.id}": ["Публикация", "Нелинейный мир", "2025 №3"],
+        f"/admin/publish/article/{art.id}/edit": ["Публикация", "Нелинейный мир", "2025 №3", "Редактирование статьи"],
+        "/admin/publish/import": ["Публикация", "Загрузка выпуска"],
+    }
+    for url, crumbs in pages.items():
+        html = client.get(url).get_data(as_text=True)
+        block = html.split("data-gh-crumbs", 1)[1].split("</div>", 1)[0]
+        text = " ".join(re.sub(r"<[^>]+>", " ", block).split()).replace(" › ", " ")
+        for c in crumbs:
+            assert c in text, (url, c)
+        assert block.count("gh-crumb-current") == 1, url          # ровно одна «текущая» капсула
+        assert "pub-crumbs" not in html, url                       # отдельной строки крошек на странице больше нет
+
+
+def test_journal_page_has_one_primary_action_in_the_page_header(client, issue):
+    html = client.get(f"/admin/publish/journal/{issue.issn}").get_data(as_text=True)
+    assert html.count("pub-btn-primary") == 1 and "pub-pagehead-actions" in html
+    assert "Загрузить выпуск целиком" not in html                  # дубль «Загрузить выпуск» убран
 
 
 def test_unknown_export_kind_is_404(client, issue):

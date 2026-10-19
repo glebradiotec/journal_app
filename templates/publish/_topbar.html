@@ -1,31 +1,22 @@
-{# Шапка раздела «Публикация»: путь (журнал → выпуск) и вход в загрузку выпуска. Стоит ВНУТРИ
-   .adm-main: при переходах внутри раздела base.html заменяет только его содержимое. #}
+{# Путь раздела «Публикация»: журнал → выпуск → страница. Здесь он только описан (скрытый блок внутри .adm-main — его
+   заменяет base.html при переходах), а рисуется в общей плашке сверху: base.html копирует его в #gh-crumbs (см. __syncCrumbs). #}
 
-<nav class="pub-crumbs" aria-label="Путь">
-    <div class="pub-crumbs-path">
-        <a href="{{ url_for('admin_publish_index') }}" class="pub-crumb pub-crumb-root">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14ZM11.78 4.72a.749.749 0 1 1-1.06 1.06L8.75 3.811V9.5a.75.75 0 0 1-1.5 0V3.811L5.28 5.78a.749.749 0 1 1-1.06-1.06l3.25-3.25a.749.749 0 0 1 1.06 0l3.25 3.25Z"/></svg>
-            Публикация
-        </a>
-        {% set crumb_issn = issue.issn if issue is defined and issue else (issn if issn is defined else none) %}
-        {% set crumb_journal = (issue.journal_name or issue.issn) if issue is defined and issue else (journal_name if journal_name is defined else none) %}
-        {% if crumb_issn %}
-        <span class="pub-crumb-sep">/</span>
-        <a href="{{ url_for('admin_publish_journal_detail', issn=crumb_issn) }}" class="pub-crumb">{{ crumb_journal or crumb_issn }}</a>
-        {% endif %}
-        {% if issue is defined and issue %}
-        <span class="pub-crumb-sep">/</span>
-        <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="pub-crumb">{{ issue.year }} №{{ issue.number }}</a>
-        {% endif %}
-        {% if crumb_last is defined and crumb_last %}
-        <span class="pub-crumb-sep">/</span>
-        <span class="pub-crumb pub-crumb-current">{{ crumb_last }}</span>
-        {% endif %}
-    </div>
-    {% if not (hide_import_btn is defined and hide_import_btn) %}
-    <a href="{{ url_for('admin_publish_import') }}" class="pub-btn pub-btn-primary pub-btn-sm">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/></svg>
-        Загрузить выпуск
-    </a>
+<div data-gh-crumbs hidden>
+    {% set only_root = not (issue is defined and issue) and not (issn is defined and issn) and not (crumb_last is defined and crumb_last) %}
+    <a href="{{ url_for('admin_publish_index') }}" class="gh-crumb{{ ' gh-crumb-current' if only_root else '' }}">Публикация</a>
+    {% set crumb_issn = issue.issn if issue is defined and issue else (issn if issn is defined else none) %}
+    {% set crumb_journal = (issue.journal_name or issue.issn) if issue is defined and issue else (journal_name if journal_name is defined else none) %}
+    {% set has_last = crumb_last is defined and crumb_last %}
+    {% if crumb_issn %}
+    <span class="gh-sep">›</span>
+    <a href="{{ url_for('admin_publish_journal_detail', issn=crumb_issn) }}" class="gh-crumb{{ ' gh-crumb-current' if not (issue is defined and issue) and not has_last else '' }}">{{ crumb_journal or crumb_issn }}</a>
     {% endif %}
-</nav>
+    {% if issue is defined and issue %}
+    <span class="gh-sep">›</span>
+    <a href="{{ url_for('admin_publish_issue_detail', issue_id=issue.id) }}" class="gh-crumb{{ '' if has_last else ' gh-crumb-current' }}">{{ issue.year }} №{{ issue.number }}</a>
+    {% endif %}
+    {% if has_last %}
+    <span class="gh-sep">›</span>
+    <span class="gh-crumb gh-crumb-current">{{ crumb_last }}</span>
+    {% endif %}
+</div>

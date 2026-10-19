@@ -8,11 +8,14 @@
 
     <div class="adm-main">
         {% set mobile_title = 'Статья' %}
+        {% set crumb_last = 'Редактирование статьи' if article else 'Новая статья' %}
         {% include "publish/_topbar.html" %}
 
-        <div class="adm-welcome">
-            <h1 class="adm-welcome-title">{{ 'Редактирование статьи' if article else 'Новая статья' }}</h1>
-            <p class="adm-welcome-sub">Выпуск {{ issue.year }} №{{ issue.number }} ({{ issue.issn }})</p>
+        <div class="pub-pagehead">
+            <div class="pub-pagehead-text">
+                <h1 class="adm-welcome-title">{{ 'Редактирование статьи' if article else 'Новая статья' }}</h1>
+                <p class="adm-welcome-sub">Выпуск {{ issue.year }} №{{ issue.number }} ({{ issue.issn }})</p>
+            </div>
         </div>
 
         <div class="adm-card">
