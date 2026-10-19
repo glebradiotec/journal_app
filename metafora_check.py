@@ -130,7 +130,7 @@ def find_pdf(pdfs, doi):
     return first or [k for k, v in pdfs.items() if doi in v["all"].lower()]
 
 
-_NAME = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁABCEHKMOPTXY]\.\s?(?:[А-ЯЁABCEHKMOPTXY]\.)?")  # терпит опечатку «Маслов. И.В.» и латинскую букву в инициале («C.Н.»)
+_NAME = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁABCEHKMOPTXY]\.\s?(?:[А-ЯЁABCEHKMOPTXY]\.)?|[А-ЯЁ][А-Яа-яё\-]+\s+[А-ЯЁ][а-яё]{2,}(?=,)")  # терпит опечатку «Маслов. И.В.» и латинскую букву в инициале («C.Н.»)
 _ORCID = re.compile(r"\d{4}-\d{4}-\d{4}-\d{3}[\dXx]")
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
@@ -173,6 +173,7 @@ def check_article(a, P):
     # В макете бывает «Дляцитирования» слитно — ищем и так.
     m_cit = re.search(r"Для\s*цитирования", P["all"])
     cit = P["all"][m_cit.end():][:1200] if m_cit else ""
+    cit = re.sub(r"(?<=\w)-[ \t]*\n[ \t]*(?=\w)", "", cit)         # перенос слова на границе строк: «Кари-⏎бов»
     w = a["title"].split()[0] if a["title"].split() else ""
     head = cit.split(w, 1)[0] if w and w in cit else cit
     cnt = len(_NAME.findall(head.replace("\n", " ")))

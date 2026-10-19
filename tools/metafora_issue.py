@@ -62,7 +62,7 @@ def build(args):
         for w in warns:
             notes.append(f"{name}: {w}")
         dates = parsed.get("dates") or {}
-        vol = re.search(r"\bТ\.\s*(\d+)", parsed.get("citation_ru") or "")
+        vol = re.search(r"\b[ТT]\.\s*(\d+)", parsed.get("citation_ru") or "")
         if vol:
             volumes.append(vol.group(1))
         articles.append(NS(

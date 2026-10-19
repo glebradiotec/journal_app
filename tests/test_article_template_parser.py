@@ -114,6 +114,45 @@ def test_abbreviations_are_glued_only_when_they_come_from_the_previous_word_and_
     assert P.equalize_keywords(["а"], ["a"]) == (["а"], ["a"])
 
 
+def test_foreign_author_with_full_name_is_parsed_and_english_surname_found_by_the_russian_one():
+    text = HEADER.format(**dict(DEFAULTS, authors="Али Султан Маея1", authors_en="Ibrahim Anagheen1",
+                                orgs="1 Санкт-Петербургский университет «ЛЭТИ» (Санкт-Петербург, Россия)",
+                                emails="1 a@b.ru", orgs_en="1 St. Petersburg LETI (St. Petersburg, Russia)",
+                                citation="Маея А.С."))
+    result, warnings = P.parse_article_text(text)
+    a = result["authors"]
+    assert len(a) == 1 and (a[0]["surname_ru"], a[0]["initials_ru"]) == ("Маея", "А.С.")
+    assert a[0]["org_ru"].startswith("Санкт-Петербургский") and a[0]["org_en"].startswith("St. Petersburg")
+    # «Ibrahim Anagheen» при русском «Ибрахим»: фамилия — слово, похожее на русскую фамилию, а не последнее
+    text = HEADER.format(**dict(DEFAULTS, authors="Анагим Ибрахим1", authors_en="Ibrahim Anagheen1", citation="Ибрахим А."))
+    assert (lambda r: (r["authors"][0]["surname_en"], r["authors"][0]["initials_en"]))(P.parse_article_text(text)[0]) == ("Ibrahim", "A.")
+
+
+def test_full_name_inside_a_list_of_initials_and_missing_comma_between_authors():
+    authors, rest = P._parse_authors_line("М.Ю. Михеев1, Соня Хилал3, Р. Ишуков5, Э.В. Роганова7 Б.С. Долговесов8")
+    assert [(a["surname"], a["initials"], a["index"]) for a in authors] == [
+        ("Михеев", "М.Ю.", 1), ("Хилал", "С.", 3), ("Ишуков", "Р.", 5), ("Роганова", "Э.В.", 7), ("Долговесов", "Б.С.", 8)]
+
+
+def test_organisation_number_in_front_of_the_authors_is_not_part_of_the_title():
+    lines = ["Заглавие статьи", "1,2 N.O. Sitkov, Z.M. Yuldashev", "1,2 St. Petersburg ETU (St. Petersburg, Russia)", "Abstract"]
+    title, i = P._consume_title_lines(lines, 0)
+    assert title == ["Заглавие статьи"] and i == 1
+    authors, _next = P._parse_authors_block(lines, 1)
+    assert [a["surname"] for a in authors] == ["Sitkov", "Yuldashev"] and all(a["org"].startswith("St. Petersburg") for a in authors)
+
+
+def test_heading_with_latin_look_alike_letter_and_one_letter_typo():
+    assert P._canon_heading("Cписок источников") == "Список источников"          # первая буква латинская
+    assert P._canon_heading("Ключевые слов") == "Ключевые слова"
+    assert P._canon_heading("Слова из текста, не заголовок") == "Слова из текста, не заголовок"
+
+
+def test_tail_of_a_long_url_after_a_hard_paragraph_break_is_glued_without_space():
+    refs = P._split_references(["Subrata K. A sensor. URL: https://x.net/pub/Respi", "_Rate (дата обращения: 16.07.2025).", "Фролова А.И. Следующая ссылка."])
+    assert refs == ["Subrata K. A sensor. URL: https://x.net/pub/Respi_Rate (дата обращения: 16.07.2025).", "Фролова А.И. Следующая ссылка."]
+
+
 def test_author_with_single_initial_is_kept():
     result, _ = parse(authors="Б. Балбашио1, А.А. Скрылев2", authors_en="B. Balbashio1, A.A. Skrylev2",
                       citation="Балбашио Б., Скрылев А.А.")

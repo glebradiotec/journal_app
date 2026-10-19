@@ -86,7 +86,7 @@ def _journal_and_volume(citation):
     """«… // Нелинейный мир. 2025. Т. 23. № 3. С. 81–87.» -> ('Нелинейный мир', '23')."""
     tail = (citation or "").split("//", 1)[-1] if "//" in (citation or "") else ""
     name = re.match(r"\s*(.+?)\.\s*(?:19|20)\d{2}\b", tail)
-    vol = re.search(r"\bТ\.\s*(\d+)", tail)
+    vol = re.search(r"\b[ТT]\.\s*(\d+)", tail)
     return (name.group(1).strip() if name else ""), (vol.group(1) if vol else "")
 
 

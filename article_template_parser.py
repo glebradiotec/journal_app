@@ -49,6 +49,7 @@
 Парсер терпим к небольшим отклонениям, но рассчитан именно на эту структуру.
 Не гарантирует 100% точность — результат нужно проверить в форме перед отправкой.
 """
+import difflib
 import re
 
 
@@ -69,10 +70,22 @@ _CANON_HEADINGS = (
 _CANON_BY_KEY = {re.sub(r"\s+", "", h).lower(): h for h in _CANON_HEADINGS}
 
 
+_LAT_TO_CYR = str.maketrans("abekmhopctxy", "авекмнорстху")
+
+
 def _canon_heading(line):
-    """«Дляцитирования» -> «Для цитирования». Только для коротких строк, целиком совпадающих с заголовком без пробелов."""
+    """«Дляцитирования» -> «Для цитирования»; «Ключевые слов» (опечатка в одну букву) -> «Ключевые слова».
+    Только для коротких строк, похожих на заголовок целиком (не на слово внутри текста)."""
     if line and len(line) < 80:
-        return _CANON_BY_KEY.get(re.sub(r"\s+", "", line).lower(), line)
+        key = re.sub(r"\s+", "", line).lower()
+        if re.search(r"[а-яё]", key):                       # «Cписок» с латинской C — русская строка с буквой-двойником
+            key = key.translate(_LAT_TO_CYR)
+        if key in _CANON_BY_KEY:
+            return _CANON_BY_KEY[key]
+        if len(key) >= 9:
+            near = difflib.get_close_matches(key, [k for k in _CANON_BY_KEY if len(k) >= 9], n=1, cutoff=0.93)
+            if near:
+                return _CANON_BY_KEY[near[0]]
     return line
 
 
@@ -231,6 +244,10 @@ def _split_references(lines, soft=None):
             refs.append(l)
             continue
         prev = refs[-1]
+        if l.startswith("_"):
+            # Хвост длинного адреса после жёсткого переноса абзаца: «…Human_Resp» + «_Rate (дата обращения: …)». Склеиваем без пробела.
+            refs[-1] = prev + l
+            continue
         if soft is not None:
             is_tail = bool(soft[k])
         elif _REF_TAIL_RE.match(l) or _ENDS_UNFINISHED_RE.search(prev):
@@ -291,7 +308,7 @@ def _strip_field_codes(text):
     return _FIELD_MERGEFORMAT_RE.sub("", text)
 
 
-_CITATION_NAME_RE = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁABCEHKMOPTXY]\.\s?(?:[А-ЯЁABCEHKMOPTXY]\.)?")  # и «Маслов. И.В.»; инициал бывает латинским «C.Н.» (C — английская)
+_CITATION_NAME_RE = re.compile(r"[А-ЯЁ][А-Яа-яё\-]+\.?\s+[А-ЯЁABCEHKMOPTXY]\.\s?(?:[А-ЯЁABCEHKMOPTXY]\.)?|[А-ЯЁ][А-Яа-яё\-]+\s+[А-ЯЁ][а-яё]{2,}(?=,)")  # и «Маслов. И.В.»; инициал бывает латинским «C.Н.» (C — английская)
 
 
 def _count_citation_authors(citation, title):
@@ -333,18 +350,81 @@ def _parse_index_list(s):
     return indices
 
 
+_FULLNAME_PART_RE = re.compile(r"^([A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’\-]+(?:\s+[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’\-]+){1,3})\s*(\d+)$")
+_FULLNAME_INLINE_RE = re.compile(r"(?:(?<=^)|(?<=, )|(?<=\d ))([A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’\-]+(?: [A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'’\-]+){1,2})(\d+)(?=[,\s]|$)")
+_CONFUSABLE = str.maketrans("АВЕКМНОРСТХаеорсху", "ABEKMHOPCTXaeopcxy")
+
+
+def _latinize(word):
+    """В английских именах попадаются кириллические двойники латинских букв («Аli» с русской «А»)."""
+    return word.translate(_CONFUSABLE) if re.search(r"[A-Za-z]", word) else word
+
+
+def _parse_fullname_authors(line):
+    """Иностранные авторы подписаны полным именем, без инициалов: «Али Султан Маея1», «Ali Sultan Mayya1»
+    (несколько — через запятую). Сноска-номер обязательна — так заглавие или организация авторами не станут.
+    Фамилия — последнее слово, инициалы — из остальных; английскую фамилию потом уточняет _resolve_fullname_en
+    (там порядок слов бывает другим: «Ibrahim Anagheen» при русском «Анагим Ибрахим»)."""
+    if not line or len(line) > 140:
+        return []
+    out = []
+    for part in line.split(","):
+        m = _FULLNAME_PART_RE.match(part.strip())
+        if not m:
+            return []
+        words = [_latinize(w) for w in m.group(1).split()]
+        out.append({"words": words, "index": int(m.group(2)), "surname": words[-1],
+                    "initials": "".join(w[0].upper() + "." for w in words[:-1])})
+    return out
+
+
+def _translit_ru(word):
+    tr = dict(zip("абвгдеёжзийклмнопрстуфхцчшщъыьэюя", ["a", "b", "v", "g", "d", "e", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p", "r", "s", "t", "u", "f", "kh", "ts", "ch", "sh", "sch", "", "y", "", "e", "yu", "ya"]))
+    return "".join(tr.get(ch, ch) for ch in word.lower())
+
+
+def _bigram_dice(a, b):
+    ga = {a[i:i + 2] for i in range(len(a) - 1)} or {a}
+    gb = {b[i:i + 2] for i in range(len(b) - 1)} or {b}
+    return 2 * len(ga & gb) / (len(ga) + len(gb))
+
+
+def _resolve_fullname_en(authors_ru, authors_en):
+    """Английскую фамилию автора, подписанного полным именем, выбираем по русской: слово, чья запись больше всего
+    похожа на транслитерацию русской фамилии («Ибрахим» ↔ «Ibrahim» в «Ibrahim Anagheen»); остальные слова —
+    инициалы. Без русской пары остаётся последнее слово."""
+    for i, en in enumerate(authors_en):
+        words = en.get("words")
+        if not words or i >= len(authors_ru) or not authors_ru[i].get("surname"):
+            continue
+        target = _translit_ru(authors_ru[i]["surname"].split()[-1])
+        best = max(range(len(words)), key=lambda k: (_bigram_dice(target, words[k].lower()), k == len(words) - 1))
+        en["surname"] = words[best]
+        en["initials"] = "".join(w[0].upper() + "." for k, w in enumerate(words) if k != best)
+
+
+_LEADING_INDEX_RE = re.compile(r"^\d+(?:\s*[,\-–—−]\s*\d+)*\s+(?=[A-ZА-ЯЁ]\.)")
+
+
+def _strip_leading_index(line):
+    """«1,2 N.O. Sitkov, Z.M. Yuldashev» (номер организации стоит ДО имён, у авторов своих номеров нет) -> «N.O. Sitkov, Z.M. Yuldashev»."""
+    return _LEADING_INDEX_RE.sub("", line.strip(), count=1)
+
+
 def _parse_authors_line(line):
     """'М.А. Басараб1, В.А. Бобков2 1, 2 Организация (Город, Страна)' ->
     ([{'initials':.., 'surname':.., 'index': 1|None}], rest) — где rest — весь остаток
     строки после последнего автора (номера сносок + одна или несколько организаций),
     ещё не разобранный: сам разбор организаций общий для одной и нескольких строк,
     см. _split_org_chunks."""
+    line = _strip_leading_index(line)
     all_matches = list(AUTHOR_TOKEN_RE.finditer(line))
     # Реальные авторы разделены запятой; отсекаем ложные срабатывания вида "Н.Э." внутри
     # названия организации ("МГТУ им. Н.Э. Баумана"), которые запятой не предваряются.
     matches = [
         mm for mm in all_matches
         if mm.start() == 0 or line[max(0, mm.start() - 2):mm.start()] == ", "
+        or re.search(r"\d\s$", line[:mm.start()])      # запятую между авторами забыли: «Роганова7 Б.С. Долговесов8»
     ]
     # Одиночный инициал принимаем, только если фамилия с заглавной буквы и сразу за ней
     # номер сноски, запятая или конец строки — так «И. Ньютона» из названия организации
@@ -354,25 +434,39 @@ def _parse_authors_line(line):
         if _TWO_INITIALS_RE.match(mm.group(1).strip())
         or (mm.group(2)[:1].isupper() and (mm.group(3) or re.match(r"\s*(,|$)", line[mm.end():])))
     ]
-    authors = [
-        {
+    found = [
+        (mm.start(), mm.end(), {
             "initials": re.sub(r"([^.])$", r"\1.", mm.group(1).replace(" ", "")),
             "surname": mm.group(2).strip(),
             "index": int(mm.group(3)) if mm.group(3) else None,
-        }
+        })
         for mm in matches
     ]
-    rest = line[matches[-1].end():].strip() if matches else line.strip()
+    # Иностранные авторы подписаны полным именем, в том числе внутри списка с инициалами: «…, Соня Хилал3, Р. Ишуков5».
+    if found or not _parse_fullname_authors(line):
+        for fm in _FULLNAME_INLINE_RE.finditer(line):
+            if found and not any(fm.start() < e and fm.end() > b for b, e, _a in found):
+                words = [_latinize(w) for w in fm.group(1).split()]
+                found.append((fm.start(), fm.end(), {
+                    "words": words, "index": int(fm.group(2)), "surname": words[-1],
+                    "initials": "".join(w[0].upper() + "." for w in words[:-1])}))
+        found.sort(key=lambda t: t[0])
+    authors = [a for _b, _e, a in found]
+    rest = line[found[-1][1]:].strip() if found else line.strip()
+    if not authors:
+        full = _parse_fullname_authors(line)
+        if full:
+            return full, ""
     return authors, rest
 
 
 def _is_authors_line(line):
     """Строка списка авторов: начинается с «И.О. Фамилия». Проверяем именно начало строки —
     инициалы с фамилией внутри заглавия («К 100-летию А.А. Харкевича») заглавие не обрывают."""
-    line = line.strip()
+    line = _strip_leading_index(line)
     mm = AUTHOR_TOKEN_RE.match(line)
     if not mm:
-        return False
+        return bool(_parse_fullname_authors(line))      # иностранные авторы: «Али Султан Маея1»
     authors, _ = _parse_authors_line(line)
     return bool(authors)
 
@@ -916,6 +1010,7 @@ def parse_article_text(text):
     else:
         warnings.append("Не нашёл английскую часть («Original article») — EN-поля не заполнены.")
 
+    _resolve_fullname_en(authors_ru, authors_en)
     # --- склейка авторов RU + EN + email + org ---
     authors = []
     for ru, en in _pair_authors(authors_ru, authors_en):
