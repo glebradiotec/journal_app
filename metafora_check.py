@@ -145,13 +145,16 @@ def _section(text, start_re, end_re):
 
 
 def _numbered(seg):
+    """Сколько ссылок в списке PDF по его нумерации. Пункт, текст которого начинается с «_», — не ссылка, а хвост длинного адреса,
+    который вёрстка напечатала отдельным номером («5. URL: …Respiratory» / «6. _Rate (дата обращения…)»): его не считаем."""
     if seg is None:
         return None
-    exp = 0
-    for v in (int(x) for x in re.findall(r"(?m)^\s*(\d{1,3})\.\s", seg)):
-        if v == exp + 1:
-            exp = v
-    return exp or None
+    exp = count = 0
+    for m in re.finditer(r"(?m)^\s*(\d{1,3})\.\s*(\S?)", seg):
+        if int(m.group(1)) == exp + 1:
+            exp += 1
+            count += m.group(2) != "_"
+    return count or None
 
 
 def _unnumbered_ok(refs, nsec):

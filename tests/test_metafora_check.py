@@ -35,3 +35,10 @@ def test_unnumbered_list_with_extra_tail_warns():
     text = ("Список источников\n1.\nИванов И. Первая. 2020.\nИнформация об авторе\nReferences\n" + refs[0]
             + "\nОдна лишняя ссылка которой нет в рукописи и она длиннее любой допустимой погрешности.\nInformation about the author")
     assert [x for x in _warns(text, ["Иванов И. Первая. 2020."], refs) if "нумерацию" in x]
+
+
+def test_pdf_numbering_does_not_count_the_tail_of_a_split_url_as_a_reference():
+    """В печатном PDF вёрстка разорвала адрес и дала хвосту свой номер («6. _Rate (дата обращения…)») — это не ссылка."""
+    seg = "1. \nПервая. 2021.\n2. \nВторая. 2022.\n3. \nURL: https://x.net/Resp\n4. \n_Rate (дата обращения: 16.07.2025).\n5. \nПятая. 2023.\n"
+    assert metafora_check._numbered(seg) == 4
+    assert metafora_check._numbered("1. A\n2. B\n3. C\n") == 3 and metafora_check._numbered(None) is None
