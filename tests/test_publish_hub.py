@@ -634,6 +634,20 @@ def test_journal_page_has_one_primary_action_in_the_page_header(client, issue):
     assert "Загрузить выпуск целиком" not in html                  # дубль «Загрузить выпуск» убран
 
 
+def test_article_form_has_reference_pair_table_and_still_saves_the_two_fields(client, issue):
+    art = PubArticle.query.one()
+    art.references_text, art.references_en_text = "Первая. 2021.\nВторая. 2022.", "First. 2021.\nSecond. 2022.\n_tail"
+    db.session.commit()
+    html = client.get(f"/admin/publish/article/{art.id}/edit").get_data(as_text=True)
+    assert 'id="refBox"' in html and 'id="refTable"' in html and 'id="refSuggest"' in html
+    assert html.count('name="references_text"') == 1 and html.count('name="references_en_text"') == 1
+    r = client.post(f"/admin/publish/article/{art.id}/edit", data={
+        "title_ru": "Тест", "references_text": "Первая. 2021.\nВторая. 2022.", "references_en_text": "First. 2021.\nSecond. 2022.", "pub_author_count": "0"})
+    assert r.status_code == 302
+    art = PubArticle.query.get(art.id)
+    assert art.references_list == ["Первая. 2021.", "Вторая. 2022."] and art.references_en_list == ["First. 2021.", "Second. 2022."]
+
+
 def test_unknown_export_kind_is_404(client, issue):
     assert client.get(f"/admin/publish/issue/{issue.id}/export/other").status_code == 404
 

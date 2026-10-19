@@ -332,3 +332,7 @@ a.pub-crumb:hover { background: var(--color-canvas-subtle); color: var(--color-f
 .kw-btn:hover { background: var(--color-canvas-subtle); color: var(--color-fg-default); }
 @media (max-width: 720px) { .kw-cell { flex-wrap: wrap; } .kw-row { grid-template-columns: 26px 1fr; } .kw-row > .kw-cell:last-child { grid-column: 2; } }
 .kw-num-ok { color: #1a7f37; font-weight: 700; }
+.kw-num-warn { color: #9a6700; font-weight: 700; }
+.kw-btns-col { flex-direction: column; gap: 3px; }
+.kw-suggest { border: 1px solid rgba(154,103,0,0.35); background: rgba(154,103,0,0.07); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 13.5px; color: var(--color-fg-default); }
+.kw-suggest-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

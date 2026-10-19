@@ -139,9 +139,14 @@
                                 <label class="pub-label">Полный текст (ru) <span class="pub-hint">нужен для eLibrary</span></label>
                                 <textarea name="fulltext_ru" id="f_fulltext_ru" class="pub-textarea" style="min-height:220px;">{{ (article.fulltext_ru if article else '') or '' }}</textarea>
                             </div>
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Список источников (ru) <span class="pub-hint">по одной ссылке на строку</span></label>
-                                <textarea name="references_text" id="f_references_text" class="pub-textarea" style="min-height:140px;">{{ (article.references_text if article else '') or '' }}</textarea>
+                            <div class="pub-field pub-field-full" id="refBox">
+                                <label class="pub-label">Список источников: русский ↔ английский <span class="pub-hint">ссылки стоят парами по номеру</span></label>
+                                <div class="kw-summary" id="refSummary"></div>
+                                <div class="kw-suggest" id="refSuggest" style="display:none;"></div>
+                                <div class="kw-table" id="refTable"></div>
+                                <button type="button" class="pub-btn pub-btn-secondary pub-btn-sm" id="refAddRow" style="margin-top:8px;">+ Добавить строку</button>
+                                <textarea name="references_text" id="f_references_text" style="display:none;">{{ (article.references_text if article else '') or '' }}</textarea>
+                                <textarea name="references_en_text" id="f_references_en_text" style="display:none;">{{ (article.references_en_text if article else '') or '' }}</textarea>
                             </div>
                         </div>
 
@@ -190,10 +195,6 @@
                             <div class="pub-field pub-field-full">
                                 <label class="pub-label">For citation (en)</label>
                                 <textarea name="citation_en" id="f_citation_en" class="pub-textarea" style="min-height:60px;">{{ (article.citation_en if article else '') or '' }}</textarea>
-                            </div>
-                            <div class="pub-field pub-field-full">
-                                <label class="pub-label">Список источников (en) <span class="pub-hint">по одной ссылке на строку</span></label>
-                                <textarea name="references_en_text" id="f_references_en_text" class="pub-textarea" style="min-height:140px;">{{ (article.references_en_text if article else '') or '' }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -458,6 +459,154 @@ function deleteArticle() {
     window.kwReload();
 })();
 
+// ---- Список источников: таблица пар «русская ↔ английская ссылка» поверх двух скрытых полей ----
+(function() {
+    var taRu = document.getElementById('f_references_text'), taEn = document.getElementById('f_references_en_text');
+    var table = document.getElementById('refTable'), summary = document.getElementById('refSummary'), suggest = document.getElementById('refSuggest');
+    if (!taRu || !taEn || !table) return;
+
+    var ru = [], en = [];
+    function lines(text) { return (text || '').split('\n').map(function(l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean); }
+
+    // «Отпечаток» ссылки, одинаковый в русском и английском виде: числа (год, том, страницы, DOI) и латинские слова (названия, адреса).
+    function tokens(s) {
+        var set = {}, m, re = /\d{2,}|[A-Za-z]{4,}/g;
+        while ((m = re.exec(s)) !== null) set[m[0].toLowerCase()] = 1;
+        return set;
+    }
+    function sim(a, b) {
+        var A = tokens(a), B = tokens(b), ka = Object.keys(A), kb = Object.keys(B);
+        if (!ka.length && !kb.length) return 0.3;
+        if (!ka.length || !kb.length) return 0.05;
+        var common = 0;
+        ka.forEach(function(k) { if (B[k]) common++; });
+        return common / (ka.length + kb.length - common);
+    }
+    // Отметки «✓» и «?» у номера — только по числам (год, том, страницы, DOI): латинские слова английской ссылки в русской не бывает.
+    function numSim(a, b) {
+        var da = a.match(/\d{2,}/g), db = b.match(/\d{2,}/g);
+        if (!da || !db) return null;
+        var A = {}, B = {}, common = 0, ka, kb;
+        da.forEach(function(x) { A[x] = 1; }); db.forEach(function(x) { B[x] = 1; });
+        ka = Object.keys(A); kb = Object.keys(B);
+        ka.forEach(function(k) { if (B[k]) common++; });
+        return common / (ka.length + kb.length - common);
+    }
+    function looksLikeTail(t) { return /^[_\-.,;:)\]»"']/.test(t) || /^[a-zа-яё]/.test(t) && t.length < 80 || t.length < 25 && !/(19|20)\d\d/.test(t); }
+
+    // Какие строки более длинного списка остались без пары: перебираем, какую убрать, чтобы сумма сходства пар была наибольшей.
+    function extras(longer, shorter, longIsRu) {
+        var idx = longer.map(function(_, i) { return i; }), found = [];
+        for (var d = longer.length - shorter.length; d > 0; d--) {
+            var best = -1, bestScore = -1;
+            for (var g = 0; g < idx.length; g++) {
+                var score = 0, k = 0;
+                for (var i = 0; i < idx.length; i++) {
+                    if (i === g) continue;
+                    var a = longer[idx[i]], b = shorter[k++];
+                    score += longIsRu ? sim(a, b) : sim(b, a);
+                }
+                if (score > bestScore) { bestScore = score; best = g; }
+            }
+            found.push(idx[best]);
+            idx.splice(best, 1);
+        }
+        return found.sort(function(x, y) { return x - y; });
+    }
+    function sync() {
+        taRu.value = ru.filter(Boolean).join('\n');
+        taEn.value = en.filter(Boolean).join('\n');
+    }
+    function fit(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 2 + 'px'; }
+    function joinRefs(prev, cur) { return /^_/.test(cur) ? prev + cur : prev + ' ' + cur; }
+
+    function cell(list, i, flag) {
+        var td = document.createElement('div');
+        td.className = 'kw-cell' + (i >= list.length ? ' kw-missing' : '');
+        if (i >= list.length) { td.textContent = '— здесь нет ссылки —'; return td; }
+        var input = document.createElement('textarea');
+        input.rows = 1; input.className = 'pub-input kw-input'; input.value = list[i]; input.placeholder = 'текст ссылки';
+        input.addEventListener('input', function() { fit(input); });
+        input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+        input.addEventListener('change', function() { list[i] = input.value.replace(/\s+/g, ' ').trim(); sync(); render(); });
+        td.appendChild(input);
+        setTimeout(function() { fit(input); }, 0);
+        if (flag) { var tag = document.createElement('span'); tag.className = 'kw-found kw-found-part'; tag.textContent = flag; td.appendChild(tag); }
+        var btns = document.createElement('span');
+        btns.className = 'kw-btns kw-btns-col';
+        [['↑', 'поменять местами с верхней', function() { if (i > 0) { var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t; } }],
+         ['↓', 'поменять местами с нижней', function() { if (i < list.length - 1) { var t = list[i + 1]; list[i + 1] = list[i]; list[i] = t; } }],
+         ['⤴', 'склеить с верхней ссылкой (если ссылка разорвалась на две)', function() { if (i > 0) { list[i - 1] = joinRefs(list[i - 1], list[i]); list.splice(i, 1); } }],
+         ['✕', 'убрать ссылку — следующие поднимутся на её место', function() { list.splice(i, 1); }],
+         ['+', 'вставить пропуск НАД этой ссылкой — она и следующие сдвинутся вниз', function() { list.splice(i, 0, ''); }]].forEach(function(b) {
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.className = 'kw-btn'; btn.textContent = b[0]; btn.title = b[1];
+            btn.addEventListener('click', function() { b[2](); sync(); render(); });
+            btns.appendChild(btn);
+        });
+        td.appendChild(btns);
+        return td;
+    }
+
+    function render() {
+        table.innerHTML = '';
+        var head = document.createElement('div');
+        head.className = 'kw-row kw-head';
+        ['№', 'Русские', 'Английские'].forEach(function(t) { var d = document.createElement('div'); d.textContent = t; head.appendChild(d); });
+        table.appendChild(head);
+
+        var nRu = ru.filter(Boolean).length, nEn = en.filter(Boolean).length, same = nRu === nEn;
+        var longIsRu = ru.length >= en.length, longer = longIsRu ? ru : en, shorter = longIsRu ? en : ru;
+        var ex = same ? [] : extras(longer.filter(Boolean), shorter.filter(Boolean), longIsRu);
+        var exSet = {}; ex.forEach(function(g) { exSet[g] = 1; });
+
+        var rows = Math.max(ru.length, en.length);
+        for (var i = 0; i < rows; i++) {
+            var row = document.createElement('div');
+            var both = i < ru.length && i < en.length && ru[i] && en[i];
+            var s = both ? numSim(ru[i], en[i]) : null;
+            var flagRu = null, flagEn = null, bad = (i >= ru.length || i >= en.length);
+            if (exSet[i]) { bad = true; var f = looksLikeTail(longer[i]) ? 'похоже на обрывок предыдущей' : 'лишняя — пары в другом языке нет'; if (longIsRu) flagRu = f; else flagEn = f; }
+            row.className = 'kw-row' + (bad ? ' kw-row-bad' : '');
+            var num = document.createElement('div'); num.className = 'kw-num'; num.textContent = i + 1;
+            if (s !== null && s >= 0.6) { num.classList.add('kw-num-ok'); num.textContent = '✓'; num.title = 'Годы, страницы и номера в обеих ссылках совпадают'; }
+            else if (s !== null && s < 0.3) { num.classList.add('kw-num-warn'); num.textContent = (i + 1) + '?'; num.title = 'Годы, страницы и номера в русской и английской ссылке не совпадают — возможно, ссылки сбились'; }
+            row.appendChild(num);
+            row.appendChild(cell(ru, i, flagRu));
+            row.appendChild(cell(en, i, flagEn));
+            table.appendChild(row);
+        }
+
+        summary.className = 'kw-summary ' + (same ? 'kw-summary-ok' : 'kw-summary-bad');
+        summary.textContent = 'Русских: ' + nRu + ' · английских: ' + nEn + (same ? ' — поровну ✓. «✓» у номера — годы и страницы в паре совпадают, «?» — не совпадают: проверьте эту пару глазами.'
+            : ' — не поровну: в ' + (nRu > nEn ? 'русском' : 'английском') + ' на ' + Math.abs(nRu - nEn) + ' больше.');
+
+        // Подсказка с готовым действием
+        suggest.innerHTML = ''; suggest.style.display = 'none';
+        if (!same && ex.length) {
+            var g = ex[0], lang = longIsRu ? 'русском' : 'английском', other = longIsRu ? 'английском' : 'русском';
+            var tail = looksLikeTail(longer[g]);
+            suggest.style.display = '';
+            var p = document.createElement('div');
+            p.textContent = tail && g > 0
+                ? 'Лишняя строка в ' + lang + ' списке — №' + (g + 1) + '. Похоже, ссылка №' + g + ' разорвалась, и её хвост ушёл отдельной строкой.'
+                : 'В ' + lang + ' списке есть строка №' + (g + 1) + ', для которой нет пары в ' + other + ' — там не хватает ссылки на этом месте (либо строка лишняя).';
+            suggest.appendChild(p);
+            var acts = document.createElement('div'); acts.className = 'kw-suggest-actions';
+            var mk = function(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'pub-btn pub-btn-secondary pub-btn-sm'; b.textContent = label; b.addEventListener('click', function() { fn(); sync(); render(); }); acts.appendChild(b); };
+            if (g > 0) mk('Склеить №' + (g + 1) + ' с №' + g, function() { longer[g - 1] = joinRefs(longer[g - 1], longer[g]); longer.splice(g, 1); });
+            mk('Вставить пропуск в ' + other + ' на место №' + (g + 1), function() { shorter.splice(g, 0, ''); });
+            mk('Убрать строку №' + (g + 1) + ' (' + lang + ')', function() { longer.splice(g, 1); });
+            suggest.appendChild(acts);
+        }
+        requestAnimationFrame(function() { table.querySelectorAll('textarea').forEach(fit); setTimeout(function() { table.querySelectorAll('textarea').forEach(fit); }, 60); });
+    }
+    window.refReload = function() { ru = lines(taRu.value); en = lines(taEn.value); render(); };
+    document.getElementById('refAddRow').addEventListener('click', function() { ru.push('новая ссылка'); en.push('new reference'); sync(); render(); });
+    window.addEventListener('resize', function() { table.querySelectorAll('textarea').forEach(fit); });
+    window.refReload();
+})();
+
 // ---- Автозаполнение по файлу ----
 (function() {
     var dropzone = document.getElementById('dropzone');
@@ -493,6 +642,7 @@ function deleteArticle() {
                 document.getElementById('f_funding_en').value = p.funding_en || '';
                 document.getElementById('f_references_text').value = (p.references || []).join('\n');
                 document.getElementById('f_references_en_text').value = (p.references_en || []).join('\n');
+                if (window.refReload) window.refReload();
                 document.getElementById('f_citation_ru').value = p.citation_ru || '';
                 document.getElementById('f_citation_en').value = p.citation_en || '';
                 document.getElementById('f_date_received').value = (p.dates && p.dates.received) || '';
