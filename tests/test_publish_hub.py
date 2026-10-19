@@ -392,6 +392,46 @@ def test_replace_is_refused_when_something_is_signed(client, issue, mf):
     assert r.status_code == 409 and mf.deleted == [] and mf.uploaded == []
 
 
+@pytest.fixture()
+def pdf_mismatch(monkeypatch):
+    """Сверка находит PDF статьи и одно расхождение; сами PDF не нужны."""
+    state = {"errors": ["англ. ссылок 7, по нумерации PDF 6"]}
+    monkeypatch.setattr(metafora_check, "load_pdfs", lambda folder: {"a.pdf": {"p1": "", "all": "", "n": 1}})
+    monkeypatch.setattr(metafora_check, "find_pdf", lambda pdfs, doi: ["a.pdf"])
+    monkeypatch.setattr(metafora_check, "check_article", lambda a, P: (list(state["errors"]), []))
+    return state
+
+
+def _row(client, issue):
+    return client.get(f"/admin/publish/issue/{issue.id}/check").get_json()
+
+
+def test_accepting_a_pdf_mismatch_unblocks_check_and_can_be_revoked(client, issue, pdf_mismatch):
+    art = PubArticle.query.one()
+    assert _row(client, issue)["articles"][0]["errors"] == pdf_mismatch["errors"]
+    r = client.post(f"/admin/publish/issue/{issue.id}/check/accept", json={"article_id": art.id})
+    assert r.status_code == 200 and r.get_json()["accepted"] is True
+    row = _row(client, issue)["articles"][0]
+    assert row["errors"] == [] and row["accepted"] is True and any("принято вручную" in w for w in row["warnings"])
+    client.post(f"/admin/publish/issue/{issue.id}/check/accept", json={"article_id": art.id, "revoke": True})
+    assert _row(client, issue)["articles"][0]["errors"] == pdf_mismatch["errors"]
+
+
+def test_accepted_mismatch_does_not_cover_a_new_error(client, issue, pdf_mismatch):
+    art = PubArticle.query.one()
+    client.post(f"/admin/publish/issue/{issue.id}/check/accept", json={"article_id": art.id})
+    pdf_mismatch["errors"] = ["англ. ссылок 7, по нумерации PDF 6", "нет УДК"]
+    assert _row(client, issue)["articles"][0]["errors"] == ["нет УДК"]
+    pdf_mismatch["errors"] = ["англ. ссылок 8, по нумерации PDF 6"]   # текст изменился — принятие не действует
+    assert _row(client, issue)["articles"][0]["errors"] == pdf_mismatch["errors"]
+
+
+def test_nothing_to_accept_without_mismatch(client, issue, pdf_mismatch):
+    pdf_mismatch["errors"] = []
+    r = client.post(f"/admin/publish/issue/{issue.id}/check/accept", json={"article_id": PubArticle.query.one().id})
+    assert r.status_code == 409
+
+
 def test_remove_deletes_file_and_forgets_state(client, issue, mf):
     client.post(f"/admin/publish/issue/{issue.id}/metafora/start", json={})
     r = client.post(f"/admin/publish/issue/{issue.id}/metafora/remove")

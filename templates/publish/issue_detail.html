@@ -448,6 +448,13 @@
                 var tr = rows.filter(function(r) { return r.dataset.article === String(a.id); })[0];
                 if (!tr) return;
                 setMsgs(tr, a.errors, a.warnings, 'chk');
+                if (a.pdf && (a.errors.length || a.accepted)) {
+                    var li = el('li', null), btn = el('button', 'pub-btn pub-btn-ghost pub-btn-sm', a.accepted ? 'Снять принятие' : 'Принять как есть');
+                    btn.type = 'button';
+                    btn.title = a.accepted ? 'Снова считать расхождения с PDF ошибкой' : 'В напечатанном PDF ошибка, а в черновике верно — не считать расхождение ошибкой';
+                    btn.addEventListener('click', function() { acceptMismatch(a, btn); });
+                    li.dataset.src = 'chk'; li.appendChild(btn); tr.querySelector('.js-msgs').appendChild(li);
+                }
                 setMark(tr, a.errors.length ? 'bad' : (a.warnings.length ? 'warn' : 'ok'), a.errors.length ? '✗' : (a.warnings.length ? '!' : '✓'));
                 var pdf = tr.querySelector('.js-pdf');
                 pdf.textContent = a.pdf || 'нет';
@@ -469,6 +476,18 @@
                 send.disabled = !(d.ok && KEY_SET);
                 send.title = d.ok ? '' : 'Сначала устраните расхождения с PDF';
             }
+        });
+    }
+
+    function acceptMismatch(a, btn) {
+        var revoke = !!a.accepted;
+        if (!revoke && !confirm('Принять расхождение с PDF как есть?\n\n' + a.errors.join('\n') +
+                '\n\nДелайте это, только если в напечатанном PDF ошибка верстки, а в черновике данные верные. ' +
+                'Принято будет именно это; любое другое расхождение снова остановит отправку.')) return;
+        btn.disabled = true;
+        api('POST', '/check/accept', { article_id: a.id, revoke: revoke }).then(function(res) {
+            if (!res.ok) { btn.disabled = false; showToast(res.data.error || 'Не получилось', 'error'); return; }
+            runCheck();
         });
     }
 

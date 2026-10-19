@@ -58,6 +58,38 @@ def mf_save_state(issue_id, state):
         json.dump(state, f, ensure_ascii=False, indent=2)
 
 
+# ---------------------------------------------------------------- принятые расхождения с PDF
+
+def accepted_path(issue_id):
+    return os.path.join(PUB_EXPORTS_FOLDER, f'{int(issue_id)}_pdf_accepted.json')
+
+
+def accepted_load(issue_id):
+    """{id статьи: {'errors': [тексты принятых ошибок], 'at': время}}. Ошибка принята, только если её текст совпал дословно:
+    поменялись данные или PDF — сообщение стало другим, и принятие не действует."""
+    try:
+        with open(accepted_path(issue_id), encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def accepted_save(issue_id, data):
+    os.makedirs(PUB_EXPORTS_FOLDER, exist_ok=True)
+    with open(accepted_path(issue_id), 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def apply_accepted(issue_id, article_id, errors, warnings):
+    """Принятые вручную ошибки сверки с PDF переходят в замечания. -> (ошибки, замечания, принято)"""
+    ok = set((accepted_load(issue_id).get(str(article_id)) or {}).get('errors') or [])
+    taken = [e for e in errors if e in ok]
+    if not taken:
+        return errors, warnings, []
+    return ([e for e in errors if e not in ok],
+            warnings + [f'принято вручную, в PDF иначе: {e}' for e in taken], taken)
+
+
 def _now():
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
@@ -232,11 +264,40 @@ def register_publish_hub_routes(app):
             else:
                 seen.add(hit[0])
                 errors, warnings = metafora_check.check_article(data, pdfs[hit[0]])
-                row.update(pdf=hit[0], errors=errors, warnings=warnings + ([kw_note] if kw_note else []))
+                errors, warnings, taken = apply_accepted(issue_id, art.id, errors, warnings)
+                row.update(pdf=hit[0], errors=errors, warnings=warnings + ([kw_note] if kw_note else []),
+                           accepted=bool(taken))
             rows.append(row)
         orphans = [k for k, v in pdfs.items() if k not in seen and publish_import._DOI_RE.search(v['p1'])]
         return jsonify({'articles': rows, 'problems': problems, 'orphan_pdfs': orphans,
                         'ok': not problems and not orphans and all(not r['errors'] for r in rows)})
+
+    @app.route('/admin/publish/issue/<int:issue_id>/check/accept', methods=['POST'])
+    @publish_required
+    def admin_publish_issue_check_accept(issue_id):
+        """«Принять как есть»: в напечатанном PDF ошибка верстки, а в черновике данные верные. Принимаются именно те ошибки,
+        которые сверка показывает сейчас; другие, появившиеся позже, снова остановят отправку. «Снять принятие» — revoke."""
+        issue = PubIssue.query.get_or_404(issue_id)
+        body = request.get_json(silent=True) or {}
+        art = next((a for a in issue.articles if a.id == body.get('article_id')), None)
+        if art is None:
+            return _json_error('Статья не найдена в выпуске.', 404)
+        acc = accepted_load(issue_id)
+        if body.get('revoke'):
+            acc.pop(str(art.id), None)
+            accepted_save(issue_id, acc)
+            return jsonify({'accepted': False})
+        pdfs = metafora_check.load_pdfs(publish_import.issue_pdf_dir(issue_id))
+        hit = metafora_check.find_pdf(pdfs, art.doi)
+        if len(hit) != 1:
+            return _json_error('Принимать можно только расхождения с найденным PDF статьи.', 409)
+        data = metafora_check.articles_from_xml(issue_xml(issue))[issue.articles.index(art)]
+        errors, _ = metafora_check.check_article(data, pdfs[hit[0]])
+        if not errors:
+            return _json_error('Расхождений с PDF нет — принимать нечего.', 409)
+        acc[str(art.id)] = {'errors': errors, 'at': _now()}
+        accepted_save(issue_id, acc)
+        return jsonify({'accepted': True, 'errors': errors})
 
     @app.route('/admin/publish/issue/<int:issue_id>/delete', methods=['POST'])
     @publish_required
@@ -453,7 +514,7 @@ def register_publish_hub_routes(app):
     @publish_required
     def admin_publish_metafora_verify(issue_id):
         """Шаг 4 (по одной статье): то, что лежит в Метафоре, сверяется с PDF."""
-        PubIssue.query.get_or_404(issue_id)
+        issue = PubIssue.query.get_or_404(issue_id)
         uid = request.args.get('uid') or ''
         state, art = _state_article(issue_id, uid)
         if not art:
@@ -468,6 +529,9 @@ def register_publish_hub_routes(app):
             errors, warnings = ['нет PDF этой статьи — сверить не с чем'], []
         else:
             errors, warnings = metafora_check.check_article(data, pdfs[hit[0]])
+            mine = next((a for a in issue.articles if a.doi == data['doi']), None)
+            if mine:
+                errors, warnings, _ = apply_accepted(issue_id, mine.id, errors, warnings)
         art.update(verified_at=_now(), verify_errors=errors, has_pdf=bool(data.get('has_pdf')),
                    signed_at=data.get('signed_at'))
         mf_save_state(issue_id, state)
