@@ -48,7 +48,8 @@ def tree():
     }
 
 
-CFG = {"host": "h", "port": 21, "user": "u", "password": "p", "tls": "no", "root": "/журналы текущие", "encoding": "utf-8"}
+CFG = {"host": "h", "port": 21, "user": "u", "password": "p", "tls": "no", "root": "/журналы текущие", "encoding": "utf-8",
+       "years_back": None}      # деревья в старых тестах — без папок-годов, поэтому без ограничения по годам
 
 
 def test_parse_unix_and_dos_listing_lines():
@@ -86,8 +87,8 @@ def test_diff_new_changed_removed():
 def test_latest_issue_per_journal_is_numeric_not_alphabetic():
     snap = fw.scan(FakeFTP(tree()), "/журналы текущие")
     latest = fw.latest_per_journal(snap)
-    assert latest["Радиотехника"][0] == "10"           # а не «9»: по номеру, не по алфавиту
-    assert latest["Успехи"][0] == "9"
+    assert latest["Радиотехника"][0] == "№10"          # а не «№9»: по номеру, не по алфавиту
+    assert latest["Успехи"][0] == "№9"
 
 
 def test_summary_first_run_then_no_changes_then_new_issue():
@@ -329,3 +330,67 @@ def test_unreadable_folder_is_skipped_and_reported_not_a_crash():
             raise PermissionError(13, "Permission denied")
     with pytest.raises(PermissionError):
         fw.scan(_Broken(tree()), "/журналы текущие")
+
+
+# ---------------------------------------------------------------- настоящая структура: журнал / год / папка номера
+
+def year_tree():
+    t = "20261019090000"
+    return {
+        "/Журналы текущие": [("Радиотехника", "dir", 0, t), ("Электромагнитные волны", "dir", 0, t), ("1111111", "dir", 0, t),
+                             ("#recycle", "dir", 0, t), ("._DAV", "dir", 0, t), (".DS_Store", "file", 6, t), ("Painter Presets.sqlrsr", "file", 9, t)],
+        "/Журналы текущие/Радиотехника": [("2008", "dir", 0, t), ("2025", "dir", 0, t), ("2026", "dir", 0, t), ("font", "dir", 0, t)],
+        "/Журналы текущие/Радиотехника/2008": [("01_2008", "dir", 0, t)],
+        "/Журналы текущие/Радиотехника/2025": [("Rt_12-2025", "dir", 0, t)],
+        "/Журналы текущие/Радиотехника/2025/Rt_12-2025": [("old.pdf", "file", 5, t)],
+        "/Журналы текущие/Радиотехника/2026": [("Rt_09-2026", "dir", 0, t), ("Rt_10-2026", "dir", 0, t)],
+        "/Журналы текущие/Радиотехника/2026/Rt_09-2026": [("макет", "dir", 0, t)],
+        "/Журналы текущие/Радиотехника/2026/Rt_09-2026/макет": [("01_Иванов.doc", "file", 100, t), ("~$01_Иванов.doc", "file", 1, t), ("01_Иванов.pdf", "file", 900, t)],
+        "/Журналы текущие/Радиотехника/2026/Rt_10-2026": [("02_Петров.docx", "file", 50, t)],
+        "/Журналы текущие/Радиотехника/font": [("a.ttf", "file", 1, t)],
+        "/Журналы текущие/Электромагнитные волны": [("2026", "dir", 0, t)],
+        "/Журналы текущие/Электромагнитные волны/2026": [("Emw_04-2026", "dir", 0, t), ("02-03_2026", "dir", 0, t)],
+        "/Журналы текущие/Электромагнитные волны/2026/Emw_04-2026": [("a.doc", "file", 1, t)],
+        "/Журналы текущие/Электромагнитные волны/2026/02-03_2026": [("b.doc", "file", 1, t)],
+    }
+
+
+YEAR_CFG = dict(CFG, root="/Журналы текущие", years_back=1)
+
+
+def test_issue_title_reads_number_and_year_from_the_folder_name():
+    assert fw.issue_title("2026", "Emw_04-2026") == ("2026 №4", (4,))
+    assert fw.issue_title("2008", "02-03_2008") == ("2008 №2-3", (2, 3))
+    assert fw.issue_title("2025", "Emv_05-2025")[0] == "2025 №5"
+    assert fw.issue_title("2026", "ЦНИРТИ_01_2026")[0] == "2026 №1"
+    assert fw.issue_title("2026", "Особый выпуск")[0] == "2026 Особый выпуск"
+
+
+def test_scan_of_the_real_layout_skips_junk_old_years_and_service_folders():
+    prune = fw.default_prune(2025)
+    snap = fw.scan(FakeFTP(year_tree()), "/Журналы текущие", prune=prune)
+    assert set(snap["files"]) == {"Радиотехника/2025/Rt_12-2025/old.pdf", "Радиотехника/2026/Rt_09-2026/макет/01_Иванов.doc",
+                                  "Радиотехника/2026/Rt_09-2026/макет/01_Иванов.pdf", "Радиотехника/2026/Rt_10-2026/02_Петров.docx",
+                                  "Электромагнитные волны/2026/Emw_04-2026/a.doc", "Электромагнитные волны/2026/02-03_2026/b.doc"}
+    assert not any("2008" in d or "font" in d or "recycle" in d or "._DAV" in d or "1111111" in d for d in snap["dirs"])
+    assert not any("~$" in f or ".DS_Store" in f or "Painter" in f for f in snap["files"])
+
+
+def test_summary_groups_by_journal_and_issue_and_latest_issue_is_by_year_then_number():
+    snap = fw.scan(FakeFTP(year_tree()), "/Журналы текущие", prune=fw.default_prune(2025))
+    assert fw._group("Радиотехника/2026/Rt_10-2026/02_Петров.docx") == ("Радиотехника", "2026 №10")
+    latest = fw.latest_per_journal(snap)
+    assert latest["Радиотехника"][0] == "2026 №10" and latest["Электромагнитные волны"][0] == "2026 №4"     # 2026 №10 > 2026 №9 > 2025 №12
+    old = {"files": {k: v for k, v in snap["files"].items() if "Rt_10-2026" not in k}, "dirs": [], "skipped": []}
+    text = fw.build_summary("Журналы текущие", snap, old, when=datetime(2026, 10, 23, 14, 0))
+    assert "<b>Радиотехника / 2026 №10</b>: +1 новых (doc 1)" in text and "Радиотехника — 2026 №10" in text
+
+
+def test_run_check_walks_only_the_current_and_previous_year_by_default(tmp_path):
+    code, text = fw.run_check(dry=True, cfg=YEAR_CFG, ftp_factory=_factory(year_tree()), snapshot_path=str(tmp_path / "s.json"),
+                              now=datetime(2026, 10, 23, 10, 0))
+    assert code == 0 and "Первая проверка" in text and "6 файлов" in text            # 2008 и «font» не считаются
+    code, text = fw.run_check(dry=True, cfg=dict(YEAR_CFG, years_back=0), ftp_factory=_factory(year_tree()),
+                              snapshot_path=str(tmp_path / "s2.json"), now=datetime(2026, 10, 23, 10, 0))
+    assert "5 файлов" in text                                                      # только 2026 (без old.pdf за 2025)
+    assert fw.config({"FTP_HOST": "h", "FTP_YEARS_BACK": "all"})["years_back"] is None and fw.config({"FTP_HOST": "h"})["years_back"] == 1

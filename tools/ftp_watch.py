@@ -52,6 +52,7 @@ def config(env=None):
         "host": host, "port": int(env.get("FTP_PORT") or (22 if proto == "sftp" else 21)), "user": env.get("FTP_USER") or "anonymous",
         "password": env.get("FTP_PASSWORD") or "", "tls": (env.get("FTP_TLS") or "auto").lower(),
         "root": (env.get("FTP_ROOT") or ("." if proto == "sftp" else "/")).strip() or "/", "encoding": env.get("FTP_ENCODING") or "utf-8",
+        "years_back": None if (env.get("FTP_YEARS_BACK") or "").lower() == "all" else int(env.get("FTP_YEARS_BACK") or 1),   # лет назад, кроме текущего; all — без ограничения
     }
 
 
@@ -188,7 +189,7 @@ def parse_list_line(line, now=None):
     return None
 
 
-def list_dir(ftp, path):
+def _list_dir_raw(ftp, path):
     """Содержимое папки: MLSD, а если сервер её не знает — LIST. -> [dict(name, is_dir, size, mtime)]."""
     if isinstance(ftp, SftpSession):
         return ftp.list(path)
@@ -213,9 +214,34 @@ def list_dir(ftp, path):
     return out
 
 
-def scan(ftp, root, max_depth=MAX_DEPTH):
+_JUNK_RE = re.compile(r"^(\._|\.DS_Store$|Thumbs\.db$|@eaDir|#recycle|\$RECYCLE|~\$|\.AppleDouble|\.TemporaryItems)", re.I)
+
+
+def list_dir(ftp, path):
+    """Содержимое папки без служебного мусора (корзина NAS, «._DAV», .DS_Store, временные файлы Word)."""
+    return [e for e in _list_dir_raw(ftp, path) if not _JUNK_RE.match(e["name"])]
+
+
+_YEAR_RE = re.compile(r"^(?:19|20)\d\d$")
+
+
+def default_prune(min_year):
+    """Что не обходить при слежении: папки журналов с одними цифрами (служебные), в журнале — всё, кроме папок-годов не старше
+    min_year (архив с 2008 года не нужен, «font», «TEMP» тоже), файлы прямо в корне. -> prune(родитель, имя, это_папка)."""
+    def prune(rel, name, is_dir):
+        depth = rel.count("/") + 1 if rel else 0
+        if depth == 0:
+            return name.isdigit() if is_dir else True
+        if depth == 1:
+            return not (is_dir and _YEAR_RE.match(name) and int(name) >= min_year)
+        return False
+    return prune
+
+
+def scan(ftp, root, max_depth=MAX_DEPTH, prune=None):
     """Обход папки в ширину. -> {'files': {путь_от_корня: [размер, mtime]}, 'dirs': [путь, …], 'skipped': [путь, …]}.
-    Папка, которую пользователь читать не может (нет прав), пропускается и попадает в 'skipped' — обход из-за неё не падает."""
+    Папка, которую пользователь читать не может (нет прав), пропускается и попадает в 'skipped' — обход из-за неё не падает.
+    prune(родитель, имя, это_папка) -> True: не заходить/не учитывать (см. default_prune)."""
     files, dirs, skipped = {}, [], []
     queue = [("", 0)]
     while queue:
@@ -229,6 +255,8 @@ def scan(ftp, root, max_depth=MAX_DEPTH):
             skipped.append(rel)
             continue
         for e in sorted(entries, key=lambda x: x["name"]):
+            if prune and prune(rel, e["name"], e["is_dir"]):
+                continue
             p = f"{rel}/{e['name']}" if rel else e["name"]
             if e["is_dir"]:
                 dirs.append(p)
@@ -250,9 +278,24 @@ def diff(old, new):
     return {"added": added, "changed": changed, "removed": removed}
 
 
+def issue_title(year, folder):
+    """Папка номера «Emw_04-2026» в папке года 2026 -> («2026 №4», (4,)); «02-03_2008» -> («2008 №2-3», (2, 3)).
+    Номер — первое число из 1–2 цифр после вычёркивания года. Не нашли — название папки как есть."""
+    rest = re.sub(r"(?:19|20)\d\d", " ", folder)
+    m = re.search(r"(?<!\d)(\d{1,2})(?:\s*[-_–]\s*(\d{1,2}))?(?!\d)", rest)
+    if not m:
+        return f"{year} {folder}", (999,)
+    nums = tuple(int(x) for x in m.groups() if x)
+    return f"{year} №" + "-".join(str(n) for n in nums), nums
+
+
 def _group(path):
-    """Журнал / выпуск по пути: «Радиотехника/8/DOC/a.doc» -> («Радиотехника», «8»)."""
+    """Журнал / выпуск по пути. Структура на сервере: журнал / год / папка номера / файлы —
+    «Радиотехника/2026/Rt_09-2026/макет/doc/a.doc» -> («Радиотехника», «2026 №9»). Без папок-годов:
+    «Радиотехника/8/DOC/a.doc» -> («Радиотехника», «8»)."""
     parts = path.split("/")
+    if len(parts) > 2 and _YEAR_RE.match(parts[1]):
+        return (parts[0], issue_title(parts[1], parts[2])[0] if len(parts) > 3 else parts[1])
     return (parts[0], parts[1] if len(parts) > 2 else "")
 
 
@@ -269,17 +312,29 @@ def _num_key(s):
     return (0, int(m.group(0)), s) if m else (1, 0, s or "")
 
 
+def _issue_info(path):
+    """(ключ сортировки, подпись) выпуска, к которому относится файл, или None (файл не в папке номера)."""
+    parts = path.split("/")
+    if len(parts) > 3 and _YEAR_RE.match(parts[1]):
+        title, nums = issue_title(parts[1], parts[2])
+        return (int(parts[1]), nums), title
+    if len(parts) > 2 and not _YEAR_RE.match(parts[1]):
+        return (0, _num_key(parts[1])), f"№{parts[1]}"
+    return None
+
+
 def latest_per_journal(snapshot):
-    """Для каждого журнала: самый большой номер выпуска (по имени папки) и время последнего файла в нём."""
+    """Для каждого журнала: самый поздний выпуск (год, потом номер — по именам папок) и время последнего файла в нём."""
     best = {}
     for path, (size, mtime) in snapshot["files"].items():
-        journal, issue = _group(path)
-        if not issue:
+        info = _issue_info(path)
+        if not info:
             continue
+        key, title = info
+        journal = path.split("/")[0]
         cur = best.get(journal)
-        key = _num_key(issue)
         if cur is None or key > cur[0]:
-            best[journal] = [key, issue, mtime]
+            best[journal] = [key, title, mtime]
         elif key == cur[0] and mtime > cur[2]:
             cur[2] = mtime
     return {j: (v[1], v[2]) for j, v in best.items()}
@@ -329,7 +384,7 @@ def build_summary(root_label, new_snap, old_snap, when=None):
         lines.append("")
         lines.append("Последний выпуск по журналам (по папкам):")
         for journal, (issue, mtime) in sorted(latest.items()):
-            lines.append(f"  {esc(journal)} — №{esc(issue)} ({_fmt_mtime(mtime)})")
+            lines.append(f"  {esc(journal)} — {esc(issue)} ({_fmt_mtime(mtime)})")
     text = "\n".join(lines)
     if len(text) > TELEGRAM_LIMIT:
         text = text[:TELEGRAM_LIMIT].rsplit("\n", 1)[0] + "\n… (сводка обрезана)"
@@ -386,7 +441,8 @@ def run_check(dry=False, cfg=None, ftp_factory=None, snapshot_path=SNAPSHOT_PATH
         return 2, "FTP не настроен: выполните «tools/ftp_watch.py setup»."
     ftp, mode = (ftp_factory or connect)(cfg)
     try:
-        new = scan(ftp, cfg["root"])
+        years_back = cfg.get("years_back", 1)
+        new = scan(ftp, cfg["root"], prune=None if years_back is None else default_prune((now or datetime.now()).year - years_back))
     finally:
         try:
             ftp.quit()
