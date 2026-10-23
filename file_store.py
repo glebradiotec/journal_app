@@ -163,6 +163,38 @@ def list_folder(rel, refresh=False):
     return entries
 
 
+def current_year():
+    return datetime.now().year
+
+
+def latest_year(entries):
+    """Папка года для показа: самая поздняя из свежих (текущий или прошлый год). Журнал без неё — не журнал (служебная папка
+    «1111111», брошенный «Наноматериалы…» с 2019 годом) и в списке не показывается."""
+    for y in sorted((e["name"] for e in entries if e["is_dir"] and _YEAR_RE.match(e["name"])), reverse=True):
+        if int(y) >= current_year() - 1:
+            return y
+    return None
+
+
+def journals():
+    """Журналы файлового сервера: [dict(name, year, issues=[имена папок номеров], mtime)] — только с папкой свежего года."""
+    out = []
+    for e in list_folder(""):
+        if not e["is_dir"]:
+            continue
+        try:
+            sub = list_folder(e["name"])
+            year = latest_year(sub)
+            if not year:
+                continue
+            issues = [i for i in list_folder(f"{e['name']}/{year}") if i["is_dir"]]
+        except FileStoreError:
+            continue                                   # папку журнала не прочитали — остальные показываем
+        ymtime = next((x["mtime"] for x in sub if x["name"] == year), "")
+        out.append({"name": e["name"], "year": year, "issues": [i["name"] for i in issues], "mtime": max([ymtime] + [i["mtime"] for i in issues])})
+    return out
+
+
 def is_year(name):
     return bool(_YEAR_RE.match(name))
 

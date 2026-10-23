@@ -16,8 +16,8 @@
             <div class="pub-pagehead-text">
                 <h1 class="adm-welcome-title">{{ title }}</h1>
                 <p class="adm-welcome-sub">
-                    {% if error %}Папка не открылась{% elif not rel %}Журналы текущие · файловый сервер издательства{% else %}Файловый сервер{% endif %}
-                    {% if not error %}· папок {{ n_dirs }}, файлов {{ n_files }}{% endif %}
+                    {% if error %}Папка не открылась{% elif not rel %}Файловый сервер издательства{% else %}Файловый сервер{% endif %}
+                    {% if subtitle %}· {{ subtitle }}{% endif %}
                     {% if can_import %}· в раздел попадут .doc и .pdf из подпапок doc и pdf{% endif %}
                 </p>
             </div>
@@ -45,11 +45,14 @@
                                     <span class="fs-kind{{ ' fs-kind-dir' if r.is_dir else '' }}">{{ 'папка' if r.is_dir else r.kind }}</span>{{ r.name }}
                                 </a>
                                 {% if r.new %}<span class="pub-chip pub-chip-ok fs-new">новое</span>{% endif %}
+                                {% if r.state %}{% if r.state.url %}<a href="{{ r.state.url }}" class="pub-chip pub-chip-{{ r.state.tone }} fs-new">{{ r.state.label }}</a>{% else %}<span class="pub-chip pub-chip-{{ r.state.tone }} fs-new">{{ r.state.label }}</span>{% endif %}{% endif %}
+                                {% if r.sub %}<div class="pub-cell-sub fs-sub">{{ r.sub }}</div>{% endif %}
                             </td>
                             <td class="pub-num">{{ '' if r.is_dir else r.size|fs_size }}</td>
                             <td class="pub-cell-sub">{{ r.mtime|fs_time }}</td>
                             <td class="pub-num">
                                 {% if r.download %}<a href="{{ r.download }}" class="pub-btn pub-btn-ghost pub-btn-sm">Скачать</a>{% endif %}
+                                {% if r.import %}<a href="{{ r.import }}" class="pub-btn {{ 'pub-btn-primary' if r.state and r.state.tone == 'warn' else 'pub-btn-ghost' }} pub-btn-sm">Загрузить в раздел</a>{% endif %}
                                 {% if r.zip %}<a href="{{ r.zip }}" class="pub-btn pub-btn-ghost pub-btn-sm">Архив</a>{% endif %}
                             </td>
                         </tr>

@@ -52,8 +52,13 @@ def make_tree():
     j = ROOT + "/Радиотехника"
     i = j + "/2026/8"
     tree = {
-        ROOT: [("Радиотехника", "dir", 0, T), ("Rt_10", "dir", 0, T), ("Rt_9", "dir", 0, T), ("note.txt", "file", 3, T)],
-        j: [("2026", "dir", 0, T)],
+        ROOT: [("Радиотехника", "dir", 0, T), ("Rt_10", "dir", 0, T), ("Rt_9", "dir", 0, T), ("note.txt", "file", 3, T),
+               ("1111111", "dir", 0, T), ("Брошенный", "dir", 0, T), ("Нейрокомпьютеры", "dir", 0, T)],
+        ROOT + "/1111111": [("п а п к и", "dir", 0, T), ("Перечень ВАК", "dir", 0, T)],
+        ROOT + "/Брошенный": [("2019", "dir", 0, T), ("TEMP", "dir", 0, T)],
+        ROOT + "/Нейрокомпьютеры": [("2025", "dir", 0, T), ("2026", "dir", 0, T), ("TEMP", "dir", 0, T)],
+        ROOT + "/Нейрокомпьютеры/2026": [("Nk_01_2026", "dir", 0, T), ("Nk_04_2026", "dir", 0, T), ("Nk_05_2026", "dir", 0, T)],
+        j: [("2026", "dir", 0, T), ("TEMP", "dir", 0, T)],
         j + "/2026": [("8", "dir", 0, T), ("~$tmp.doc", "file", 1, T)],
         i: [("doc", "dir", 0, T), ("pdf", "dir", 0, T), ("Рецензии", "dir", 0, T), ("#recycle", "dir", 0, T), ("cover.pdf", "file", 5, T)],
         i + "/doc": [("01_Иванов.doc", "file", 100, T), ("~$01_Иванов.doc", "file", 1, T), ("10_Петров.docx", "file", 100, T), ("2_Сидоров.docx", "file", 100, T)],
@@ -85,6 +90,7 @@ def sftp(monkeypatch):
 
     monkeypatch.setattr(fs.fw, "config", lambda env=None: {"proto": "sftp", "root": ROOT})
     monkeypatch.setattr(fs.fw, "connect", connect)
+    monkeypatch.setattr(fs, "current_year", lambda: 2026)
     fs.reset()
     yield client
     fs.reset()
@@ -117,7 +123,7 @@ def test_recent():
 
 def test_list_folder_sorts_naturally_dirs_first_and_hides_junk(sftp):
     names = [e["name"] for e in fs.list_folder("")]
-    assert names == ["Rt_9", "Rt_10", "Радиотехника", "note.txt"]
+    assert names[:4] == ["1111111", "Rt_9", "Rt_10", "Брошенный"] and names[-1] == "note.txt"
     assert "#recycle" not in [e["name"] for e in fs.list_folder("Радиотехника/2026/8")]
     assert "~$tmp.doc" not in [e["name"] for e in fs.list_folder("Радиотехника/2026")]
 
@@ -229,17 +235,75 @@ def test_files_requires_login_and_hides_from_authors(app, client, sftp):
         assert client.get(url).status_code in (302, 403)
 
 
+def test_journals_only_those_with_a_fresh_year_folder(sftp):
+    got = {j["name"]: j for j in fs.journals()}
+    assert set(got) == {"Радиотехника", "Нейрокомпьютеры"}                 # «1111111», «Брошенный» (2019), Rt_9, Rt_10 — не журналы
+    assert got["Нейрокомпьютеры"]["year"] == "2026" and got["Нейрокомпьютеры"]["issues"] == ["Nk_01_2026", "Nk_04_2026", "Nk_05_2026"]
+
+
+def test_latest_year_ignores_stale_and_non_year_folders(sftp, monkeypatch):
+    e = lambda *names: [{"name": n, "is_dir": True} for n in names]
+    assert fs.latest_year(e("2024", "2025", "2026", "TEMP")) == "2026"
+    assert fs.latest_year(e("2018", "2019", "obl")) is None
+    monkeypatch.setattr(fs, "current_year", lambda: 2027)
+    assert fs.latest_year(e("2025", "2026")) == "2026"                    # в январе новой папки года ещё нет — показываем прошлый
+    assert fs.latest_year(e("2025")) is None
+
+
+def _issue(db, issn, name, number, pushed=False, year=2026):
+    from datetime import datetime
+    from models_publish import PubIssue
+    row = PubIssue(issn=issn, journal_name=name, year=year, number=number, pushed_at=datetime(2026, 10, 1) if pushed else None)
+    db.session.add(row)
+    db.session.commit()
+    return row
+
+
+def test_marks_match_journal_names_and_numbers(app):
+    import file_marks as fm
+    _issue(db, "1999-8554", "Нейрокомпьютеры: разработка, применение", "4")
+    _issue(db, "1999-8554", "Нейрокомпьютеры", "1", pushed=True)
+    _issue(db, "2225-0980", "Нанотехнологии: разработка, применение – XXI век", "2-3")
+    idx = fm.load_index()
+    m = fm.marks(idx, "Нейрокомпьютеры", 2026, ["Nk_01_2026", "Nk_04_2026", "Nk_05_2026", "Readme"])
+    assert [m[k][0] for k in ("Nk_01_2026", "Nk_04_2026", "Nk_05_2026")] == ["pushed", "loaded", "missing"] and "Readme" not in m
+    m = fm.marks(idx, "Нанотехнологии_разработка, применение - XXI век", 2026, ["Nano_02-03-2026", "Nano_01-2026"])
+    assert m["Nano_02-03-2026"][0] == "loaded" and m["Nano_01-2026"][0] == "missing"
+    assert fm.marks(idx, "ЦНИРТИ", 2026, ["ЦНИРТИ_01_2026"])["ЦНИРТИ_01_2026"][0] == "nojournal"
+    assert fm.counts(fm.marks(idx, "Нейрокомпьютеры", 2026, ["Nk_01_2026", "Nk_05_2026"]))["missing"] == 1
+    assert fm.same_journal("Нейрокомпьютеры", "Нейрокомпьютеры: разработка") and not fm.same_journal("Антенны", "Наукоемкие технологии")
+    assert fm.db_nums("1(1)") == (1,) and fm.db_nums("2–3") == (2, 3) and fm.db_nums("") is None
+
+
+def test_browse_root_shows_only_journals_with_marks(app, client, sftp):
+    _login(client, "user")
+    _issue(db, "0033-8486", "Радиотехника", "8")
+    html = client.get("/files/").get_data(as_text=True)
+    assert "Радиотехника" in html and "Нейрокомпьютеры" in html
+    assert "1111111" not in html and "Брошенный" not in html and "Rt_9" not in html and "note.txt" not in html
+    assert "выпусков: 3" in html and "в разделе: 1" in html                      # Радиотехника: номер 8 есть
+    assert "журнал не заведён в разделе" in html                                 # Нейрокомпьютеров в разделе нет совсем
+
+
+def test_journal_goes_straight_to_its_year_and_year_shows_marks(app, client, sftp):
+    _login(client, "user")
+    r = client.get("/files/Нейрокомпьютеры")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/files/%D0%9D%D0%B5%D0%B9%D1%80%D0%BE%D0%BA%D0%BE%D0%BC%D0%BF%D1%8C%D1%8E%D1%82%D0%B5%D1%80%D1%8B/2026")
+    _issue(db, "1999-8554", "Нейрокомпьютеры", "1")
+    html = client.get("/files/Нейрокомпьютеры/2026").get_data(as_text=True)
+    assert html.count("нет в разделе") >= 2 and "в разделе</a>" in html and "Загрузить в раздел" in html and "from=" in html
+
+
 def test_browse_pages(app, client, sftp):
     _login(client, "user")
-    r = client.get("/files/")
-    html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Радиотехника" in html and "Загрузить выпуск" not in html
-    r = client.get("/files/Радиотехника/2026/8")
-    html = r.get_data(as_text=True)
+    html = client.get("/files/Радиотехника/2026/8").get_data(as_text=True)
     assert "Загрузить выпуск в раздел" in html and "from=" in html and "новое" not in html  # файлам 2025 год — не новые
     assert "01_Иванов" not in html and "cover.pdf" in html
-    assert "Скачать папку архивом" in client.get("/files/Радиотехника/2026").get_data(as_text=True)
-    assert "Загрузить выпуск" not in client.get("/files/Радиотехника/2026").get_data(as_text=True)
+    _issue(db, "0033-8486", "Радиотехника", "7")                       # журнал в разделе есть, номера 8 — нет
+    html = client.get("/files/Радиотехника/2026").get_data(as_text=True)
+    assert "Скачать папку архивом" in html
+    assert "Загрузить выпуск в раздел" not in html
+    assert "нет в разделе" in html
 
 
 def test_browse_errors_are_shown_not_500(app, client, sftp):
