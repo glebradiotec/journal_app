@@ -197,3 +197,105 @@ def test_password_with_special_characters_survives_the_env_file(tmp_path):
     vals = dotenv_values(str(path))
     assert vals["FTP_PASSWORD"] == pw and vals["FTP_USER"] == "u" and vals["SECRET_KEY"] == "abc"
     assert open(path, encoding="utf-8").read().count("FTP_USER=") == 1
+
+
+# ---------------------------------------------------------------- SFTP
+
+import stat as _stat  # noqa: E402
+import sys as _sys  # noqa: E402
+from types import SimpleNamespace as NS  # noqa: E402
+
+
+class _FakeSftpClient:
+    """listdir_attr по словарю {путь: [(имя, 'dir'|'file'|'link', размер, unix-время)]}."""
+
+    def __init__(self, tree):
+        self.tree, self.closed = tree, False
+
+    def listdir_attr(self, path):
+        modes = {"dir": _stat.S_IFDIR | 0o755, "file": _stat.S_IFREG | 0o644, "link": _stat.S_IFLNK | 0o777}
+        return [NS(filename=n, st_mode=modes[k], st_size=sz, st_mtime=t) for n, k, sz, t in self.tree.get(path, [])]
+
+    def stat(self, path):
+        return NS(st_mode=_stat.S_IFDIR | 0o755)           # ссылка в тесте указывает на папку
+
+    def close(self):
+        self.closed = True
+
+
+def _sftp_tree():
+    t = 1760000000
+    return {
+        ".": [("журналы текущие", "dir", 0, t)],
+        "./журналы текущие": [("Радиотехника", "dir", 0, t), ("ссылка", "link", 0, t), ("readme.txt", "file", 5, t)],
+        "./журналы текущие/Радиотехника": [("9", "dir", 0, t)],
+        "./журналы текущие/Радиотехника/9": [("01_Иванов.doc", "file", 100, t), ("01_Иванов.pdf", "file", 900, t + 60)],
+        "./журналы текущие/ссылка": [("внутри.doc", "file", 1, t)],
+    }
+
+
+def test_sftp_session_lists_dirs_files_and_follows_links_and_scan_works_on_it():
+    sess = fw.SftpSession(NS(close=lambda: None), _FakeSftpClient(_sftp_tree()))
+    entries = {e["name"]: e for e in sess.list("./журналы текущие")}
+    assert entries["Радиотехника"]["is_dir"] and not entries["readme.txt"]["is_dir"]
+    assert entries["ссылка"]["is_dir"]                                   # ссылка на папку — как папка
+    assert entries["readme.txt"]["size"] == 5 and len(entries["readme.txt"]["mtime"]) == 14
+    snap = fw.scan(sess, "./журналы текущие")
+    assert set(snap["files"]) == {"readme.txt", "Радиотехника/9/01_Иванов.doc", "Радиотехника/9/01_Иванов.pdf", "ссылка/внутри.doc"}
+
+
+def test_sftp_config_defaults_port_and_root():
+    cfg = fw.config({"FTP_HOST": "85.30.219.155", "FTP_PROTO": "SFTP", "FTP_USER": "u", "FTP_PASSWORD": "p"})
+    assert (cfg["proto"], cfg["port"], cfg["root"]) == ("sftp", 22, ".")
+    assert fw.config({"FTP_HOST": "h"})["port"] == 21 and fw.config({"FTP_HOST": "h"})["root"] == "/"
+
+
+def _fake_paramiko(monkeypatch, key=b"server-key", log=None):
+    log = log if log is not None else []
+
+    class Transport:
+        def __init__(self, sock):
+            self.sock = sock
+
+        def start_client(self, timeout=None):
+            log.append("start_client")
+
+        def get_remote_server_key(self):
+            return NS(asbytes=lambda: key)
+
+        def auth_password(self, user, password):
+            log.append(("auth", user, password))
+
+        def close(self):
+            log.append("close")
+
+    class SFTPClient:
+        @staticmethod
+        def from_transport(t):
+            return _FakeSftpClient({})
+
+    monkeypatch.setitem(_sys.modules, "paramiko", NS(Transport=Transport, SFTPClient=SFTPClient))
+    monkeypatch.setattr(fw.socket, "create_connection", lambda addr, timeout=None: NS(settimeout=lambda t: None))
+    return log
+
+
+def test_sftp_connect_checks_the_server_key_before_sending_the_password(monkeypatch):
+    log = _fake_paramiko(monkeypatch)
+    cfg = dict(CFG, proto="sftp", port=22, hostkey="")
+    sess, mode = fw.connect(cfg)
+    assert mode == "SFTP" and sess.fingerprint.startswith("SHA256:") and ("auth", "u", "p") in log
+    # ключ запомнен, и он тот же — пускаем
+    sess2, _ = fw.connect(dict(cfg, hostkey=sess.fingerprint))
+    assert sess2.fingerprint == sess.fingerprint
+    # ключ изменился — пароль НЕ отправляется
+    log.clear()
+    with pytest.raises(fw.HostKeyChanged):
+        fw.connect(dict(cfg, hostkey="SHA256:другой"))
+    assert not any(isinstance(x, tuple) and x[0] == "auth" for x in log) and "close" in log
+
+
+def test_summary_label_for_the_home_folder_is_not_a_dot(tmp_path):
+    sftp_cfg = dict(CFG, proto="sftp", root=".")
+    code, text = fw.run_check(dry=True, cfg=sftp_cfg, ftp_factory=lambda c: (fw.SftpSession(NS(close=lambda: None), _FakeSftpClient(_sftp_tree())), "SFTP"),
+                              snapshot_path=str(tmp_path / "s.json"))
+    assert code == 0 and "«корень»" in text and "«.»" not in text

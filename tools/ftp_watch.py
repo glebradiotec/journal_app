@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Слежение за папкой на FTP: не появились ли новые номера журналов. Сводка — в Telegram.
+"""Слежение за папкой на FTP/SFTP: не появились ли новые номера журналов. Сводка — в Telegram.
 
   setup           спрашивает хост, логин, пароль ЗДЕСЬ, в терминале; проверяет подключение и показывает папки;
                   записывает FTP_* в .env (старый .env сохраняется). Пароль не печатается и никуда не уходит, кроме FTP и .env.
@@ -11,14 +11,18 @@
 Папка на FTP — только чтение: утилита ничего не загружает, не удаляет и не переименовывает.
 Запуск на сервере:  cd /var/www/journal_app && venv/bin/python3 tools/ftp_watch.py setup
 """
+import base64
 import ftplib
 import getpass
+import hashlib
 import html
 import json
 import os
 import re
 import shutil
+import socket
 import ssl
+import stat
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -36,15 +40,18 @@ _MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun",
 # ---------------------------------------------------------------- настройки
 
 def config(env=None):
-    """Настройки из окружения (.env подгружает вызывающий). -> dict или None, если FTP не настроен."""
+    """Настройки из окружения (.env подгружает вызывающий). -> dict или None, если FTP не настроен.
+    FTP_PROTO: «ftp» (по умолчанию; пробует FTPS) или «sftp» (SSH, порт 22; FTP_HOSTKEY — отпечаток ключа сервера)."""
     env = os.environ if env is None else env
     host = (env.get("FTP_HOST") or "").strip()
     if not host:
         return None
+    proto = (env.get("FTP_PROTO") or "ftp").strip().lower()
     return {
-        "host": host, "port": int(env.get("FTP_PORT") or 21), "user": env.get("FTP_USER") or "anonymous",
+        "proto": proto, "hostkey": (env.get("FTP_HOSTKEY") or "").strip(),
+        "host": host, "port": int(env.get("FTP_PORT") or (22 if proto == "sftp" else 21)), "user": env.get("FTP_USER") or "anonymous",
         "password": env.get("FTP_PASSWORD") or "", "tls": (env.get("FTP_TLS") or "auto").lower(),
-        "root": (env.get("FTP_ROOT") or "/").strip() or "/", "encoding": env.get("FTP_ENCODING") or "utf-8",
+        "root": (env.get("FTP_ROOT") or ("." if proto == "sftp" else "/")).strip() or "/", "encoding": env.get("FTP_ENCODING") or "utf-8",
     }
 
 
@@ -64,9 +71,67 @@ def write_env(path, updates):
 
 # ---------------------------------------------------------------- FTP
 
+class HostKeyChanged(Exception):
+    """Ключ SFTP-сервера не тот, что запомнили при настройке: либо сервер переустановили, либо кто-то подменил адрес."""
+
+
+class SftpSession:
+    """Тонкая обёртка над paramiko: список папки и закрытие. Пароль уходит на сервер только после проверки его ключа."""
+
+    def __init__(self, transport, client, fingerprint=""):
+        self.transport, self.client, self.fingerprint = transport, client, fingerprint
+
+    def list(self, path):
+        out = []
+        for a in self.client.listdir_attr(path):
+            if a.filename in (".", ".."):
+                continue
+            mode = a.st_mode or 0
+            if stat.S_ISLNK(mode):                       # ссылка: смотрим, на что она указывает
+                try:
+                    mode = self.client.stat(path.rstrip("/") + "/" + a.filename).st_mode or 0
+                except OSError:
+                    pass
+            mtime = datetime.utcfromtimestamp(a.st_mtime).strftime("%Y%m%d%H%M%S") if a.st_mtime else ""
+            out.append({"name": a.filename, "is_dir": stat.S_ISDIR(mode), "size": int(a.st_size or 0), "mtime": mtime})
+        return out
+
+    def quit(self):
+        try:
+            self.client.close()
+        finally:
+            self.transport.close()
+
+
+def key_fingerprint(key):
+    """Отпечаток ключа сервера в том виде, как его показывает ssh: SHA256:…"""
+    return "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip("=")
+
+
+def sftp_connect(cfg):
+    """SFTP-подключение. Порядок: ключ сервера -> сверка с запомненным -> только потом пароль. -> (SftpSession, 'SFTP')."""
+    import paramiko                                    # ставится отдельно (pip install paramiko); без SFTP не нужен
+    sock = socket.create_connection((cfg["host"], cfg["port"]), timeout=20)
+    sock.settimeout(60)
+    transport = paramiko.Transport(sock)
+    try:
+        transport.start_client(timeout=30)
+        fingerprint = key_fingerprint(transport.get_remote_server_key())
+        if cfg.get("hostkey") and cfg["hostkey"] != fingerprint:
+            raise HostKeyChanged(f"отпечаток ключа сервера {fingerprint} не совпадает с запомненным {cfg['hostkey']}")
+        transport.auth_password(cfg["user"], cfg["password"])
+        client = paramiko.SFTPClient.from_transport(transport)
+    except Exception:
+        transport.close()
+        raise
+    return SftpSession(transport, client, fingerprint), "SFTP"
+
+
 def connect(cfg):
     """Подключение. tls=auto: сначала шифрованное (FTPS), если сервер не умеет — обычное с предупреждением.
     -> (ftp, 'FTPS'|'FTP')."""
+    if cfg.get("proto") == "sftp":
+        return sftp_connect(cfg)
     last = None
     if cfg["tls"] in ("auto", "yes", "on", "true", "1"):
         try:
@@ -125,6 +190,8 @@ def parse_list_line(line, now=None):
 
 def list_dir(ftp, path):
     """Содержимое папки: MLSD, а если сервер её не знает — LIST. -> [dict(name, is_dir, size, mtime)]."""
+    if isinstance(ftp, SftpSession):
+        return ftp.list(path)
     out = []
     try:
         for name, facts in ftp.mlsd(path, facts=["type", "size", "modify"]):
@@ -317,7 +384,8 @@ def run_check(dry=False, cfg=None, ftp_factory=None, snapshot_path=SNAPSHOT_PATH
     new["checked_at"] = (now or datetime.now()).strftime("%Y-%m-%d %H:%M")
     new["mode"] = mode
     old = load_snapshot(snapshot_path)
-    text = build_summary(cfg["root"].strip("/") or "/", new, old, when=now)
+    label = os.path.basename(cfg["root"].rstrip("/"))
+    text = build_summary(label if label not in ("", ".") else "корень", new, old, when=now)
     if dry:
         return 0, text
     ok, why = send(text)
@@ -359,39 +427,52 @@ def cmd_setup(args):
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     from site_connect import fix_env_permissions
     current = open(ENV_PATH, encoding="utf-8").read() if os.path.exists(ENV_PATH) else ""
-    if re.search(r"^FTP_HOST=", current, re.M) and input("FTP уже настроен. Заменить? [y/N] ").strip().lower() != "y":
+    if re.search(r"^FTP_HOST=", current, re.M) and input("Подключение уже настроено. Заменить? [y/N] ").strip().lower() != "y":
         print("Ничего не изменено.")
         return 1
-    print("Подключение к FTP. Пароль при вводе не показывается.")
-    host = input("Адрес FTP (например 109.197.26.84): ").strip().replace("ftp://", "").strip("/")
-    port = input("Порт [21]: ").strip() or "21"
+    print("Подключение к серверу с файлами. Пароль при вводе не показывается.")
+    kind = input("Протокол: 1 — SFTP (через SSH, порт 22, надёжнее), 2 — FTP (порт 21) [1]: ").strip() or "1"
+    proto = "ftp" if kind == "2" else "sftp"
+    host = input("Адрес сервера (например 85.30.219.155): ").strip().replace("sftp://", "").replace("ftp://", "").strip("/")
+    default_port = "21" if proto == "ftp" else "22"
+    port = input(f"Порт [{default_port}]: ").strip() or default_port
     user = input("Логин: ").strip()
     password = getpass.getpass("Пароль: ")
     if not (host and user and password):
         print("Нужны адрес, логин и пароль. Ничего не изменено.")
         return 1
-    cfg = {"host": host, "port": int(port), "user": user, "password": password, "tls": "auto", "root": "/", "encoding": "utf-8"}
+    cfg = {"proto": proto, "hostkey": "", "host": host, "port": int(port), "user": user, "password": password,
+           "tls": "auto", "root": "." if proto == "sftp" else "/", "encoding": "utf-8"}
     print("\nПроверяю подключение…")
     try:
-        ftp, mode = connect(cfg)
-        top = [e for e in list_dir(ftp, "/")]
-        ftp.quit()
+        session, mode = connect(cfg)
+        top = list_dir(session, cfg["root"])
+        fingerprint = getattr(session, "fingerprint", "")
+        session.quit()
     except Exception as e:  # noqa: BLE001
         print("Подключиться не удалось:", str(e).replace(password, "***")[:300])
         print("Ничего не изменено: .env не тронут.")
         return 1
-    print(f"Подключено. Режим: {mode}" + (" (шифрованное соединение)" if mode == "FTPS" else
-          " — ВНИМАНИЕ: сервер не поддерживает шифрование, пароль и файлы идут открытым текстом"))
-    print("В корне FTP:")
+    if mode == "SFTP":
+        print("Подключено по SFTP (шифрованное соединение).")
+        print(f"Отпечаток ключа сервера: {fingerprint}")
+        print("Он запоминается: если ключ когда-нибудь изменится, утилита откажется подключаться и не отдаст пароль.")
+    else:
+        print(f"Подключено. Режим: {mode}" + (" (шифрованное соединение)" if mode == "FTPS" else
+              " — ВНИМАНИЕ: сервер не поддерживает шифрование, пароль и файлы идут открытым текстом"))
+    print("В начальной папке:")
     for e in top:
         print(f"   {'папка' if e['is_dir'] else 'файл '}  {e['name']}")
-    root = input("\nКакую папку отслеживать (например «журналы текущие»; Enter — корень): ").strip()
-    root = "/" + root.strip("/") if root else "/"
-    if root != "/":
+    root = input("\nКакую папку отслеживать (например «журналы текущие»; Enter — начальную): ").strip()
+    if proto == "sftp":
+        root = root if root.startswith("/") else (root.strip("/") or ".")
+    else:
+        root = "/" + root.strip("/") if root else "/"
+    if root not in (".", "/"):
         try:
-            ftp, _ = connect(cfg)
-            n = len(list_dir(ftp, root))
-            ftp.quit()
+            session, _ = connect(dict(cfg, hostkey=fingerprint))
+            n = len(list_dir(session, root))
+            session.quit()
         except Exception as e:  # noqa: BLE001
             print(f"Папка «{root}» не открывается: {str(e).replace(password, '***')[:200]}")
             return 1
@@ -401,8 +482,8 @@ def cmd_setup(args):
         return 1
     if os.path.exists(ENV_PATH):
         shutil.copy2(ENV_PATH, ENV_PATH + ".bak_before_ftp")
-    write_env(ENV_PATH, {"FTP_HOST": host, "FTP_PORT": port, "FTP_USER": user, "FTP_PASSWORD": password,
-                         "FTP_TLS": "auto", "FTP_ROOT": root, "FTP_ENCODING": "utf-8"})
+    write_env(ENV_PATH, {"FTP_PROTO": proto, "FTP_HOST": host, "FTP_PORT": port, "FTP_USER": user, "FTP_PASSWORD": password,
+                         "FTP_HOSTKEY": fingerprint, "FTP_TLS": "auto", "FTP_ROOT": root, "FTP_ENCODING": "utf-8"})
     ok, why = fix_env_permissions(ENV_PATH)
     if not ok:
         print("ВНИМАНИЕ:", why)
