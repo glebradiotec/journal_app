@@ -463,6 +463,7 @@
                 if (href.indexOf('/download/') !== -1) return false;
                 if (href.indexOf('/uploads/') !== -1) return false;
                 if (href.indexOf('/export') !== -1) return false;
+                if (href.indexOf('/files/raw/') === 0 || href.indexOf('/files/zip/') === 0) return false;
                 return true;
             }
             

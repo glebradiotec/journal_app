@@ -14,6 +14,7 @@ from flask import flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 
 import export_metafora
+import file_store
 import metafora_api
 import metafora_check
 import publish_import
@@ -174,26 +175,30 @@ def register_publish_hub_routes(app):
     def admin_publish_import():
         return render_template('publish/import.html', token=publish_import.new_token())
 
+    def _import_file():
+        """Файл для загрузки: либо присланный браузером, либо взятый с файлового сервера (поле sftp_path, раздел «Файлы»)."""
+        sftp_path = request.form.get('sftp_path')
+        if sftp_path:
+            return file_store.fetch_to_storage(sftp_path)
+        f = request.files.get('file')
+        if not f or not f.filename:
+            raise publish_import.ImportError_('Нет файла')
+        return f
+
     @app.route('/admin/publish/import/<token>/doc', methods=['POST'])
     @publish_required
     def admin_publish_import_doc(token):
-        f = request.files.get('file')
-        if not f or not f.filename:
-            return _json_error('Нет файла')
         try:
-            return jsonify(publish_import.add_doc(token, f))
-        except publish_import.ImportError_ as e:
+            return jsonify(publish_import.add_doc(token, _import_file()))
+        except (publish_import.ImportError_, file_store.FileStoreError) as e:
             return _json_error(str(e))
 
     @app.route('/admin/publish/import/<token>/pdf', methods=['POST'])
     @publish_required
     def admin_publish_import_pdf(token):
-        f = request.files.get('file')
-        if not f or not f.filename:
-            return _json_error('Нет файла')
         try:
-            return jsonify(publish_import.add_pdf(publish_import.session_pdf_dir(token), f))
-        except publish_import.ImportError_ as e:
+            return jsonify(publish_import.add_pdf(publish_import.session_pdf_dir(token), _import_file()))
+        except (publish_import.ImportError_, file_store.FileStoreError) as e:
             return _json_error(str(e))
 
     @app.route('/admin/publish/import/<token>/summary')

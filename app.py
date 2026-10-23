@@ -20,6 +20,7 @@ from routes_public import register_public_routes
 from routes_admin import register_admin_routes
 from routes_author import author_bp
 from routes_publish import register_publish_routes
+from routes_files import register_files_routes
 
 
 BASE_DIR = Path(__file__).parent
@@ -143,6 +144,7 @@ app.register_blueprint(author_bp)
 register_public_routes(app)
 register_admin_routes(app)
 register_publish_routes(app)
+register_files_routes(app)
 
 # Создаём таблицы (если новых модели добавились)
 with app.app_context():

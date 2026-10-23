@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ title if rel else "Файлы" }}{% if rel %} — файлы{% endif %}{% endblock %}
+{% block body_class %}pub-body{% endblock %}
+{% block content %}
+
+<div class="adm-layout">
+    {% include "publish/_sidebar.html" %}
+
+    <div class="adm-main">
+        <div data-gh-crumbs hidden>
+            {% if crumbs %}<a href="{{ url_for('files_browse', rel='') }}" class="gh-crumb">Файлы</a>{% else %}<span class="gh-crumb gh-crumb-current">Файлы</span>{% endif %}
+            {% for label, url in crumbs %}<span class="gh-sep">›</span>{% if loop.last %}<span class="gh-crumb gh-crumb-current">{{ label }}</span>{% else %}<a href="{{ url }}" class="gh-crumb">{{ label }}</a>{% endif %}{% endfor %}
+        </div>
+
+        <div class="pub-pagehead">
+            <div class="pub-pagehead-text">
+                <h1 class="adm-welcome-title">{{ title }}</h1>
+                <p class="adm-welcome-sub">
+                    {% if error %}Папка не открылась{% elif not rel %}Журналы текущие · файловый сервер издательства{% else %}Файловый сервер{% endif %}
+                    {% if not error %}· папок {{ n_dirs }}, файлов {{ n_files }}{% endif %}
+                    {% if can_import %}· в раздел попадут .doc и .pdf из подпапок doc и pdf{% endif %}
+                </p>
+            </div>
+            <div class="pub-pagehead-actions">
+                {% if rel %}<a href="?refresh=1" class="pub-btn pub-btn-ghost">Обновить</a>{% endif %}
+                {% if can_zip %}<a href="{{ zip_url }}" class="pub-btn pub-btn-ghost">Скачать папку архивом</a>{% endif %}
+                {% if can_import %}<a href="{{ import_url }}" class="pub-btn pub-btn-primary">Загрузить выпуск в раздел</a>{% endif %}
+            </div>
+        </div>
+
+        {% if error %}
+        <div class="pub-warning-box">{{ error }}</div>
+        {% else %}
+        <div class="adm-card">
+            <div class="fs-toolbar"><input type="search" id="fsFilter" class="pub-input" placeholder="Найти в этой папке"></div>
+            {% if rows %}
+            <div class="pub-table-wrap">
+                <table class="pub-table" id="fsTable">
+                    <thead><tr><th>Название</th><th class="pub-num">Размер</th><th>Изменён</th><th></th></tr></thead>
+                    <tbody>
+                        {% for r in rows %}
+                        <tr data-name="{{ r.name|lower }}">
+                            <td class="pub-cell-title">
+                                <a href="{{ r.url }}"{% if r.viewable %} target="_blank" rel="noopener"{% endif %} class="fs-name">
+                                    <span class="fs-kind{{ ' fs-kind-dir' if r.is_dir else '' }}">{{ 'папка' if r.is_dir else r.kind }}</span>{{ r.name }}
+                                </a>
+                                {% if r.new %}<span class="pub-chip pub-chip-ok fs-new">новое</span>{% endif %}
+                            </td>
+                            <td class="pub-num">{{ '' if r.is_dir else r.size|fs_size }}</td>
+                            <td class="pub-cell-sub">{{ r.mtime|fs_time }}</td>
+                            <td class="pub-num">
+                                {% if r.download %}<a href="{{ r.download }}" class="pub-btn pub-btn-ghost pub-btn-sm">Скачать</a>{% endif %}
+                                {% if r.zip %}<a href="{{ r.zip }}" class="pub-btn pub-btn-ghost pub-btn-sm">Архив</a>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="pub-empty">В этой папке пусто.</div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+(function() {
+    var input = document.getElementById('fsFilter'), table = document.getElementById('fsTable');
+    if (!input || !table) return;
+    input.addEventListener('input', function() {
+        var q = input.value.trim().toLowerCase();
+        table.querySelectorAll('tbody tr').forEach(function(tr) { tr.style.display = !q || tr.dataset.name.indexOf(q) !== -1 ? '' : 'none'; });
+    });
+})();
+</script>
+{% endblock %}

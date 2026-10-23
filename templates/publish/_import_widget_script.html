@@ -82,7 +82,8 @@
 
     function post(url, file) {
         var fd = new FormData();
-        fd.append('file', file, file.name);
+        if (file.sftp) fd.append('sftp_path', file.sftp);   // файл лежит на файловом сервере — сервер возьмёт его сам
+        else fd.append('file', file, file.name);
         return fetch(url, { method: 'POST', body: fd }).then(function(r) {
             return r.json().catch(function() { return { error: 'Сервер ответил с ошибкой ' + r.status }; })
                 .then(function(d) { return { ok: r.ok, data: d }; });
@@ -285,6 +286,19 @@
         } else {
             upload(Array.prototype.map.call(e.dataTransfer.files, function(f) { return { file: f, path: f.name }; }));
         }
+    }
+    // Переход из раздела «Файлы» (?from=журнал/год/номер): файлы выпуска берём с файлового сервера, без перетаскивания.
+    var fromRel = new URLSearchParams(location.search).get('from');
+    if (fromRel) {
+        document.getElementById('impWork').style.display = '';
+        document.getElementById('impProgressText').textContent = 'Смотрю папку выпуска на файловом сервере…';
+        fetch('/files/api/issue/' + fromRel.split('/').map(encodeURIComponent).join('/'), { headers: { 'Accept': 'application/json' } })
+            .then(function(r) { return r.json().catch(function() { return { error: 'Сервер ответил с ошибкой ' + r.status }; }); })
+            .then(function(d) {
+                if (!d.files) { document.getElementById('impWork').style.display = 'none'; showToast(d.error || 'Не удалось прочитать папку', 'error'); return; }
+                upload(d.files.map(function(f) { return { file: { name: f.name, sftp: f.path }, path: f.path }; }));
+            })
+            .catch(function() { document.getElementById('impWork').style.display = 'none'; showToast('Не удалось связаться с файловым сервером', 'error'); });
     }
     window.addEventListener('dragenter', onEnter);
     window.addEventListener('dragleave', onLeave);
