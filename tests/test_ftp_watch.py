@@ -427,3 +427,39 @@ def test_telegram_failure_never_leaks_the_token(monkeypatch):
     monkeypatch.setattr(requests, "post", lambda *a, **k: NS(status_code=401, text='{"description":"bad 123:SECRETTOKEN"}'))
     ok, why = fw.send_telegram("текст", {"TELEGRAM_BOT_TOKEN": "123:SECRETTOKEN", "TELEGRAM_CHAT_ID": "42"})
     assert not ok and "SECRETTOKEN" not in why
+
+
+def test_new_bot_token_is_validated_hidden_and_written_to_env(tmp_path, monkeypatch, capsys):
+    import requests
+    env = tmp_path / ".env"
+    env.write_text("SECRET_KEY=abc\nTELEGRAM_BOT_TOKEN=старый\nTELEGRAM_CHAT_ID=42\nTELEGRAM_API_BASE=https://relay.example/СЕКРЕТ\n", encoding="utf-8")
+    monkeypatch.setattr(fw, "ENV_PATH", str(env))
+    monkeypatch.setattr(fw, "_load_env", lambda: None)
+    new = "1234567890:AAHnewTOKENnewTOKENnewTOKENnewTOKEN12"
+    seen = {}
+    monkeypatch.setattr(fw.getpass, "getpass", lambda prompt="": new)
+    monkeypatch.setattr("builtins.input", lambda prompt="": "y")
+    monkeypatch.setattr(requests, "get", lambda url, timeout=None: seen.update(url=url) or NS(status_code=200, json=lambda: {"ok": True, "result": {"username": "my_bot"}}))
+    monkeypatch.setenv("TELEGRAM_API_BASE", "https://relay.example/СЕКРЕТ")
+    assert fw.cmd_token([]) == 0
+    from dotenv import dotenv_values
+    vals = dotenv_values(str(env))
+    assert vals["TELEGRAM_BOT_TOKEN"] == new and vals["TELEGRAM_CHAT_ID"] == "42" and vals["SECRET_KEY"] == "abc"
+    assert seen["url"] == f"https://relay.example/СЕКРЕТ/bot{new}/getMe"        # проверка шла через мостик
+    assert new not in capsys.readouterr().out                                    # токен на экран не печатается
+    assert (tmp_path / ".env.bak_before_token").exists()
+
+
+def test_bad_or_rejected_bot_token_changes_nothing(tmp_path, monkeypatch):
+    import requests
+    env = tmp_path / ".env"
+    env.write_text("TELEGRAM_BOT_TOKEN=старый\n", encoding="utf-8")
+    monkeypatch.setattr(fw, "ENV_PATH", str(env))
+    monkeypatch.setattr(fw, "_load_env", lambda: None)
+    monkeypatch.setattr("builtins.input", lambda prompt="": "y")
+    monkeypatch.setattr(fw.getpass, "getpass", lambda prompt="": "не токен")
+    assert fw.cmd_token([]) == 1
+    monkeypatch.setattr(fw.getpass, "getpass", lambda prompt="": "1234567890:AAHnewTOKENnewTOKENnewTOKENnewTOKEN12")
+    monkeypatch.setattr(requests, "get", lambda url, timeout=None: NS(status_code=401, json=lambda: {"ok": False, "description": "Unauthorized"}))
+    assert fw.cmd_token([]) == 1
+    assert env.read_text(encoding="utf-8") == "TELEGRAM_BOT_TOKEN=старый\n"

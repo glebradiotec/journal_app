@@ -8,6 +8,7 @@
                   ничего не отправлять и не запоминать.
   install         ставит расписание (systemd-таймер): 10:00 и 14:00 по Москве. Нужны права root.
   relay           подключает «мостик» к Telegram (если с сервера api.telegram.org недоступен).
+  token           записывает новый токен бота (после перевыпуска в @BotFather); вводится скрыто.
 
 Папка на FTP — только чтение: утилита ничего не загружает, не удаляет и не переименовывает.
 Запуск на сервере:  cd /var/www/journal_app && venv/bin/python3 tools/ftp_watch.py setup
@@ -504,6 +505,47 @@ def cmd_ls(args):
     return 0
 
 
+TOKEN_RE = re.compile(r"^\d{6,}:[A-Za-z0-9_-]{30,}$")
+
+
+def cmd_token(args):
+    """Меняет токен бота в .env после перевыпуска в @BotFather: вводится скрыто, проверяется (getMe, через мостик, если он настроен)."""
+    import requests
+    import urllib3.util.connection as _conn
+    _conn.allowed_gai_family = lambda: socket.AF_INET
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    from site_connect import fix_env_permissions
+    _load_env()
+    token = getpass.getpass("Новый токен бота (при вводе не показывается): ").strip()
+    if not TOKEN_RE.match(token):
+        print("Это не похоже на токен бота (вид 1234567890:AAH…). Ничего не изменено.")
+        return 1
+    try:
+        r = requests.get(f"{telegram_base()}/bot{token}/getMe", timeout=20)
+        data = r.json()
+    except Exception as e:  # noqa: BLE001
+        print("Telegram не ответил:", type(e).__name__, "— ничего не изменено.")
+        return 1
+    if not data.get("ok"):
+        print(f"Telegram не принял токен (http {r.status_code}): {str(data.get('description') or '')[:100]} — ничего не изменено.")
+        return 1
+    print(f"Токен принят: @{(data.get('result') or {}).get('username')}")
+    if input("Записать в .env? [y/N] ").strip().lower() != "y":
+        print("Ничего не изменено.")
+        return 1
+    if os.path.exists(ENV_PATH):
+        shutil.copy2(ENV_PATH, ENV_PATH + ".bak_before_token")
+    write_env(ENV_PATH, {"TELEGRAM_BOT_TOKEN": token})
+    ok, why = fix_env_permissions(ENV_PATH)
+    if not ok:
+        print("ВНИМАНИЕ:", why)
+        shutil.copy2(ENV_PATH + ".bak_before_token", ENV_PATH)
+        print("Прежний .env возвращён, ничего не применено.")
+        return 1
+    print("Записано. Перезапустите службу journal-bot, чтобы бот начал работать с новым токеном.")
+    return 0
+
+
 def cmd_relay(args):
     """Подключает «мостик» к Telegram: проверяет, что через него бот отвечает, и записывает TELEGRAM_API_BASE в .env."""
     import requests
@@ -674,5 +716,5 @@ def cmd_install(args):
 
 if __name__ == "__main__":
     cmd, rest = (sys.argv[1] if len(sys.argv) > 1 else ""), sys.argv[2:]
-    handler = {"setup": cmd_setup, "ls": cmd_ls, "check": cmd_check, "install": cmd_install, "relay": cmd_relay}.get(cmd)
+    handler = {"setup": cmd_setup, "ls": cmd_ls, "check": cmd_check, "install": cmd_install, "relay": cmd_relay, "token": cmd_token}.get(cmd)
     sys.exit(handler(rest) if handler else (print(__doc__) or 2))
