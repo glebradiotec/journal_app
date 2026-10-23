@@ -25,7 +25,7 @@ import ssl
 import stat
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -92,7 +92,7 @@ class SftpSession:
                     mode = self.client.stat(path.rstrip("/") + "/" + a.filename).st_mode or 0
                 except OSError:
                     pass
-            mtime = datetime.utcfromtimestamp(a.st_mtime).strftime("%Y%m%d%H%M%S") if a.st_mtime else ""
+            mtime = datetime.fromtimestamp(a.st_mtime, timezone.utc).strftime("%Y%m%d%H%M%S") if a.st_mtime else ""
             out.append({"name": a.filename, "is_dir": stat.S_ISDIR(mode), "size": int(a.st_size or 0), "mtime": mtime})
         return out
 
@@ -423,6 +423,19 @@ def cmd_ls(args):
     return 0
 
 
+def pick_folder(typed, entries):
+    """Что ввёл пользователь -> имя папки на сервере. Номер из списка, либо название без учёта регистра («журналы текущие» найдёт
+    «Журналы текущие»: на Linux регистр важен). Не нашли — возвращаем как введено."""
+    dirs = [e["name"] for e in entries if e["is_dir"]]
+    t = typed.strip()
+    if t.isdigit() and 1 <= int(t) <= len(dirs):
+        return dirs[int(t) - 1]
+    if "/" in t.strip("/"):
+        return t
+    low = [d for d in dirs if d.casefold() == t.strip("/").casefold()]
+    return low[0] if len(low) == 1 else t.strip("/")
+
+
 def cmd_setup(args):
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     from site_connect import fix_env_permissions
@@ -461,9 +474,13 @@ def cmd_setup(args):
         print(f"Подключено. Режим: {mode}" + (" (шифрованное соединение)" if mode == "FTPS" else
               " — ВНИМАНИЕ: сервер не поддерживает шифрование, пароль и файлы идут открытым текстом"))
     print("В начальной папке:")
+    n = 0
     for e in top:
-        print(f"   {'папка' if e['is_dir'] else 'файл '}  {e['name']}")
-    root = input("\nКакую папку отслеживать (например «журналы текущие»; Enter — начальную): ").strip()
+        if e["is_dir"]:
+            n += 1
+        print(f"   {str(n) + '.' if e['is_dir'] else '   '} {'папка' if e['is_dir'] else 'файл '}  {e['name']}")
+    root = input("\nКакую папку отслеживать (номер из списка или название; Enter — начальную): ").strip()
+    root = pick_folder(root, top) if root else ""
     if proto == "sftp":
         root = root if root.startswith("/") else (root.strip("/") or ".")
     else:

@@ -299,3 +299,12 @@ def test_summary_label_for_the_home_folder_is_not_a_dot(tmp_path):
     code, text = fw.run_check(dry=True, cfg=sftp_cfg, ftp_factory=lambda c: (fw.SftpSession(NS(close=lambda: None), _FakeSftpClient(_sftp_tree())), "SFTP"),
                               snapshot_path=str(tmp_path / "s.json"))
     assert code == 0 and "«корень»" in text and "«.»" not in text
+
+
+def test_folder_is_found_by_number_or_by_name_without_regard_to_case():
+    top = [{"name": "chat", "is_dir": True}, {"name": "АРХИВ", "is_dir": True}, {"name": "readme.txt", "is_dir": False},
+           {"name": "Журналы текущие", "is_dir": True}, {"name": "Книги текущие", "is_dir": True}]
+    assert fw.pick_folder("журналы текущие", top) == "Журналы текущие"       # на Linux регистр важен — находим настоящее имя
+    assert fw.pick_folder("3", top) == "Журналы текущие" and fw.pick_folder("1", top) == "chat"
+    assert fw.pick_folder("Журналы текущие/Радиотехника", top) == "Журналы текущие/Радиотехника"
+    assert fw.pick_folder("нет такой", top) == "нет такой" and fw.pick_folder("9", top) == "9"
