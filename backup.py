@@ -5,11 +5,12 @@ from datetime import datetime, timedelta
 
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '')
+TELEGRAM_API_BASE = os.environ.get('TELEGRAM_API_BASE', 'https://api.telegram.org').rstrip('/')
 
 
 def send_to_telegram(backup_file):
     """Отправляет файл бэкапа в Telegram."""
-    url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
+    url = f'{TELEGRAM_API_BASE}/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
     size_mb = os.path.getsize(backup_file) / 1024 / 1024
     caption = (
         f"📦 Бэкап БД Radiotec Journal App\n"
@@ -42,7 +43,7 @@ def send_excel_to_telegram():
         filepath = os.path.join(backups_dir, filename)
         total = generate_excel(filepath)
 
-        url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
+        url = f'{TELEGRAM_API_BASE}/bot{TELEGRAM_BOT_TOKEN}/sendDocument'
         with open(filepath, 'rb') as f:
             resp = requests.post(url, data={
                 'chat_id': TELEGRAM_CHAT_ID,

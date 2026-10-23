@@ -394,3 +394,36 @@ def test_run_check_walks_only_the_current_and_previous_year_by_default(tmp_path)
                               snapshot_path=str(tmp_path / "s2.json"), now=datetime(2026, 10, 23, 10, 0))
     assert "5 файлов" in text                                                      # только 2026 (без old.pdf за 2025)
     assert fw.config({"FTP_HOST": "h", "FTP_YEARS_BACK": "all"})["years_back"] is None and fw.config({"FTP_HOST": "h"})["years_back"] == 1
+
+
+# ---------------------------------------------------------------- Telegram через «мостик»
+
+def test_telegram_goes_through_the_relay_when_the_server_cannot_reach_telegram(monkeypatch):
+    import requests
+    seen = {}
+
+    def fake_post(url, data=None, timeout=None):
+        seen["url"] = url
+        return NS(status_code=200, text="ok")
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    env = {"TELEGRAM_BOT_TOKEN": "123:ABC", "TELEGRAM_CHAT_ID": "42"}
+    assert fw.send_telegram("текст", env) == (True, "")
+    assert seen["url"] == "https://api.telegram.org/bot123:ABC/sendMessage"
+    env["TELEGRAM_API_BASE"] = "https://relay.example.workers.dev/СЕКРЕТ/"
+    fw.send_telegram("текст", env)
+    assert seen["url"] == "https://relay.example.workers.dev/СЕКРЕТ/bot123:ABC/sendMessage"
+
+
+def test_telegram_failure_never_leaks_the_token(monkeypatch):
+    import requests
+
+    def boom(url, data=None, timeout=None):
+        raise requests.ConnectionError(f"HTTPSConnectionPool: Max retries with url: {url}")
+
+    monkeypatch.setattr(requests, "post", boom)
+    ok, why = fw.send_telegram("текст", {"TELEGRAM_BOT_TOKEN": "123:SECRETTOKEN", "TELEGRAM_CHAT_ID": "42"})
+    assert not ok and "SECRETTOKEN" not in why and "ConnectionError" in why
+    monkeypatch.setattr(requests, "post", lambda *a, **k: NS(status_code=401, text='{"description":"bad 123:SECRETTOKEN"}'))
+    ok, why = fw.send_telegram("текст", {"TELEGRAM_BOT_TOKEN": "123:SECRETTOKEN", "TELEGRAM_CHAT_ID": "42"})
+    assert not ok and "SECRETTOKEN" not in why

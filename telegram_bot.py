@@ -20,7 +20,14 @@ BOT_PASSWORD = os.environ.get('BOT_PASSWORD', '1845')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_APP_URL = 'http://127.0.0.1:8001'
 
-API = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}'
+# С некоторых серверов api.telegram.org недоступен: TELEGRAM_API_BASE — адрес «мостика» (см. tools/telegram_relay_worker.js).
+TELEGRAM_API_BASE = os.environ.get('TELEGRAM_API_BASE', 'https://api.telegram.org').rstrip('/')
+API = f'{TELEGRAM_API_BASE}/bot{TELEGRAM_BOT_TOKEN}'
+
+
+def _safe(e):
+    """Текст ошибки без токена: адрес запроса с токеном иначе попадает в журнал службы."""
+    return str(e).replace(TELEGRAM_BOT_TOKEN, '***') if TELEGRAM_BOT_TOKEN else str(e)
 POLL_INTERVAL = 2  # секунды
 
 # Авторизованные пользователи (chat_id -> True). Владелец всегда авторизован.
@@ -263,12 +270,12 @@ def main():
                     try:
                         process_update(update)
                     except Exception as e:
-                        print(f'Error processing update: {e}')
+                        print(f'Error processing update: {_safe(e)}')
 
         except requests.exceptions.Timeout:
             continue
         except Exception as e:
-            print(f'Polling error: {e}')
+            print(f'Polling error: {_safe(e)}')
             time.sleep(5)
 
 
