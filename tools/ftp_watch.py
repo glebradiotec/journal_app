@@ -214,13 +214,21 @@ def list_dir(ftp, path):
 
 
 def scan(ftp, root, max_depth=MAX_DEPTH):
-    """Обход папки в ширину. -> {'files': {путь_от_корня: [размер, mtime]}, 'dirs': [путь, …]}."""
-    files, dirs = {}, []
+    """Обход папки в ширину. -> {'files': {путь_от_корня: [размер, mtime]}, 'dirs': [путь, …], 'skipped': [путь, …]}.
+    Папка, которую пользователь читать не может (нет прав), пропускается и попадает в 'skipped' — обход из-за неё не падает."""
+    files, dirs, skipped = {}, [], []
     queue = [("", 0)]
     while queue:
         rel, depth = queue.pop(0)
         full = root.rstrip("/") + ("/" + rel if rel else "")
-        for e in sorted(list_dir(ftp, full or "/"), key=lambda x: x["name"]):
+        try:
+            entries = list_dir(ftp, full or "/")
+        except (OSError, ftplib.error_perm):
+            if not rel:
+                raise                                    # не открылась сама отслеживаемая папка — это настоящая ошибка
+            skipped.append(rel)
+            continue
+        for e in sorted(entries, key=lambda x: x["name"]):
             p = f"{rel}/{e['name']}" if rel else e["name"]
             if e["is_dir"]:
                 dirs.append(p)
@@ -228,7 +236,7 @@ def scan(ftp, root, max_depth=MAX_DEPTH):
                     queue.append((p, depth + 1))
             else:
                 files[p] = [e["size"], e["mtime"]]
-    return {"files": files, "dirs": sorted(dirs)}
+    return {"files": files, "dirs": sorted(dirs), "skipped": sorted(skipped)}
 
 
 # ---------------------------------------------------------------- сравнение и сводка
@@ -313,6 +321,9 @@ def build_summary(root_label, new_snap, old_snap, when=None):
                 if g["removed"]:
                     bits.append(f"удалено {len(g['removed'])}")
                 lines.append(f"• <b>{esc(title)}</b>: " + "; ".join(bits))
+    if new_snap.get("skipped"):
+        lines.append(f"⚠️ Не прочитал папок (нет прав): {len(new_snap['skipped'])} — {esc(', '.join(new_snap['skipped'][:3]))}"
+                     + ("…" if len(new_snap["skipped"]) > 3 else ""))
     latest = latest_per_journal(new_snap)
     if latest:
         lines.append("")
@@ -420,6 +431,10 @@ def cmd_ls(args):
     for p in sorted(p for p in snap["files"] if "/" not in p):
         print(f"  {p}")
     print(f"\nВсего: {len(snap['files'])} файлов на глубине до {depth}, {len(snap['dirs'])} папок.")
+    if snap.get("skipped"):
+        print(f"Не удалось прочитать (нет прав), пропущено папок: {len(snap['skipped'])}:")
+        for d in snap["skipped"]:
+            print(f"   {d}/")
     return 0
 
 

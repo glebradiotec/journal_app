@@ -308,3 +308,24 @@ def test_folder_is_found_by_number_or_by_name_without_regard_to_case():
     assert fw.pick_folder("3", top) == "Журналы текущие" and fw.pick_folder("1", top) == "chat"
     assert fw.pick_folder("Журналы текущие/Радиотехника", top) == "Журналы текущие/Радиотехника"
     assert fw.pick_folder("нет такой", top) == "нет такой" and fw.pick_folder("9", top) == "9"
+
+
+class _DeniedFTP(FakeFTP):
+    def mlsd(self, path, facts=None):
+        if "Успехи" in path:
+            raise PermissionError(13, "Permission denied")
+        return super().mlsd(path, facts)
+
+
+def test_unreadable_folder_is_skipped_and_reported_not_a_crash():
+    snap = fw.scan(_DeniedFTP(tree()), "/журналы текущие")
+    assert snap["skipped"] == ["Успехи"] and "Успехи/9/a.doc" not in snap["files"]
+    assert "Радиотехника/9/DOC/01_Иванов.doc" in snap["files"]                 # остальное прочитано
+    text = fw.build_summary("журналы текущие", snap, None, when=datetime(2026, 10, 23, 10, 0))
+    assert "Не прочитал папок (нет прав): 1" in text and "Успехи" in text
+    # а если не открылась сама отслеживаемая папка — это ошибка, её не прячем
+    class _Broken(FakeFTP):
+        def mlsd(self, path, facts=None):
+            raise PermissionError(13, "Permission denied")
+    with pytest.raises(PermissionError):
+        fw.scan(_Broken(tree()), "/журналы текущие")
